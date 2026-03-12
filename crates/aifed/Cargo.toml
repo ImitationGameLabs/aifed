@@ -1,0 +1,6 @@
+[package]
+name = "aifed"
+edition = "2024"
+version.workspace = true
+
+[dependencies]
