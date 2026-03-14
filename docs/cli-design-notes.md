@@ -10,17 +10,23 @@ This document records design rationale, trade-offs, and decisions. For command u
 
 Every design decision prioritizes AI usage patterns over human convenience:
 
-| Human Preference    | AI Preference            | Our Choice                   |
-| ------------------- | ------------------------ | ---------------------------- |
-| Short flags (-f)    | Long flags (--file)      | **Long flags only**          |
-| Interactive prompts | Explicit arguments       | Always explicit              |
-| Colored output      | Structured text/JSON     | `--json` for structure       |
-| Error suggestions   | Machine-parseable errors | Structured errors with codes |
+| Human Preference    | AI Preference        | Our Choice             |
+| ------------------- | -------------------- | ---------------------- |
+| Interactive prompts | Explicit arguments   | Always explicit        |
+| Colored output      | Structured text/JSON | `--json` for structure |
 
-**Why no short flags?**
-- AI doesn't benefit from typing fewer characters
-- Long flags are self-documenting (`--file` vs `-f`)
-- Consistent with AI-first philosophy: optimize for clarity, not brevity
+### One Way to Do It
+
+Avoid multiple ways to accomplish the same task. When alternatives exist, choose the clearer one and remove the other.
+
+**Rationale:**
+- Reduces decision fatigue for AI agents
+- Simplifies documentation and learning
+- Prevents inconsistent usage patterns
+
+**Examples:**
+- Single locator syntax (not `file:line` AND `file line`)
+- Long flags only (not `-f` AND `--file`)
 
 ---
 
