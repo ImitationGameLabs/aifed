@@ -32,33 +32,33 @@ aifed diff <FILE1> <FILE2>
 
 ```bash
 # Compare snapshot to current
-aifed diff main.go --from before-refactor
+aifed diff main.rs --from before-refactor
 
 # Compare two snapshots
-aifed diff main.go --from v1 --to v2
+aifed diff main.rs --from v1 --to v2
 
 # Compare two files
-aifed diff old.go new.go
+aifed diff old.rs new.rs
 
 # Show diffstat only
-aifed diff main.go --from before-refactor --stat
+aifed diff main.rs --from before-refactor --stat
 
 # More context lines
-aifed diff main.go --from before-refactor --unified 5
+aifed diff main.rs --from before-refactor --unified 5
 
 # JSON output
-aifed diff main.go --from before-refactor --json
+aifed diff main.rs --from before-refactor --json
 ```
 
 ### Output Format
 
 ```
---- main.go (before-refactor)
-+++ main.go (current)
+--- main.rs (before-refactor)
++++ main.rs (current)
 @@ -42,7 +42,7 @@
- func main() {
--    fmt.Println("old")
-+    fmt.Println("new")
+ fn main() {
+-    println!("old");
++    println!("new");
  }
 ```
 
@@ -98,19 +98,19 @@ python = "black -"
 
 ```bash
 # Format single file
-aifed format main.go
+aifed format main.rs
 
 # Format directory recursively
 aifed format src/ --recursive
 
 # Check formatting (exit 1 if not formatted)
-aifed format main.go --check
+aifed format main.rs --check
 
 # Preview changes
-aifed format main.go --dry-run
+aifed format main.rs --dry-run
 
 # JSON output
-aifed format main.go --json
+aifed format main.rs --json
 ```
 
 ### Check Mode
@@ -162,29 +162,29 @@ aifed diagnostics --all
 
 ```bash
 # After editing
-aifed replace main.go:42:abc123 "new code" --auto-fmt
+aifed replace main.rs 42:abc123 "new code" --auto-fmt
 
 # Check for errors
-aifed diagnostics main.go
+aifed diagnostics main.rs
 
 # View changes
-aifed diff main.go --from before-edit
+aifed diff main.rs --from before-edit
 ```
 
 ### Compare Before/After
 
 ```bash
 # Create snapshot
-aifed snapshot create main.go --tag before
+aifed snapshot create main.rs --tag before
 
 # Make changes
-aifed replace main.go:42:abc123 "new code"
+aifed replace main.rs 42:abc123 "new code"
 
 # View diff
-aifed diff main.go --from before
+aifed diff main.rs --from before
 
 # Restore if needed
-aifed snapshot restore main.go --tag before
+aifed snapshot restore main.rs --tag before
 ```
 
 ## See Also

@@ -6,12 +6,12 @@ Commands for modifying file content.
 
 Edit commands use **locators** to specify positions. The primary locator format is **hashline**, which combines line numbers with content hashes for safe, deterministic edits.
 
-| Format       | Example        | Description                                       |
-| ------------ | -------------- | ------------------------------------------------- |
-| `:LINE:HASH` | `:42:abc12345` | Hashline - line + hash verification (recommended) |
-| `:HASH`      | `:abc12345`    | Hash only (content-based positioning)             |
-| `:LINE`      | `:42`          | Line number only (no verification)                |
-| `:START-END` | `:10-20`       | Line range                                        |
+| Format      | Example     | Description                                       |
+| ----------- | ----------- | ------------------------------------------------- |
+| `LINE:HASH` | `42:abc123` | Hashline - line + hash verification (recommended) |
+| `HASH`      | `abc123`    | Hash only (content-based positioning)             |
+| `LINE`      | `42`        | Line number only (no verification)                |
+| `START-END` | `10-20`     | Line range                                        |
 
 See [locator.md](locator.md) for detailed documentation on locators and hashline.
 
@@ -24,7 +24,7 @@ Replace content at specified location with hash verification.
 ### Usage
 
 ```
-aifed replace <FILE>:<LOCATOR> <CONTENT>
+aifed replace <FILE> <LOCATOR> <CONTENT>
 ```
 
 ### Options
@@ -37,47 +37,47 @@ aifed replace <FILE>:<LOCATOR> <CONTENT>
 
 ### Locator Formats
 
-| Format       | Example               | Use Case                          |
-| ------------ | --------------------- | --------------------------------- |
-| `:LINE:HASH` | `main.go:42:abc12345` | Default - safest, dual validation |
-| `:HASH`      | `main.go:abc12345`    | When line number unknown          |
-| `:LINE`      | `main.go:42`          | When hash unavailable             |
-| `:START-END` | `main.go:10-20`       | Multi-line replacement            |
+| Format      | Example             | Use Case                          |
+| ----------- | ------------------- | --------------------------------- |
+| `LINE:HASH` | `main.rs 42:abc123` | Default - safest, dual validation |
+| `HASH`      | `main.rs abc123`    | When line number unknown          |
+| `LINE`      | `main.rs 42`        | When hash unavailable             |
+| `START-END` | `main.rs 10-20`     | Multi-line replacement            |
 
 ### Examples
 
 ```bash
 # Replace line 42 with hash verification
-aifed replace main.go:42:abc12345 "func main() {"
+aifed replace main.rs 42:abc123 "fn main() {"
 
 # Replace using hash only
-aifed replace main.go:abc12345 "func main() {"
+aifed replace main.rs abc123 "fn main() {"
 
 # Replace multi-line range
-aifed replace main.go:10-15 <<EOF
-func newFunc() {
-    return nil
+aifed replace main.rs 10-15 <<EOF
+fn new_func() -> Option<i32> {
+    None
 }
 EOF
 
 # With auto-format
-aifed replace main.go:42:abc12345 "func main(){" --auto-fmt
+aifed replace main.rs 42:abc123 "fn main(){" --auto-fmt
 
 # Preview changes
-aifed replace main.go:42:abc12345 "func main() {" --dry-run
+aifed replace main.rs 42:abc123 "fn main() {" --dry-run
 ```
 
 ### Content Input Methods
 
 ```bash
 # Direct argument
-aifed replace file.go:42:abc123 "content"
+aifed replace lib.rs 42:abc123 "content"
 
 # From stdin
-echo "content" | aifed replace file.go:42:abc123 -
+echo "content" | aifed replace lib.rs 42:abc123 -
 
 # Multi-line via heredoc
-aifed replace file.go:10-15 <<EOF
+aifed replace lib.rs 10-15 <<EOF
 line 1
 line 2
 EOF
@@ -107,31 +107,29 @@ aifed insert <FILE> --before <LOCATOR> <CONTENT>
 
 ### Locator Formats for `--after`/`--before`
 
-| Format      | Example       | Description                                      |
-| ----------- | ------------- | ------------------------------------------------ |
-| `LINE:HASH` | `10:abc12345` | Line number with hash verification (recommended) |
-| `LINE`      | `10`          | Line number only (no verification)               |
-
-Note: For insert, the locator format is `LINE:HASH` (no leading colon).
+| Format      | Example     | Description                                      |
+| ----------- | ----------- | ------------------------------------------------ |
+| `LINE:HASH` | `10:abc123` | Line number with hash verification (recommended) |
+| `LINE`      | `10`        | Line number only (no verification)               |
 
 ### Examples
 
 ```bash
 # Insert after line 10 with hash verification
-aifed insert main.go --after 10:abc12345 "    fmt.Println(\"hello\")"
+aifed insert main.rs --after 10:abc123 "    println!(\"hello\");"
 
 # Insert before line 1 (prepend)
-aifed insert main.go --before 1:def456 "// Copyright 2026"
+aifed insert main.rs --before 1:def456 "// Copyright 2026"
 
 # Insert multi-line content
-aifed insert main.go --after 42:ghi789 <<EOF
-func helper() {
-    return 42
+aifed insert main.rs --after 42:ghi789 <<EOF
+fn helper() -> i32 {
+    42
 }
 EOF
 
 # With auto-format
-aifed insert main.go --after 10:abc123 "    new code" --auto-fmt
+aifed insert main.rs --after 10:abc123 "    new code" --auto-fmt
 ```
 
 ---
@@ -143,7 +141,7 @@ Delete content at specified location with hash verification.
 ### Usage
 
 ```
-aifed delete <FILE>:<LOCATOR>
+aifed delete <FILE> <LOCATOR>
 ```
 
 ### Options
@@ -155,27 +153,27 @@ aifed delete <FILE>:<LOCATOR>
 
 ### Locator Formats
 
-| Format       | Example               | Use Case                          |
-| ------------ | --------------------- | --------------------------------- |
-| `:LINE:HASH` | `main.go:42:abc12345` | Default - safest, dual validation |
-| `:HASH`      | `main.go:abc12345`    | When line number unknown          |
-| `:LINE`      | `main.go:42`          | When hash unavailable             |
-| `:START-END` | `main.go:10-20`       | Multi-line deletion               |
+| Format      | Example             | Use Case                          |
+| ----------- | ------------------- | --------------------------------- |
+| `LINE:HASH` | `main.rs 42:abc123` | Default - safest, dual validation |
+| `HASH`      | `main.rs abc123`    | When line number unknown          |
+| `LINE`      | `main.rs 42`        | When hash unavailable             |
+| `START-END` | `main.rs 10-20`     | Multi-line deletion               |
 
 ### Examples
 
 ```bash
 # Delete line 42 with hash verification
-aifed delete main.go:42:abc12345
+aifed delete main.rs 42:abc123
 
 # Delete using hash only
-aifed delete main.go:abc12345
+aifed delete main.rs abc123
 
 # Delete multi-line range
-aifed delete main.go:10-15
+aifed delete main.rs 10-15
 
 # Preview changes
-aifed delete main.go:42:abc12345 --dry-run
+aifed delete main.rs 42:abc123 --dry-run
 ```
 
 ---
@@ -202,7 +200,7 @@ insert --before <LOCATOR> <CONTENT>
 delete <LOCATOR>
 ```
 
-Note: For edit, locator format is `LINE:HASH` (no leading colon).
+Note: Locator format is `LINE:HASH` (e.g., `42:abc123`).
 
 ### Options
 
@@ -235,23 +233,23 @@ Hashes are content-based, so they remain valid regardless of other edits.
 
 ```bash
 # Interactive edit operations
-aifed edit main.go <<EOF
-replace 42:abc12345 "func main() {"
-insert --after 10:def456 "    fmt.Println(\"hello\")"
+aifed edit main.rs <<EOF
+replace 42:abc123 "fn main() {"
+insert --after 10:def456 "    println!(\"hello\");"
 delete 15:ghi789
 EOF
 
 # From file
-aifed edit main.go --file ops.txt
+aifed edit main.rs --file ops.txt
 
 # From stdin
-cat ops.txt | aifed edit main.go --file -
+cat ops.txt | aifed edit main.rs --file -
 
 # Preview changes
-aifed edit main.go --file ops.txt --dry-run
+aifed edit main.rs --file ops.txt --dry-run
 
 # Continue on failures
-aifed edit main.go --file ops.txt --continue
+aifed edit main.rs --file ops.txt --continue
 ```
 
 ### Failure Handling
@@ -262,5 +260,5 @@ aifed edit main.go --file ops.txt --continue
 ## See Also
 
 - [Locator Reference](locator.md) - Detailed locator documentation
-- [File Operations](file-operations.md) - Getting hashes with info/read
+- [Read Commands](read-commands.md) - Getting hashes with info/read
 - [History & Snapshots](history.md) - Undoing edits

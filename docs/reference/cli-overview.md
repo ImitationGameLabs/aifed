@@ -12,7 +12,7 @@ aifed [OPTIONS] <COMMAND>
 
 | Option            | Description                                    |
 | ----------------- | ---------------------------------------------- |
-| `--json`          | Output in JSON format (for AI consumption)     |
+| `--json`          | Output in JSON format                          |
 | `--no-color`      | Disable colored output                         |
 | `--quiet`         | Suppress non-essential output                  |
 | `--dir <DIR>`     | Change working directory before executing      |

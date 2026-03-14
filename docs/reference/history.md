@@ -47,16 +47,16 @@ Snapshots are stored in `.aifed/snapshots/` within the project directory.
 
 ```bash
 # Create snapshot before risky edit
-aifed snapshot create main.go --tag before-refactor
+aifed snapshot create main.rs --tag before-refactor
 
 # List snapshots
-aifed snapshot list main.go
+aifed snapshot list main.rs
 
 # Restore to previous state
-aifed snapshot restore main.go --tag before-refactor
+aifed snapshot restore main.rs --tag before-refactor
 
 # Delete old snapshot
-aifed snapshot delete main.go --tag old-snapshot
+aifed snapshot delete main.rs --tag old-snapshot
 ```
 
 ### Snapshot Retention
@@ -104,16 +104,16 @@ aifed history <FILE>
 
 ```bash
 # View recent history
-aifed history main.go
+aifed history main.rs
 
 # Show last 20 edits
-aifed history main.go --last 20
+aifed history main.rs --last 20
 
 # Show full diffs
-aifed history main.go --full
+aifed history main.rs --full
 
 # JSON output
-aifed history main.go --json
+aifed history main.rs --json
 ```
 
 ### History vs Git
@@ -184,13 +184,13 @@ aifed undo <FILE>
 
 ```bash
 # Undo last edit
-aifed undo main.go
+aifed undo main.rs
 
 # Undo last 3 edits
-aifed undo main.go --steps 3
+aifed undo main.rs --steps 3
 
 # Preview undo
-aifed undo main.go --dry-run
+aifed undo main.rs --dry-run
 ```
 
 ### Undo Granularity
@@ -205,22 +205,22 @@ aifed undo main.go --dry-run
 
 ```bash
 # 1. Create snapshot before major changes
-aifed snapshot create main.go --tag before-refactor
+aifed snapshot create main.rs --tag before-refactor
 
 # 2. Make edits
-aifed replace main.go:42:abc123 "new code"
+aifed replace main.rs 42:abc123 "new code"
 
 # 3. Check history
-aifed history main.go
+aifed history main.rs
 
 # 4. If something went wrong, undo
-aifed undo main.go
+aifed undo main.rs
 
 # 5. Or restore to snapshot
-aifed snapshot restore main.go --tag before-refactor
+aifed snapshot restore main.rs --tag before-refactor
 
 # 6. Clean up snapshot when done
-aifed snapshot delete main.go --tag before-refactor
+aifed snapshot delete main.rs --tag before-refactor
 ```
 
 ## Configuration

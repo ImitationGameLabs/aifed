@@ -4,16 +4,16 @@ This directory contains reference documentation for all **aifed** commands and c
 
 ## Quick Navigation
 
-| Category                | Description                                       | Reference                                |
-| ----------------------- | ------------------------------------------------- | ---------------------------------------- |
-| **CLI Overview**        | Global options, environment variables, exit codes | [cli-overview.md](cli-overview.md)       |
-| **Locator**             | Positioning mechanism for safe edits              | [locator.md](locator.md)                 |
-| **Edit Commands**       | replace, insert, delete, edit                     | [edit-commands.md](edit-commands.md)     |
-| **File Operations**     | info, read                                        | [file-operations.md](file-operations.md) |
-| **LSP Integration**     | diagnostics, symbols, rename, etc.                | [lsp.md](lsp.md)                         |
-| **History & Snapshots** | snapshot, history, undo                           | [history.md](history.md)                 |
-| **Configuration**       | config command and file format                    | [configuration.md](configuration.md)     |
-| **Utilities**           | diff, format                                      | [utilities.md](utilities.md)             |
+| Category                | Description                                       | Reference                            |
+| ----------------------- | ------------------------------------------------- | ------------------------------------ |
+| **CLI Overview**        | Global options, environment variables, exit codes | [cli-overview.md](cli-overview.md)   |
+| **Locator**             | Positioning mechanism for safe edits              | [locator.md](locator.md)             |
+| **Edit Commands**       | replace, insert, delete, edit                     | [edit-commands.md](edit-commands.md) |
+| **Read Commands**       | info, read                                        | [read-commands.md](read-commands.md) |
+| **LSP Integration**     | diagnostics, symbols, rename, etc.                | [lsp.md](lsp.md)                     |
+| **History & Snapshots** | snapshot, history, undo                           | [history.md](history.md)             |
+| **Configuration**       | config command and file format                    | [configuration.md](configuration.md) |
+| **Utilities**           | diff, format                                      | [utilities.md](utilities.md)         |
 
 ## Command Categories
 
@@ -24,8 +24,8 @@ This directory contains reference documentation for all **aifed** commands and c
 - [`edit`](edit-commands.md#edit) - Atomic batch operations
 
 ### File Information
-- [`info`](file-operations.md#info) - Get file metadata and hashes
-- [`read`](file-operations.md#read) - Read file content
+- [`read`](read-commands.md#read) - Read file content
+- [`info`](read-commands.md#info) - Get file metadata and stats
 
 ### LSP Integration
 - [`diagnostics`](lsp.md#diagnostics) - Get errors and warnings
@@ -34,7 +34,6 @@ This directory contains reference documentation for all **aifed** commands and c
 - [`references`](lsp.md#references) - Find all references
 - [`definition`](lsp.md#definition) - Go to definition
 - [`hover`](lsp.md#hover) - Get type information
-- [`organize-imports`](lsp.md#organize-imports) - Organize imports
 
 ### History & Snapshots
 - [`snapshot`](history.md#snapshot) - Manage file snapshots
@@ -64,6 +63,38 @@ aifed is designed specifically for AI agents:
 - Explicit arguments - no interactive prompts
 - Structured JSON output with `--json`
 - Machine-parseable errors with exit codes
+
+## Document Conventions
+
+This documentation follows consistent conventions for clarity:
+
+### Hash Length
+
+All examples use **6-character hashes** (e.g., `abc123`, `def456`):
+
+```
+main.rs 42:abc123
+```
+
+**Note:** This is a provisional standard for documentation consistency. The actual hash algorithm and length are TBD - see [CLI Design Notes](../cli-design-notes.md#2-hash-algorithm) for options being considered.
+
+### Example Language
+
+All code examples use **Rust** syntax:
+
+```rust
+fn main() {
+    println!("hello");
+}
+```
+
+**Why Rust?**
+
+- aifed is written in Rust, making it the natural choice for consistency
+- Using a single language across all documentation keeps examples uniform
+- The concepts demonstrated are language-agnostic - Rust is simply the vehicle
+
+The tool itself supports any programming language with appropriate LSP servers configured.
 
 ## See Also
 

@@ -89,14 +89,14 @@ hash_enabled = true
 
 [format]
 # Per-language formatters
-go = "gofmt"
 rust = "rustfmt"
+go = "gofmt"
 javascript = "prettier --stdin-filepath"
 
 [lsp]
 # Per-language LSP servers
-go = "gopls"
 rust = "rust-analyzer"
+go = "gopls"
 typescript = "typescript-language-server --stdio"
 
 [history]
@@ -124,8 +124,8 @@ Per-language formatter configuration.
 
 ```toml
 [format]
-go = "gofmt"
 rust = "rustfmt"
+go = "gofmt"
 javascript = "prettier --stdin-filepath"
 python = "black -"
 ```
@@ -136,8 +136,8 @@ Per-language LSP server configuration.
 
 ```toml
 [lsp]
-go = "gopls"
 rust = "rust-analyzer"
+go = "gopls"
 typescript = "typescript-language-server --stdio"
 python = "pylsp"
 ```
@@ -215,10 +215,10 @@ Specify the formatter command for each language:
 ```toml
 [format]
 # Simple command
-go = "gofmt"
+rust = "rustfmt"
 
 # Command with flags
-rust = "rustfmt --edition 2021"
+go = "gofmt -s"
 
 # Using stdin
 javascript = "prettier --stdin-filepath $FILE"
@@ -230,8 +230,8 @@ Specify the LSP server for each language:
 
 ```toml
 [lsp]
-go = "gopls"
 rust = "rust-analyzer"
+go = "gopls"
 typescript = "typescript-language-server --stdio"
 python = "pylsp"
 ```

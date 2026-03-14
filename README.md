@@ -20,13 +20,13 @@ Here's how an AI agent might work with aifed in typical development scenarios:
 
 ```bash
 # Read a specific function with hashes for later editing
-aifed read main.go:42-80
+aifed read main.go 42-80
 
 # Check a symbol's type and signature
-aifed hover main.go:55:10
+aifed hover main.go S1:user
 
 # Navigate to a symbol's definition
-aifed definition main.go:55:10
+aifed definition main.go S1:user
 ```
 
 ### Refactoring
@@ -36,11 +36,11 @@ aifed definition main.go:55:10
 aifed references main.go --symbol oldName
 
 # Rename across the entire codebase
-aifed rename main.go:15:6 newName
+aifed rename main.go S1:oldName newName
 
 # Get current hashes, then safely replace code
-aifed read main.go:20-30
-aifed replace main.go:25:abc12345 "refactored code"
+aifed read main.go 20-30
+aifed replace main.go 25:abc123 "refactored code"
 ```
 
 ### Debugging

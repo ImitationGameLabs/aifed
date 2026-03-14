@@ -62,7 +62,7 @@ By default, shows only errors and warnings (not hints or info).
 
 ```bash
 # Get errors for current file
-aifed diagnostics main.go
+aifed diagnostics main.rs
 
 # Get all diagnostics in workspace
 aifed diagnostics --all
@@ -91,44 +91,40 @@ aifed symbols <FILE>
 
 ### Options
 
-| Option              | Description                                           |
-| ------------------- | ----------------------------------------------------- |
-| `--type <TYPE>`     | Filter by symbol type: `func`, `type`, `var`, `const` |
-| `--include-private` | Include private symbols                               |
+| Option              | Description                               |
+| ------------------- | ----------------------------------------- |
+| `--type <TYPE>`     | Filter by symbol type (language-specific) |
+| `--list-types`      | List available symbol types for the file  |
+| `--include-private` | Include private symbols                   |
 
-### Symbol Types
-
-| Type     | Description                  |
-| -------- | ---------------------------- |
-| `func`   | Functions and methods        |
-| `type`   | Classes, interfaces, structs |
-| `var`    | Variables                    |
-| `const`  | Constants                    |
-| `module` | Modules and namespaces       |
+Symbol types depend on the LSP server and language. Use `--list-types` to discover available types.
 
 ### Output Format (Text)
 
 ```
-L10: func main()
-L25: func process(data []byte) error
-L40: type Config struct
-L55: var defaultConfig Config
+L10: fn main()
+L25: fn process(data: &[u8]) -> Result<()>
+L40: struct Config
+L55: static DEFAULT_CONFIG: Config
 ```
 
 ### Examples
 
 ```bash
 # List all symbols
-aifed symbols main.go
+aifed symbols main.rs
+
+# List available symbol types
+aifed symbols main.rs --list-types
 
 # Filter by type
-aifed symbols main.go --type func
+aifed symbols main.rs --type func
 
 # Include private symbols
-aifed symbols main.go --include-private
+aifed symbols main.rs --include-private
 
 # JSON output
-aifed symbols main.go --json
+aifed symbols main.rs --json
 ```
 
 ---
@@ -140,7 +136,7 @@ Rename a symbol across all references using LSP.
 ### Usage
 
 ```
-aifed rename <FILE>:<LINE>:<COL> <NEW_NAME>
+aifed rename <FILE> <SYMBOL_LOCATOR> <NEW_NAME>
 aifed rename <FILE> --symbol <NAME> <NEW_NAME>
 ```
 
@@ -160,22 +156,29 @@ aifed rename <FILE> --symbol <NAME> <NEW_NAME>
 
 ### Position Format
 
-Use `LINE:COL` for symbol position (1-based).
+Use Symbol Locator (AI-friendly, no counting required):
+
+| Format             | Example      | Description                  |
+| ------------------ | ------------ | ---------------------------- |
+| `SINDEX:NAME`      | `S1:user`    | Symbol locator (recommended) |
+| `LINE:SINDEX:NAME` | `15:S1:user` | With line context            |
+
+Get symbol locators with: `aifed read <FILE> <LINE> --symbols`
 
 ### Examples
 
 ```bash
-# Rename by position
-aifed rename main.go:15:10 newName
+# Rename by Symbol Locator
+aifed rename main.rs S1:user new_name
 
 # Rename by symbol name
-aifed rename main.go --symbol oldFunc newFunc
+aifed rename main.rs --symbol oldFunc newFunc
 
 # Preview changes
-aifed rename main.go:15:10 newName --dry-run
+aifed rename main.rs S1:user new_name --dry-run
 
 # Rename in file only
-aifed rename main.go:15:10 newName --scope file
+aifed rename main.rs S1:user new_name --scope file
 ```
 
 ### Conflict Handling
@@ -191,7 +194,7 @@ Find all references to a symbol.
 ### Usage
 
 ```
-aifed references <FILE>:<LINE>:<COL>
+aifed references <FILE> <SYMBOL_LOCATOR>
 aifed references <FILE> --symbol <NAME>
 ```
 
@@ -202,20 +205,31 @@ aifed references <FILE> --symbol <NAME>
 | `--include-declaration` | Include symbol declaration in results           |
 | `--scope <SCOPE>`       | Scope: `file`, `workspace` [default: workspace] |
 
+### Position Format
+
+Use Symbol Locator (AI-friendly, no counting required):
+
+| Format             | Example      | Description                  |
+| ------------------ | ------------ | ---------------------------- |
+| `SINDEX:NAME`      | `S1:user`    | Symbol locator (recommended) |
+| `LINE:SINDEX:NAME` | `15:S1:user` | With line context            |
+
+Get symbol locators with: `aifed read <FILE> <LINE> --symbols`
+
 ### Examples
 
 ```bash
-# Find references by position
-aifed references main.go:15:10
+# Find references by Symbol Locator
+aifed references main.rs S4:user
 
 # Find references by symbol name
-aifed references main.go --symbol processConfig
+aifed references main.rs --symbol processConfig
 
 # Include declaration
-aifed references main.go:15:10 --include-declaration
+aifed references main.rs S4:user --include-declaration
 
 # JSON output
-aifed references main.go:15:10 --json
+aifed references main.rs S4:user --json
 ```
 
 ---
@@ -227,21 +241,28 @@ Find the definition of a symbol.
 ### Usage
 
 ```
-aifed definition <FILE>:<LINE>:<COL>
+aifed definition <FILE> <SYMBOL_LOCATOR>
 ```
 
 ### Position Format
 
-Use `LINE:COL` for symbol position (1-based).
+Use Symbol Locator (AI-friendly, no counting required):
+
+| Format             | Example      | Description                  |
+| ------------------ | ------------ | ---------------------------- |
+| `SINDEX:NAME`      | `S1:user`    | Symbol locator (recommended) |
+| `LINE:SINDEX:NAME` | `15:S1:user` | With line context            |
+
+Get symbol locators with: `aifed read <FILE> <LINE> --symbols`
 
 ### Examples
 
 ```bash
 # Go to definition
-aifed definition main.go:25:15
+aifed definition main.rs S2:User
 
 # JSON output
-aifed definition main.go:25:15 --json
+aifed definition main.rs S2:User --json
 ```
 
 ---
@@ -253,49 +274,28 @@ Get type information and documentation for a symbol.
 ### Usage
 
 ```
-aifed hover <FILE>:<LINE>:<COL>
+aifed hover <FILE> <SYMBOL_LOCATOR>
 ```
 
 ### Position Format
 
-Use `LINE:COL` for symbol position (1-based).
+Use Symbol Locator (AI-friendly, no counting required):
+
+| Format             | Example      | Description                  |
+| ------------------ | ------------ | ---------------------------- |
+| `SINDEX:NAME`      | `S1:user`    | Symbol locator (recommended) |
+| `LINE:SINDEX:NAME` | `15:S1:user` | With line context            |
+
+Get symbol locators with: `aifed read <FILE> <LINE> --symbols`
 
 ### Examples
 
 ```bash
 # Get hover info
-aifed hover main.go:15:10
+aifed hover main.rs S1:user
 
 # JSON output
-aifed hover main.go:15:10 --json
-```
-
----
-
-## `organize-imports` - Organize Imports
-
-Organize and clean up imports in a file.
-
-### Usage
-
-```
-aifed organize-imports <FILE>
-```
-
-### Options
-
-| Option      | Description                      |
-| ----------- | -------------------------------- |
-| `--dry-run` | Preview changes without applying |
-
-### Examples
-
-```bash
-# Organize imports
-aifed organize-imports main.go
-
-# Preview changes
-aifed organize-imports main.go --dry-run
+aifed hover main.rs S1:user --json
 ```
 
 ## LSP Performance
@@ -317,5 +317,5 @@ For files > 10,000 lines:
 ## See Also
 
 - [Configuration](configuration.md) - Configuring LSP servers
-- [File Operations](file-operations.md) - Getting symbols via info command
+- [Read Commands](read-commands.md) - Getting symbols via info command
 - [CLI Design Notes](../cli-design-notes.md) - LSP design rationale
