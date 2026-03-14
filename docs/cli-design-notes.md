@@ -248,9 +248,17 @@ Error: Hash mismatch
   Hint: Run 'aifed info main.rs' to get current hashes
 ```
 
-### 4. Architecture: CLI + Daemon vs Daemonless
+### 4. Architecture: CLI + Daemon
 
-**Question:** Should aifed run as a standalone CLI or as a CLI + daemon architecture?
+**Decision:** aifed uses CLI + daemon architecture.
+
+**Rationale:**
+
+LSP servers have significant startup cost. For example, rust-analyzer can take seconds to initialize and index a project. A daemonless approach would require starting LSP server on every CLI invocation, wait for initialization, execute a single operation, then shutdown. This is impractical for interactive use.
+
+Daemon architecture keeps LSP servers running in background, providing instant responses.
+
+**Comparison (for reference):**
 
 | Aspect          | CLI + Daemon                              | Daemonless CLI         |
 | --------------- | ----------------------------------------- | ---------------------- |
@@ -261,19 +269,30 @@ Error: Hash mismatch
 | **Deployment**  | Daemon lifecycle management               | Simple, single binary  |
 | **Portability** | Requires daemon running                   | Self-contained         |
 
-**Daemon benefits:**
-- In-memory history storage with fast undo/redo
-- Background LSP tasks (diagnostics, indexing, preloading)
+**Daemon responsibilities:**
+- Maintain persistent LSP server connections
+- Background indexing and diagnostics
+- In-memory history with fast undo/redo
 - Shared file cache across CLI invocations
 - Watch mode and reactive features
 
-**Daemonless benefits:**
-- Simpler deployment (single binary)
-- No background process management
-- More portable and predictable
-- Easier to debug
+**Workspace management:**
+- Single daemon manages multiple project workspaces
+- Project identified by root directory (git root or `.aifed.toml` location)
+- Detailed design TBD
 
-**Decision:** TBD - Will evaluate based on performance requirements and use case complexity.
+**Lightweight mode consideration:**
+
+For simple file edits without LSP or workspace management, a lightweight mode should be considered:
+
+- **Use case:** Quick edits on standalone files (e.g., config files, notes, scripts)
+- **Options:**
+  - `--no-daemon` flag to skip daemon connection
+  - Auto-detect: skip daemon if no LSP commands used
+  - Separate lightweight commands (e.g., `aifed edit-quick`)
+- **Trade-off:** Simplicity vs. consistency of CLI interface
+
+Detailed design TBD.
 
 ---
 

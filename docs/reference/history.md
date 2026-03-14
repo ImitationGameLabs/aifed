@@ -134,32 +134,41 @@ aifed history main.rs --json
 - Collaboration
 - Branching
 
-### Storage Implementation Options
+### Storage Implementation
 
-The history feature can be implemented using different storage backends:
+aifed uses a daemon architecture (required for LSP performance), but history storage backend is configurable:
 
-| Option          | Pros                                       | Cons                                             |
-| --------------- | ------------------------------------------ | ------------------------------------------------ |
-| **Daemon**      | Fast in-memory access, centralized state   | Requires background process, state loss on crash |
-| **File-system** | Simple, no dependencies, portable          | Slower for large histories, file I/O overhead    |
-| **SQLite**      | Efficient queries, indexing, atomic writes | External dependency, database management         |
+| Option          | Pros                                       | Cons                                          | Use Case           |
+| --------------- | ------------------------------------------ | --------------------------------------------- | ------------------ |
+| **Memory**      | Fastest access, simple                     | State loss on crash                           | Default            |
+| **File-system** | Persistent, no dependencies, portable      | Slower for large histories, file I/O overhead | Simple persistence |
+| **SQLite**      | Efficient queries, indexing, atomic writes | External dependency, database management      | Large histories    |
 
-**Daemon-based:**
-- CLI communicates with a background daemon process
-- Daemon maintains history in memory, periodically persists to disk
-- Fast operations, but requires daemon lifecycle management
+**Memory (default):**
+- Daemon maintains history in memory
+- Fastest operations
+- State lost on daemon restart/crash
+- Use snapshots for intentional save points
 
 **File-system:**
 - Direct file storage in `.aifed/history/`
 - Each edit stored as a separate file or appended to a log
-- Simple and portable, no background processes
+- Persistent across daemon restarts
+- No external dependencies
 
 **SQLite:**
 - Single database file `.aifed/history.db`
 - Efficient querying with indexes
 - Built-in support for transactions and atomic operations
+- Best for large history volumes
 
-**Decision:** TBD - Will evaluate based on performance requirements and deployment complexity.
+**Configuration:**
+
+```toml
+[history]
+backend = "memory"  # Options: memory, filesystem, sqlite
+max_entries = 100
+```
 
 ---
 

@@ -298,24 +298,8 @@ aifed hover main.rs S1:user
 aifed hover main.rs S1:user --json
 ```
 
-## LSP Performance
-
-### Startup Time
-
-LSP servers can take 1-3 seconds to start. aifed uses:
-
-- **Lazy initialization** - Start on first LSP command
-- **Keep-alive** - Keep running for the session
-- **Configurable timeout** - Adjust via configuration
-
-### Large Files
-
-For files > 10,000 lines:
-- Diagnostics may be slower
-- Consider using `--scope file` for targeted operations
-
 ## See Also
 
 - [Configuration](configuration.md) - Configuring LSP servers
-- [Read Commands](read-commands.md) - Getting symbols via info command
+- [Read Commands](read-commands.md) - Getting Symbol Locators
 - [CLI Design Notes](../cli-design-notes.md) - LSP design rationale
