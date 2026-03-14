@@ -8,10 +8,6 @@ A text editor designed for AI agents.
 
 aifed's goal is to design a dedicated text editor for AI agents, implemented as a CLI, improving AI's editing efficiency, accuracy, and comfort.
 
-## Inspiration
-
-This project was inspired by [agent-browser](https://github.com/vercel-labs/agent-browser) - a browser designed for AI agents.
-
 - **CLI is the best UI for AI** - Text input/output, structured responses
 - **Progressive disclosure** - Simple commands for simple tasks, advanced features on demand
 - **Decoupled from AI Agents** - Any coding agent that supports shell can use it
@@ -68,6 +64,13 @@ aifed undo main.go
 
 - [CLI Reference](docs/reference/README.md) - Command documentation
 - [CLI Design Notes](docs/cli-design-notes.md) - Design rationale and trade-offs
+
+## Credits
+
+This project was inspired by:
+
+- [agent-browser](https://github.com/vercel-labs/agent-browser) - A browser designed for AI agents
+- [oh-my-pi](https://github.com/can1357/oh-my-pi) - The [Hashline Edit Mode](https://deepwiki.com/can1357/oh-my-pi/8.1-hashline-edit-mode) inspired our [Locator](docs/reference/locator.md) design
 
 ## Development
 
