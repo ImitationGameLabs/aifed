@@ -2,241 +2,84 @@
 
 Commands for modifying file content.
 
-## Locator Quick Reference
+## `edit` - Edit File Content
 
-Edit commands use **locators** to specify positions. The primary locator format is **hashline**, which combines line numbers with content hashes for safe, deterministic edits.
+The unified command for all file edits: replace, insert, and delete.
+
+### Usage
+
+```
+aifed edit <FILE> <OPERATION> <LOCATOR> [CONTENT]
+aifed edit <FILE> [OPERATIONS...]    # Multiple operations via stdin/file
+```
+
+### Operations
+
+| Operator | Syntax                  | Description                  |
+| -------- | ----------------------- | ---------------------------- |
+| `~`      | `~ <LOCATOR> <CONTENT>` | Replace content at locator   |
+| `+`      | `+ <LOCATOR> <CONTENT>` | Insert content after locator |
+| `-`      | `- <LOCATOR>`           | Delete content at locator    |
+
+**Mnemonic:**
+- `~` - Tilde suggests "modify" or "change" (used in regex, diff)
+- `+` - Plus suggests "add" or "insert"
+- `-` - Minus suggests "remove" or "delete"
+
+### Locator Format
+
+Edit commands use **hashline** locators to specify positions with verification.
 
 | Format      | Example     | Description                                       |
 | ----------- | ----------- | ------------------------------------------------- |
 | `LINE:HASH` | `42:abc123` | Hashline - line + hash verification (recommended) |
 | `HASH`      | `abc123`    | Hash only (content-based positioning)             |
-| `LINE`      | `42`        | Line number only (no verification)                |
-| `START-END` | `10-20`     | Line range                                        |
+
+**Virtual line:** The special hashline `0:000000` represents the position before the first line, used for inserting at the beginning of a file.
+
+```bash
+# Insert a copyright header at the very start of a file
+aifed edit main.rs + 0:000000 "// Copyright 2026"
+```
 
 See [locator.md](locator.md) for detailed documentation on locators and hashline.
 
----
-
-## `replace` - Replace Line(s)
-
-Replace content at specified location with hash verification.
-
-### Usage
-
-```
-aifed replace <FILE> <LOCATOR> <CONTENT>
-```
-
 ### Options
 
-| Option       | Description                                       |
-| ------------ | ------------------------------------------------- |
-| `--auto-fmt` | Auto-format after replace                         |
-| `--dry-run`  | Preview changes without applying                  |
-| `--force`    | Apply changes even if hash mismatch (use caution) |
-
-### Locator Formats
-
-| Format      | Example             | Use Case                          |
-| ----------- | ------------------- | --------------------------------- |
-| `LINE:HASH` | `main.rs 42:abc123` | Default - safest, dual validation |
-| `HASH`      | `main.rs abc123`    | When line number unknown          |
-| `LINE`      | `main.rs 42`        | When hash unavailable             |
-| `START-END` | `main.rs 10-20`     | Multi-line replacement            |
+| Option          | Description                                       |
+| --------------- | ------------------------------------------------- |
+| `--file <FILE>` | Read operations from file (use `-` for stdin)     |
+| `--auto-fmt`    | Auto-format after all operations                  |
+| `--dry-run`     | Preview changes without applying                  |
+| `--continue`    | Continue on individual operation failures         |
+| `--force`       | Apply changes even if hash mismatch (use caution) |
 
 ### Examples
+
+#### Single Operations
 
 ```bash
 # Replace line 42 with hash verification
-aifed replace main.rs 42:abc123 "fn main() {"
+aifed edit main.rs ~ 42:abc123 "fn main() {"
 
-# Replace using hash only
-aifed replace main.rs abc123 "fn main() {"
+# Insert after line 10
+aifed edit main.rs + 10:abc123 "    println!(\"hello\");"
 
-# Replace multi-line range
-aifed replace main.rs 10-15 <<EOF
-fn new_func() -> Option<i32> {
-    None
-}
-EOF
+# Delete line 42
+aifed edit main.rs - 42:abc123
 
-# With auto-format
-aifed replace main.rs 42:abc123 "fn main(){" --auto-fmt
-
-# Preview changes
-aifed replace main.rs 42:abc123 "fn main() {" --dry-run
+# Insert at file beginning
+aifed edit main.rs + 0:000000 "// Copyright 2026"
 ```
 
-### Content Input Methods
+#### Batch Operations
 
 ```bash
-# Direct argument
-aifed replace lib.rs 42:abc123 "content"
-
-# From stdin
-echo "content" | aifed replace lib.rs 42:abc123 -
-
-# Multi-line via heredoc
-aifed replace lib.rs 10-15 <<EOF
-line 1
-line 2
-EOF
-```
-
----
-
-## `insert` - Insert New Line(s)
-
-Insert new content before or after a specified line.
-
-### Usage
-
-```
-aifed insert <FILE> --after <LOCATOR> <CONTENT>
-aifed insert <FILE> --before <LOCATOR> <CONTENT>
-```
-
-### Options
-
-| Option               | Description                      |
-| -------------------- | -------------------------------- |
-| `--after <LOCATOR>`  | Insert after specified line      |
-| `--before <LOCATOR>` | Insert before specified line     |
-| `--auto-fmt`         | Auto-format after insert         |
-| `--dry-run`          | Preview changes without applying |
-
-### Locator Formats for `--after`/`--before`
-
-| Format      | Example     | Description                                      |
-| ----------- | ----------- | ------------------------------------------------ |
-| `LINE:HASH` | `10:abc123` | Line number with hash verification (recommended) |
-| `LINE`      | `10`        | Line number only (no verification)               |
-
-### Examples
-
-```bash
-# Insert after line 10 with hash verification
-aifed insert main.rs --after 10:abc123 "    println!(\"hello\");"
-
-# Insert before line 1 (prepend)
-aifed insert main.rs --before 1:def456 "// Copyright 2026"
-
-# Insert multi-line content
-aifed insert main.rs --after 42:ghi789 <<EOF
-fn helper() -> i32 {
-    42
-}
-EOF
-
-# With auto-format
-aifed insert main.rs --after 10:abc123 "    new code" --auto-fmt
-```
-
----
-
-## `delete` - Delete Line(s)
-
-Delete content at specified location with hash verification.
-
-### Usage
-
-```
-aifed delete <FILE> <LOCATOR>
-```
-
-### Options
-
-| Option      | Description                                       |
-| ----------- | ------------------------------------------------- |
-| `--dry-run` | Preview changes without applying                  |
-| `--force`   | Apply changes even if hash mismatch (use caution) |
-
-### Locator Formats
-
-| Format      | Example             | Use Case                          |
-| ----------- | ------------------- | --------------------------------- |
-| `LINE:HASH` | `main.rs 42:abc123` | Default - safest, dual validation |
-| `HASH`      | `main.rs abc123`    | When line number unknown          |
-| `LINE`      | `main.rs 42`        | When hash unavailable             |
-| `START-END` | `main.rs 10-20`     | Multi-line deletion               |
-
-### Examples
-
-```bash
-# Delete line 42 with hash verification
-aifed delete main.rs 42:abc123
-
-# Delete using hash only
-aifed delete main.rs abc123
-
-# Delete multi-line range
-aifed delete main.rs 10-15
-
-# Preview changes
-aifed delete main.rs 42:abc123 --dry-run
-```
-
----
-
-## `edit` - Atomic Batch Operations
-
-Apply multiple operations atomically. All succeed or all fail.
-
-### Usage
-
-```
-aifed edit <FILE> [OPERATIONS]
-aifed edit <FILE> --file <OPS_FILE>
-```
-
-### Input Format
-
-One operation per line:
-
-```
-replace <LOCATOR> <CONTENT>
-insert --after <LOCATOR> <CONTENT>
-insert --before <LOCATOR> <CONTENT>
-delete <LOCATOR>
-```
-
-Note: Locator format is `LINE:HASH` (e.g., `42:abc123`).
-
-### Options
-
-| Option          | Description                                   |
-| --------------- | --------------------------------------------- |
-| `--file <FILE>` | Read operations from file (use `-` for stdin) |
-| `--auto-fmt`    | Auto-format after all operations              |
-| `--dry-run`     | Preview changes without applying              |
-| `--continue`    | Continue on individual operation failures     |
-
-### Line Number Drift Solution
-
-Edit uses hashes instead of line numbers to avoid drift:
-
-```
-Original:
-  L1: a
-  L2: b
-  L3: c
-
-Edit operations:
-  replace hash_a "aa"    # Hash-based, valid
-  delete hash_b          # Hash-based, valid
-  replace hash_c "cc"    # Hash-based, valid
-```
-
-Hashes are content-based, so they remain valid regardless of other edits.
-
-### Examples
-
-```bash
-# Interactive edit operations
+# Multiple operations via heredoc
 aifed edit main.rs <<EOF
-replace 42:abc123 "fn main() {"
-insert --after 10:def456 "    println!(\"hello\");"
-delete 15:ghi789
+~ 42:abc123 "fn main() {"
++ 10:def456 "    println!(\"hello\");"
+- 15:ghi789
 EOF
 
 # From file
@@ -247,15 +90,73 @@ cat ops.txt | aifed edit main.rs --file -
 
 # Preview changes
 aifed edit main.rs --file ops.txt --dry-run
+```
 
-# Continue on failures
+#### With Options
+
+```bash
+# With auto-format
+aifed edit main.rs ~ 42:abc123 "fn main(){" --auto-fmt
+
+# Preview changes
+aifed edit main.rs ~ 42:abc123 "fn main() {" --dry-run
+
+# Continue on failures (best-effort mode)
 aifed edit main.rs --file ops.txt --continue
 ```
+
+### Content Input Methods
+
+```bash
+# Direct argument
+aifed edit lib.rs ~ 42:abc123 "content"
+
+# From stdin (single operation)
+echo "content" | aifed edit lib.rs ~ 42:abc123 -
+
+# Multi-line via heredoc
+aifed edit lib.rs ~ 10-15 - <<EOF
+fn new_func() -> Option<i32> {
+    None
+}
+EOF
+```
+
+### Line Number Drift Solution
+
+Batch edits use hashes instead of line numbers to avoid drift:
+
+```
+Original:
+  L1: a
+  L2: b
+  L3: c
+
+Edit operations:
+  ~ abc123 "aa"    # Hash-based, valid
+  - def456         # Hash-based, valid
+  ~ ghi789 "cc"    # Hash-based, valid
+```
+
+Hashes are content-based, so they remain valid regardless of other edits.
 
 ### Failure Handling
 
 - **Default:** Atomic (all-or-nothing) - if any operation fails, none are applied
 - **With `--continue`:** Best-effort - continue on failures, report results
+
+## Locator Quick Reference
+
+**Note:** File path is a separate argument. Examples show full command-line context.
+
+| Format      | Locator Only | Full Example        | Use Case                          |
+| ----------- | ------------ | ------------------- | --------------------------------- |
+| `LINE:HASH` | `42:abc123`  | `main.rs 42:abc123` | Default - safest, dual validation |
+| `HASH`      | `abc123`     | `main.rs abc123`    | When line number unknown          |
+
+**Virtual line** (`0:000000`) is a special hashline for inserting at file beginning.
+
+See [locator.md](locator.md) for detailed documentation.
 
 ## See Also
 

@@ -162,7 +162,7 @@ aifed diagnostics --all
 
 ```bash
 # After editing
-aifed replace main.rs 42:abc123 "new code" --auto-fmt
+aifed edit main.rs ~ 42:abc123 "new code" --auto-fmt
 
 # Check for errors
 aifed diagnostics main.rs
@@ -178,7 +178,7 @@ aifed diff main.rs --from before-edit
 aifed snapshot create main.rs --tag before
 
 # Make changes
-aifed replace main.rs 42:abc123 "new code"
+aifed edit main.rs ~ 42:abc123 "new code"
 
 # View diff
 aifed diff main.rs --from before

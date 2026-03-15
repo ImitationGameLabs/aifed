@@ -38,9 +38,9 @@ aifed references main.go --symbol oldName
 # Rename across the entire codebase
 aifed rename main.go S1:oldName newName
 
-# Get current hashes, then safely replace code
+# Get current hashes, then safely edit code
 aifed read main.go 20-30
-aifed replace main.go 25:abc123 "refactored code"
+aifed edit main.go ~ 25:abc123 "refactored code"
 ```
 
 ### Debugging

@@ -66,16 +66,41 @@ See [locator.md](reference/locator.md) for usage details.
 
 **Decision:** TBD - Will benchmark both approaches (8-char hex vs 2-char oh-my-pi style) to determine optimal balance between compactness and collision rate for our use case.
 
-### 3. Command Structure: Split Verbs
+### 3. Command Structure: Unified Edit
 
-**Why not a single `edit` command?**
+**Decision:** Use a single `edit` command with operator prefixes (`~`/`+`/`-`) instead of separate `replace`/`insert`/`delete` commands.
 
-| Aspect           | Single `edit`                     | Split verbs (replace/insert/delete) |
-| ---------------- | --------------------------------- | ----------------------------------- |
-| Flag complexity  | `--delete` conflicts with CONTENT | No conflicts                        |
-| Help text        | Must explain all modes            | Focused per-command                 |
-| Error messages   | Generic                           | Context-specific                    |
-| AI comprehension | Needs flag parsing                | Direct mapping                      |
+```
+~ <LOCATOR> <CONTENT>   # replace: 替换
++ <LOCATOR> <CONTENT>   # insert: 在之后插入
+- <LOCATOR>             # delete: 删除
+```
+
+**Rationale:**
+
+| Aspect           | Unified `edit`        | Split verbs (replace/insert/delete) |
+| ---------------- | --------------------- | ----------------------------------- |
+| Decision fatigue | Single entry point    | Must choose which command           |
+| Learning curve   | Three operators       | Four commands                       |
+| Consistency      | One syntax for all    | Different per-command syntax        |
+| Token efficiency | Operators are compact | Command names are longer            |
+| Help text        | One place to look     | Multiple man pages                  |
+
+**Why operators over subcommands:**
+
+Using symbolic operators (`~`/`+`/`-`) instead of subcommands (`replace`/`insert`/`delete`):
+- **Consistency:** Same syntax for single and batch operations
+- **Token efficiency:** Shorter, especially in batch mode
+- **Visual clarity:** Operators visually distinguish operation types
+- **No decision point:** Single command entry eliminates "which command?" decision
+
+**Virtual Line Convention:**
+
+`0:000000` represents the position before the first line, enabling insert-at-beginning:
+
+```bash
+aifed edit main.rs + 0:000000 "// Copyright 2026"
+```
 
 ### 4. Filepath and Locator Separation
 
@@ -97,15 +122,12 @@ See [locator.md](reference/locator.md) for usage details.
 2. **AI-friendly** - Follows "command + arg1 + arg2" pattern naturally
 3. **Implementation simplicity** - No string splitting, no Windows path conflicts
 4. **Better error messages** - FILE and LOCATOR validated independently
-5. **Consistency with insert/edit** - These commands already use positional locators
 
 **Why not colon-joined:**
 
 - Requires parsing to separate file path from locator
 - Windows paths (`C:\path:15`) create ambiguous `:` characters
 - Industry convention (vim/grep) is less relevant for AI users
-
-**Note:** `insert` and `edit` commands already use positional format (`--after 10:abc123`), so this change brings consistency across all commands.
 
 ### 5. Column Positioning: Symbol Locator vs Numeric Column
 
@@ -302,63 +324,6 @@ Detailed design TBD.
 2. **Binary files** - Current: reject with clear error. Focus on text editing.
 3. **Remote files** - Current: no. Use sshfs or similar.
 4. **Plugin system** - Defer. Hooks provide some extensibility.
-5. **Edit command syntax** - See below.
-
-### Edit Command Syntax: Words vs Symbols
-
-**Question:** Should edit commands use words (`replace`/`insert`/`delete`) or symbols (`~`/`+`/`-`)?
-
-**Background:** Target users are AI agents, who prioritize token efficiency and consistency over human readability.
-
-| Syntax  | Replace   | Insert   | Delete   |
-| ------- | --------- | -------- | -------- |
-| Words   | `replace` | `insert` | `delete` |
-| Symbols | `~`       | `+`      | `-`      |
-
-**Comparison:**
-
-| Aspect              | Words | Symbols                                                    |
-| ------------------- | ----- | ---------------------------------------------------------- |
-| Token efficiency    | Lower | Higher (4-6 tokens saved per command)                      |
-| Self-documenting    | Yes   | No (requires learning)                                     |
-| Debug readability   | High  | Lower                                                      |
-| Pattern consistency | Good  | Good                                                       |
-| `~` semantics       | N/A   | "Modify" - intuitive in programming contexts (regex, diff) |
-
-**Options:**
-
-1. **Words only** - `replace`/`insert`/`delete` everywhere
-   - Pro: Self-documenting, easy debugging
-   - Con: Higher token cost in batch operations
-
-2. **Symbols only** - `~`/`+`/`-` everywhere (including CLI)
-   - Pro: Maximum consistency, token efficiency
-   - Con: `aifed ~ file:loc "content"` less readable
-
-3. **Layered** - Words for CLI, symbols for batch/pipe
-   - Pro: Balance readability (CLI) and efficiency (batch)
-   - Con: Two syntaxes to learn
-
-4. **Unified `edit` only** - Single entry point, no separate replace/insert/delete commands
-   ```
-   # Single operation
-   aifed edit lib.rs <<< "~ 42:abc 'new'"
-   aifed edit lib.rs <<< "+ --after 10:def 'line'"
-   aifed edit lib.rs <<< "- 15:ghi"
-
-   # Multiple operations
-   aifed edit lib.rs <<EOF
-   ~ 42:abc "new content"
-   + --after 10:def "new line"
-   - 15:ghi
-   EOF
-   ```
-   - Pro: Maximum simplicity - one command, one format to learn
-   - Pro: No decision point for AI (which command to use?)
-   - Con: Single operations require heredoc/pipe (AI doesn't mind)
-   - Con: Less intuitive for human debugging
-
-**Decision:** TBD - Gather feedback from actual AI agent usage patterns.
 
 ---
 
@@ -372,13 +337,12 @@ Detailed design TBD.
 
 ## Command Priority Matrix
 
-| Command               | Priority | Complexity | Dependencies    |
-| --------------------- | -------- | ---------- | --------------- |
-| replace/insert/delete | P0       | Medium     | Hash system     |
-| info/read             | P0       | Low        | None            |
-| edit                  | P0       | High       | edit, atomicity |
-| diagnostics/symbols   | P1       | Medium     | LSP             |
-| rename/references     | P1       | High       | LSP             |
-| snapshot              | P1       | Medium     | File storage    |
-| history/undo          | P2       | Medium     | Storage         |
-| config/format/diff    | P2       | Low        | None/External   |
+| Command             | Priority | Complexity | Dependencies  |
+| ------------------- | -------- | ---------- | ------------- |
+| edit                | P0       | Medium     | Hash system   |
+| info/read           | P0       | Low        | None          |
+| diagnostics/symbols | P1       | Medium     | LSP           |
+| rename/references   | P1       | High       | LSP           |
+| snapshot            | P1       | Medium     | File storage  |
+| history/undo        | P2       | Medium     | Storage       |
+| config/format/diff  | P2       | Low        | None/External |

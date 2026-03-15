@@ -4,11 +4,16 @@ The locator is aifed's positioning mechanism for safe, deterministic edits.
 
 ## What is a Locator?
 
-A locator identifies a specific position in a file for editing operations.
+A locator identifies a specific position in a file. aifed uses different locator formats for different commands:
 
-aifed uses **hashline** as its primary locator format, which combines line numbers with content hashes to ensure edits are applied at the correct location.
+- **Read Locators** - Used with `read` command to specify what to read
+- **Edit Locators** - Used with `edit` command to specify where to edit
 
-## Why Line + Hash?
+## Edit Locators
+
+Edit commands use **hashline** as the primary locator format, which combines line numbers with content hashes to ensure edits are applied at the correct location.
+
+### Why Line + Hash?
 
 Traditional line-number-only positioning has problems:
 
@@ -24,50 +29,55 @@ Traditional line-number-only positioning has problems:
 - **AI-friendly** - AI gets hashes when reading, includes them when editing
 - **Human-readable** - Line number visible for debugging
 
-## Locator Formats
+### `LINE:HASH` - Hashline
 
-### `LINE:HASH` - Hashline (Default)
-
-The recommended format for most use cases, also known as **hashline**.
+The recommended format for edit operations.
 
 ```
-main.rs 42:abc123
+42:abc123
 ```
 
 - `42` - Line number (human-readable, helps locate quickly)
 - `abc123` - 6-character content hash (verification)
 
-**When to use:** Default choice for most edits. Provides both human-readability and safety.
+**Virtual Line:** The special value `0:000000` represents the position before the first line, used for inserting at the beginning of a file:
+
+```bash
+# Insert at file beginning
+aifed edit main.rs + 0:000000 "// Copyright 2026"
+```
 
 ### `HASH` - Hash Only
 
 Content-based positioning without line number.
 
 ```
-main.rs abc123
+abc123
 ```
 
 **When to use:** When line number is unknown or you want pure content-based positioning.
 
-### `LINE` - Line Number Only
+---
 
-Positioning without hash verification.
+## Read Locators
+
+Read commands use simpler formats since no verification is needed (you're just reading, not modifying).
+
+### `LINE` - Line Number
+
+Read a specific line.
 
 ```
-main.rs 42
+15
 ```
-
-**When to use:** When hash is unavailable and you accept the risk of potential drift.
 
 ### `START-END` - Line Range
 
-For multi-line operations.
+Read a range of lines.
 
 ```
-main.rs 10-20
+10-20
 ```
-
-**When to use:** Replacing or deleting multiple lines.
 
 ## Hash Algorithm
 
@@ -110,12 +120,23 @@ Error: Hash mismatch
 
 ## Format Summary
 
-| Format    | Syntax      | Example             | Verification       |
-| --------- | ----------- | ------------------- | ------------------ |
-| Line+Hash | `LINE:HASH` | `main.rs 42:abc123` | Full (recommended) |
-| Hash only | `HASH`      | `main.rs abc123`    | Content-based      |
-| Line only | `LINE`      | `main.rs 42`        | None               |
-| Range     | `START-END` | `main.rs 10-20`     | None               |
+**Note:** File path is a separate command argument, not part of the locator. Examples below show full command-line context for clarity.
+
+### Edit Locators (for `edit` command)
+
+| Format    | Syntax      | Locator Only | Full Example        | Use Case            |
+| --------- | ----------- | ------------ | ------------------- | ------------------- |
+| Hashline  | `LINE:HASH` | `42:abc123`  | `main.rs 42:abc123` | Default, safest     |
+| Hash only | `HASH`      | `abc123`     | `main.rs abc123`    | Line number unknown |
+
+**Virtual line** (`0:000000`) is a special hashline value for inserting at file beginning.
+
+### Read Locators (for `read` command)
+
+| Format | Syntax      | Locator Only | Full Example    | Use Case            |
+| ------ | ----------- | ------------ | --------------- | ------------------- |
+| Line   | `LINE`      | `42`         | `main.rs 42`    | Read specific line  |
+| Range  | `START-END` | `10-20`      | `main.rs 10-20` | Read multiple lines |
 
 ---
 
@@ -134,10 +155,10 @@ Symbol Locator solves this by using semantic information from LSP.
 
 ### Format
 
-| Format                 | Example              | Description         |
-| ---------------------- | -------------------- | ------------------- |
-| `S<INDEX>:<NAME>`      | `main.rs S1:user`    | Symbol index + name |
-| `LINE:S<INDEX>:<NAME>` | `main.rs 15:S1:user` | With line context   |
+| Format                 | Locator Only | Full Example         | Description         |
+| ---------------------- | ------------ | -------------------- | ------------------- |
+| `S<INDEX>:<NAME>`      | `S1:user`    | `main.rs S1:user`    | Symbol index + name |
+| `LINE:S<INDEX>:<NAME>` | `15:S1:user` | `main.rs 15:S1:user` | With line context   |
 
 - `INDEX` - Sequential number (1-based) for symbols on the line
 - `NAME` - Symbol name for self-documentation and LSP verification
@@ -167,7 +188,7 @@ Note: `S1:user` (variable, type `User`) and `S4:user` (parameter, e.g., type `&s
 
 | Locator Type   | Format        | Use Case                                               |
 | -------------- | ------------- | ------------------------------------------------------ |
-| Line Locator   | `LINE:HASH`   | Edit operations (replace, insert, delete)              |
+| Line Locator   | `LINE:HASH`   | Edit operations (`~`, `+`, `-`)                        |
 | Symbol Locator | `SINDEX:NAME` | LSP operations (rename, hover, definition, references) |
 
 ### Example Usage
@@ -184,22 +205,26 @@ aifed references main.rs S4:user
 
 ## Usage in Commands
 
-Locators are used in edit commands:
+Locators are used with the `edit` command:
 
 ```bash
-# replace - uses LINE:HASH format
-aifed replace main.rs 42:abc123 "new content"
+# Replace with LINE:HASH format
+aifed edit main.rs ~ 42:abc123 "new content"
 
-# insert - uses LINE:HASH format
-aifed insert main.rs --after 10:abc123 "new line"
+# Insert after a line
+aifed edit main.rs + 10:abc123 "new line"
 
-# delete - uses LINE:HASH format
-aifed delete main.rs 42:abc123
+# Insert at file beginning (virtual line)
+aifed edit main.rs + 0:000000 "// Copyright 2026"
 
-# edit - uses LINE:HASH format
+# Delete a line
+aifed edit main.rs - 42:abc123
+
+# Batch operations
 aifed edit main.rs <<EOF
-replace 42:abc123 "new content"
-delete 15:ghi789
+~ 42:abc123 "new content"
++ 10:def456 "another line"
+- 15:ghi789
 EOF
 ```
 

@@ -217,7 +217,7 @@ aifed undo main.rs --dry-run
 aifed snapshot create main.rs --tag before-refactor
 
 # 2. Make edits
-aifed replace main.rs 42:abc123 "new code"
+aifed edit main.rs ~ 42:abc123 "new code"
 
 # 3. Check history
 aifed history main.rs

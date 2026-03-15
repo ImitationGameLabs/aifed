@@ -8,7 +8,7 @@ This directory contains reference documentation for all **aifed** commands and c
 | ----------------------- | ------------------------------------------------- | ------------------------------------ |
 | **CLI Overview**        | Global options, environment variables, exit codes | [cli-overview.md](cli-overview.md)   |
 | **Locator**             | Positioning mechanism for safe edits              | [locator.md](locator.md)             |
-| **Edit Commands**       | replace, insert, delete, edit                     | [edit-commands.md](edit-commands.md) |
+| **Edit Commands**       | Unified edit with ~, +, - operators               | [edit-commands.md](edit-commands.md) |
 | **Read Commands**       | info, read                                        | [read-commands.md](read-commands.md) |
 | **LSP Integration**     | diagnostics, symbols, rename, etc.                | [lsp.md](lsp.md)                     |
 | **History & Snapshots** | snapshot, history, undo                           | [history.md](history.md)             |
@@ -18,10 +18,7 @@ This directory contains reference documentation for all **aifed** commands and c
 ## Command Categories
 
 ### Core Editing
-- [`replace`](edit-commands.md#replace) - Replace content at specified location
-- [`insert`](edit-commands.md#insert) - Insert new content
-- [`delete`](edit-commands.md#delete) - Delete content
-- [`edit`](edit-commands.md#edit) - Atomic batch operations
+- [`edit`](edit-commands.md#edit) - Edit file content (replace, insert, delete)
 
 ### File Information
 - [`read`](read-commands.md#read) - Read file content

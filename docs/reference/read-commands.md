@@ -32,6 +32,8 @@ Note: Each line prefixed with `LINE:HASH` for use in edit commands. Hashes are i
 
 ### Position Arguments
 
+Read commands use simple position specifiers (no hash verification needed since you're only reading):
+
 | Argument    | Example         | Description        |
 | ----------- | --------------- | ------------------ |
 | None        | `main.rs`       | Read entire file   |
@@ -101,7 +103,7 @@ Note: Same-named symbols (e.g., `S1:user` and `S4:user`) are independent - renam
 aifed read main.rs 15
 
 # 2. If you need LSP operation, get Symbol Locators
-aifed read main.rs 15:abc123 --symbols
+aifed read main.rs 15 --symbols
 
 # 3. Use Symbol Locator in LSP command
 aifed hover main.rs S1:user
