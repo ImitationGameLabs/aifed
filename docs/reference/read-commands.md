@@ -16,7 +16,7 @@ aifed read <FILE> [LOCATOR]
 
 | Option          | Description                                            |
 | --------------- | ------------------------------------------------------ |
-| `--no-hashes`   | Exclude line hashes (rarely needed for AI)             |
+| `--no-hashes`   | Exclude line hashes (for exploration, not editing)     |
 | `--context <N>` | Show N lines of context around target                  |
 | `--symbols`     | Include Symbol Locators for LSP operations (on-demand) |
 
@@ -52,7 +52,7 @@ aifed read main.rs 10-20
 # Read specific line with context
 aifed read main.rs 15 --context 5
 
-# Read without hashes (rarely needed)
+# Read without hashes (for exploration, saves tokens)
 aifed read main.rs --no-hashes
 
 # JSON output
@@ -113,6 +113,7 @@ aifed hover main.rs S1:user
 
 - **Understanding code** - Read file content
 - **Before editing** - Hashes included by default
+- **Exploration** - Use `--no-hashes` to save tokens when not planning to edit
 - **Focused reading** - Use ranges for specific sections
 
 
