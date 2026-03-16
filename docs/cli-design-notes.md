@@ -50,12 +50,10 @@ See [locator.md](reference/locator.md) for usage details.
 
 **Decision:** xxHash64 + base32hex (2 characters, 10 bits)
 
-| Option                    | Hash Length | Entropy | Pros                             |
-| ------------------------- | ----------- | ------- | -------------------------------- |
-| Full SHA-256              | 64 chars    | 256 bit | No collisions                    |
-| xxHash64 (hex)            | 6 chars     | 24 bit  | Simple encoding                  |
-| oh-my-pi style (xxHash32) | 2 chars     | 8 bit   | Very compact                     |
-| **xxHash64 + base32hex**  | 2 chars     | 10 bit  | Compact, 4x lower collision rate |
+| Option               | Hash Length | Entropy | Pros                             |
+| -------------------- | ----------- | ------- | -------------------------------- |
+| oh-my-pi (xxHash32)  | 2 chars     | 8 bit   | Very compact                     |
+| **aifed (xxHash64)** | 2 chars     | 10 bit  | Compact, 4x lower collision rate |
 
 **Our approach:**
 
@@ -80,18 +78,21 @@ See [locator.md](reference/locator.md) for usage details.
 - **No symbol-only special case**: Simplifies implementation, relies on 10-bit low collision rate
 - **Independent line hashes**: Each line's hash is computed independently, not chained to neighbors
 
-1. **Preserve whitespace**: Whitespace is part of content; `foo` and `  foo` should have different hashes
-2. **No symbol-only special case**: Simplifies implementation, relies on 10-bit low collision rate
-3. **base32hex**: Standard RFC 2938 encoding, good readability, avoids confusing characters (0/O, 1/I/L)
+**Why independent hashes over chaining:**
+
+| Aspect                    | Independent Hashes        | Chaining Hashes                                         |
+| ------------------------- | ------------------------- | ------------------------------------------------------- |
+| Hash stability            | Same content -> same hash | Same content -> different hash (if lines above changed) |
+| Concurrent edit detection | Target line only          | Target line and all lines above                         |
 
 ### 3. Command Structure: Unified Edit
 
 **Decision:** Use a single `edit` command with operator prefixes (`~`/`+`/`-`) instead of separate `replace`/`insert`/`delete` commands.
 
 ```
-~ <LOCATOR> <CONTENT>   # replace: 替换
-+ <LOCATOR> <CONTENT>   # insert: 在之后插入
-- <LOCATOR>             # delete: 删除
+~ <LOCATOR> <CONTENT>   # replace
++ <LOCATOR> <CONTENT>   # insert after
+- <LOCATOR>             # delete
 ```
 
 **Rationale:**
@@ -270,7 +271,7 @@ Error: Hash mismatch
   Expected hash: AB
   Actual hash: 3K
   Actual content: fn main() {
-  Hint: Run 'aifed info main.rs' to get current hashes
+  Hint: Run 'aifed read main.rs' to get current hashes
 ```
 
 ### No Exit Codes

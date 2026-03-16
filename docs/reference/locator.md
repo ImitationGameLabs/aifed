@@ -107,18 +107,6 @@ aifed uses xxHash64 with base32hex encoding for line identification.
 - Digits first to avoid 0/O, 1/I/L confusion
 - 32 characters = 5 bits/char, 2 characters = 10 bits
 
-### Collision Probability
-
-| Lines | Collision Rate (10 bit) |
-| ----- | ----------------------- |
-| 100   | ~0.5%                   |
-| 1000  | ~38%                    |
-| 10000 | ~99%                    |
-
-For typical files (<1000 lines), collision rate is acceptable. When collisions occur, line number + hash combination still provides unique identification.
-
-See [CLI Design Notes](../cli-design-notes.md) for the design rationale.
-
 ## Hash Mismatch Behavior
 
 When the provided hash doesn't match the current line content:
@@ -129,7 +117,7 @@ Error: Hash mismatch
   Expected hash: AB
   Actual hash: 3K
   Actual content: fn main() {
-  Hint: Run 'aifed info main.rs' to get current hashes
+  Hint: Run 'aifed read main.rs' to get current hashes
 ```
 
 ### Resolution Options
