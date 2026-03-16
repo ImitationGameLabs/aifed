@@ -1,6 +1,9 @@
 # Rust build artifacts
 target/
 
+# CLI testing playground
+.playground
+
 # Environment files
 .env
 .env.local

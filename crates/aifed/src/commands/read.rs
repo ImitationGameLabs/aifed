@@ -1,0 +1,77 @@
+use std::path::Path;
+
+use crate::error::{Error, Result};
+use crate::hash::hash_line;
+use crate::locator::Locator;
+use crate::output::{HashedLine, OutputFormat, format_lines};
+
+/// Execute the read command
+pub fn execute(
+    path: &Path,
+    locator_str: Option<&str>,
+    no_hashes: bool,
+    context: Option<usize>,
+    format: OutputFormat,
+) -> Result<()> {
+    if !path.exists() {
+        return Err(Error::FileNotFound { path: path.to_path_buf() });
+    }
+
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| Error::IoError { path: path.to_path_buf(), source: e })?;
+
+    let lines: Vec<&str> = content.lines().collect();
+
+    // Determine which lines to show
+    let (start, end) = if let Some(loc_str) = locator_str {
+        let locator = Locator::parse(loc_str)?;
+
+        match locator {
+            Locator::Hashline { line, .. } | Locator::LineOnly(line) => {
+                if line == 0 || line > lines.len() {
+                    return Err(Error::InvalidLocator {
+                        input: loc_str.to_string(),
+                        reason: format!("Line {} out of range (1-{})", line, lines.len()),
+                    });
+                }
+
+                if let Some(ctx) = context {
+                    let ctx_start = line.saturating_sub(ctx).max(1);
+                    let ctx_end = (line + ctx).min(lines.len());
+                    (ctx_start, ctx_end)
+                } else {
+                    (line, line)
+                }
+            }
+            Locator::Range { start, end } => {
+                if start > lines.len() {
+                    return Err(Error::InvalidLocator {
+                        input: loc_str.to_string(),
+                        reason: format!("Range start {} out of range (1-{})", start, lines.len()),
+                    });
+                }
+                let actual_end = end.min(lines.len());
+                (start, actual_end)
+            }
+        }
+    } else {
+        // No locator: show all lines
+        (1, lines.len())
+    };
+
+    // Build output lines
+    let output_lines: Vec<HashedLine> = (start..=end)
+        .map(|line_num| {
+            let content = lines[line_num - 1].to_string();
+            let hash = hash_line(&content);
+            HashedLine { line: line_num, hash, content }
+        })
+        .collect();
+
+    if output_lines.is_empty() {
+        return Ok(());
+    }
+
+    println!("{}", format_lines(&output_lines, format, no_hashes));
+    Ok(())
+}

@@ -16,6 +16,7 @@ This directory contains **action wizards** - structured documents that guide AI 
 | Document | Purpose |
 | -------- | ------- |
 | [add-workspace-member.md](add-workspace-member.md) | Add a new Rust crate to the workspace |
+| [aifed-cli-test-walkthrough.md](aifed-cli-test-walkthrough.md) | Test suite walkthrough for aifed CLI functionality |
 
 ## When to Use
 
