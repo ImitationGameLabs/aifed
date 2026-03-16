@@ -246,6 +246,6 @@ aifed detects language using a cascading approach:
 
 ## See Also
 
-- [CLI Overview](cli-overview.md) - Environment variables and exit codes
+- [CLI Overview](cli-overview.md) - Environment variables
 - [LSP Integration](lsp.md) - LSP server configuration
 - [Utilities](utilities.md) - Formatter usage

@@ -1,6 +1,6 @@
 # CLI Overview
 
-Global options, environment variables, and exit codes for aifed.
+Global options and environment variables for aifed.
 
 ## Usage
 
@@ -28,18 +28,6 @@ aifed [OPTIONS] <COMMAND>
 | `AIFED_NO_COLOR` | Disable colored output (`1` or `true`) |
 | `AIFED_JSON`     | Default to JSON output (`1` or `true`) |
 | `AIFED_QUIET`    | Quiet mode (`1` or `true`)             |
-
-## Exit Codes
-
-| Code | Meaning                       |
-| ---- | ----------------------------- |
-| 0    | Success                       |
-| 1    | General error                 |
-| 2    | Invalid arguments             |
-| 3    | File not found                |
-| 4    | Hash mismatch (edit rejected) |
-| 5    | LSP error                     |
-| 6    | Configuration error           |
 
 ## AI-First Design Principles
 

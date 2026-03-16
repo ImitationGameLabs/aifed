@@ -111,8 +111,6 @@ Error: Hash mismatch
   Hint: Run 'aifed info main.rs' to get current hashes
 ```
 
-**Exit code:** 4
-
 ### Resolution Options
 
 1. **Re-read the file** - Get current hashes with `aifed read <FILE>`

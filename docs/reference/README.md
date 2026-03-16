@@ -4,16 +4,16 @@ This directory contains reference documentation for all **aifed** commands and c
 
 ## Quick Navigation
 
-| Category                | Description                                       | Reference                            |
-| ----------------------- | ------------------------------------------------- | ------------------------------------ |
-| **CLI Overview**        | Global options, environment variables, exit codes | [cli-overview.md](cli-overview.md)   |
-| **Locator**             | Positioning mechanism for safe edits              | [locator.md](locator.md)             |
-| **Edit Commands**       | Unified edit with ~, +, - operators               | [edit-commands.md](edit-commands.md) |
-| **Read Commands**       | info, read                                        | [read-commands.md](read-commands.md) |
-| **LSP Integration**     | diagnostics, symbols, rename, etc.                | [lsp.md](lsp.md)                     |
-| **History & Snapshots** | snapshot, history, undo                           | [history.md](history.md)             |
-| **Configuration**       | config command and file format                    | [configuration.md](configuration.md) |
-| **Utilities**           | diff, format                                      | [utilities.md](utilities.md)         |
+| Category                | Description                           | Reference                            |
+| ----------------------- | ------------------------------------- | ------------------------------------ |
+| **CLI Overview**        | Global options, environment variables | [cli-overview.md](cli-overview.md)   |
+| **Locator**             | Positioning mechanism for safe edits  | [locator.md](locator.md)             |
+| **Edit Commands**       | Unified edit with ~, +, - operators   | [edit-commands.md](edit-commands.md) |
+| **Read Commands**       | info, read                            | [read-commands.md](read-commands.md) |
+| **LSP Integration**     | diagnostics, symbols, rename, etc.    | [lsp.md](lsp.md)                     |
+| **History & Snapshots** | snapshot, history, undo               | [history.md](history.md)             |
+| **Configuration**       | config command and file format        | [configuration.md](configuration.md) |
+| **Utilities**           | diff, format                          | [utilities.md](utilities.md)         |
 
 ## Command Categories
 
@@ -59,7 +59,7 @@ aifed is designed specifically for AI agents:
 - Long flags only (`--file` not `-f`) - clearer, self-documenting
 - Explicit arguments - no interactive prompts
 - Structured JSON output with `--json`
-- Machine-parseable errors with exit codes
+- Clear error messages for easy parsing
 
 ## Document Conventions
 

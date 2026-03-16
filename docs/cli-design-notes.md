@@ -199,7 +199,7 @@ When hash doesn't match current line content:
 | Prompt for confirmation | Human-friendly | Not AI-friendly     |
 | Force flag to override  | Flexibility    | Risk of wrong edit  |
 
-**Choice:** Reject with error (exit code 4) + show current line/hash, with `--force` override.
+**Choice:** Reject with error + show current line/hash, with `--force` override.
 
 ### Batch Operations: Line Number Drift
 
@@ -245,20 +245,6 @@ Priority (highest wins): CLI flags > Environment variables > Project config > Gl
 
 ## Error Handling
 
-### Exit Codes
-
-| Code | Meaning             |
-| ---- | ------------------- |
-| 0    | Success             |
-| 1    | General error       |
-| 2    | Invalid arguments   |
-| 3    | File not found      |
-| 4    | Hash mismatch       |
-| 5    | LSP error           |
-| 6    | Configuration error |
-
-**Why specific codes?** AI can programmatically handle different errors.
-
 ### Error Format
 
 ```
@@ -269,6 +255,24 @@ Error: Hash mismatch
   Actual content: fn main() {
   Hint: Run 'aifed info main.rs' to get current hashes
 ```
+
+### No Exit Codes
+
+**Decision:** aifed does not use semantic exit codes.
+
+**Rationale:**
+
+aifed is designed exclusively for AI agents, not for shell integration. Traditional exit codes (e.g., 3 for file not found, 4 for hash mismatch) serve shell scripts and CI pipelines where programs need to branch based on numeric codes.
+
+For AI agents:
+- They parse error messages or JSON output directly
+- Numeric codes add no value
+- Unit tests match `Result<T, Error>` types, not exit codes
+- E2E tests can verify error message content
+
+Shell users have better alternatives: `sed`, `awk`, `ed` for scripting needs. aifed's value proposition is AI-first editing, not general-purpose shell integration.
+
+**Implementation:** Simple binary exit: 0 for success, 1 for any error.
 
 ### 4. Architecture: CLI + Daemon
 
