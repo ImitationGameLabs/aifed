@@ -65,15 +65,15 @@ aifed is designed specifically for AI agents:
 
 This documentation follows consistent conventions for clarity:
 
-### Hash Length
+### Hash Format
 
-All examples use **6-character hashes** (e.g., `abc123`, `def456`):
+All examples use **2-character base32hex hashes** (e.g., `AB`, `3K`):
 
 ```
-main.rs 42:abc123
+main.rs 42:AB
 ```
 
-**Note:** This is a provisional standard for documentation consistency. The actual hash algorithm and length are TBD - see [CLI Design Notes](../cli-design-notes.md#2-hash-algorithm) for options being considered.
+The hash encodes 10 bits of the xxHash64 output using base32hex character set (`0-9`, `A-V`). See [CLI Design Notes](../cli-design-notes.md#2-hash-algorithm) for the algorithm details.
 
 ### Example Language
 

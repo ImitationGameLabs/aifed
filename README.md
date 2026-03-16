@@ -1,8 +1,6 @@
-# aifed - AI-First Editor
+# aifed - AI-First Editor (Early Stage)
 
 A text editor designed for AI agents.
-
-> **Early Stage Project** - Currently in the design and documentation phase. No implementation yet.
 
 ## Core Philosophy
 
@@ -23,7 +21,7 @@ Here's how an AI agent might work with aifed in typical development scenarios:
 aifed read main.rs 15
 ```
 ```
-15:abc123  let count = calculate_total(items);
+15:3K|let count = calculate_total(items);
 ```
 
 ```bash
@@ -31,18 +29,18 @@ aifed read main.rs 15
 aifed symbols main.rs 15
 ```
 ```
-15:abc123  let count = calculate_total(items);
-    S1:count
-    S2:calculate_total
-    S3:items
+15:3K|let count = calculate_total(items);
+S1:count
+S2:calculate_total
+S3:items
 ```
 
 ```bash
 # Get type info for calculate_total function
-aifed hover main.rs 15:abc123 S2:calculate_total
+aifed hover main.rs 15:3K S2:calculate_total
 
 # Go to definition of items
-aifed definition main.rs 15:abc123 S3:items
+aifed definition main.rs 15:3K S3:items
 ```
 
 ### Refactoring
@@ -52,20 +50,20 @@ aifed definition main.rs 15:abc123 S3:items
 aifed symbols main.rs 10
 ```
 ```
-10:xyz789  let config = load_config();
-    S1:config
-    S2:load_config
+10:AB|let config = load_config();
+S1:config
+S2:load_config
 ```
 
 ```bash
 # Find all references to config
-aifed references main.rs 10:xyz789 S1:config
+aifed references main.rs 10:AB S1:config
 
 # Rename config to settings across the codebase
-aifed rename main.rs 10:xyz789 S1:config settings
+aifed rename main.rs 10:AB S1:config settings
 
 # Edit line 10 with hashline verification
-aifed edit main.rs ~ 10:xyz789 "let settings = load_config();"
+aifed edit main.rs ~ 10:AB "let settings = load_config();"
 ```
 
 ### Debugging

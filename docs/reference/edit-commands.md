@@ -30,29 +30,28 @@ aifed edit <FILE> [OPERATIONS...]    # Multiple operations via stdin/file
 
 Edit commands use **hashline** locators to specify positions with verification.
 
-| Format      | Example     | Description                                       |
-| ----------- | ----------- | ------------------------------------------------- |
-| `LINE:HASH` | `42:abc123` | Hashline - line + hash verification (recommended) |
-| `HASH`      | `abc123`    | Hash only (content-based positioning)             |
+| Format      | Example | Description                                       |
+| ----------- | ------- | ------------------------------------------------- |
+| `LINE:HASH` | `42:AB` | Hashline - line + hash verification (recommended) |
+| `HASH`      | `AB`    | Hash only (content-based positioning)             |
 
-**Virtual line:** The special hashline `0:000000` represents the position before the first line, used for inserting at the beginning of a file.
+**Virtual line:** The special hashline `0:00` represents the position before the first line, used for inserting at the beginning of a file.
 
 ```bash
 # Insert a copyright header at the very start of a file
-aifed edit main.rs + 0:000000 "// Copyright 2026"
+aifed edit main.rs + 0:00 "// Copyright 2026"
 ```
 
 See [locator.md](locator.md) for detailed documentation on locators and hashline.
 
 ### Options
 
-| Option          | Description                                       |
-| --------------- | ------------------------------------------------- |
-| `--file <FILE>` | Read operations from file (use `-` for stdin)     |
-| `--auto-fmt`    | Auto-format after all operations                  |
-| `--dry-run`     | Preview changes without applying                  |
-| `--continue`    | Continue on individual operation failures         |
-| `--force`       | Apply changes even if hash mismatch (use caution) |
+| Option          | Description                                   |
+| --------------- | --------------------------------------------- |
+| `--file <FILE>` | Read operations from file (use `-` for stdin) |
+| `--auto-fmt`    | Auto-format after all operations              |
+| `--dry-run`     | Preview changes without applying              |
+| `--continue`    | Continue on individual operation failures     |
 
 ### Examples
 
@@ -60,16 +59,16 @@ See [locator.md](locator.md) for detailed documentation on locators and hashline
 
 ```bash
 # Replace line 42 with hash verification
-aifed edit main.rs ~ 42:abc123 "fn main() {"
+aifed edit main.rs ~ 42:AB "fn main() {"
 
 # Insert after line 10
-aifed edit main.rs + 10:abc123 "    println!(\"hello\");"
+aifed edit main.rs + 10:AB "    println!(\"hello\");"
 
 # Delete line 42
-aifed edit main.rs - 42:abc123
+aifed edit main.rs - 42:AB
 
 # Insert at file beginning
-aifed edit main.rs + 0:000000 "// Copyright 2026"
+aifed edit main.rs + 0:00 "// Copyright 2026"
 ```
 
 #### Batch Operations
@@ -77,9 +76,9 @@ aifed edit main.rs + 0:000000 "// Copyright 2026"
 ```bash
 # Multiple operations via heredoc
 aifed edit main.rs <<EOF
-~ 42:abc123 "fn main() {"
-+ 10:def456 "    println!(\"hello\");"
-- 15:ghi789
+~ 42:AB "fn main() {"
++ 10:3K "    println!(\"hello\");"
+- 15:7M
 EOF
 
 # From file
@@ -96,10 +95,10 @@ aifed edit main.rs --file ops.txt --dry-run
 
 ```bash
 # With auto-format
-aifed edit main.rs ~ 42:abc123 "fn main(){" --auto-fmt
+aifed edit main.rs ~ 42:AB "fn main(){" --auto-fmt
 
 # Preview changes
-aifed edit main.rs ~ 42:abc123 "fn main() {" --dry-run
+aifed edit main.rs ~ 42:AB "fn main() {" --dry-run
 
 # Continue on failures (best-effort mode)
 aifed edit main.rs --file ops.txt --continue
@@ -109,10 +108,10 @@ aifed edit main.rs --file ops.txt --continue
 
 ```bash
 # Direct argument
-aifed edit lib.rs ~ 42:abc123 "content"
+aifed edit lib.rs ~ 42:AB "content"
 
 # From stdin (single operation)
-echo "content" | aifed edit lib.rs ~ 42:abc123 -
+echo "content" | aifed edit lib.rs ~ 42:AB -
 
 # Multi-line via heredoc
 aifed edit lib.rs ~ 10-15 - <<EOF
@@ -133,9 +132,9 @@ Original:
   L3: c
 
 Edit operations:
-  ~ abc123 "aa"    # Hash-based, valid
-  - def456         # Hash-based, valid
-  ~ ghi789 "cc"    # Hash-based, valid
+  ~ AB "aa"    # Hash-based, valid
+  - 3K         # Hash-based, valid
+  ~ 7M "cc"    # Hash-based, valid
 ```
 
 Hashes are content-based, so they remain valid regardless of other edits.
@@ -149,12 +148,12 @@ Hashes are content-based, so they remain valid regardless of other edits.
 
 **Note:** File path is a separate argument. Examples show full command-line context.
 
-| Format      | Locator Only | Full Example        | Use Case                          |
-| ----------- | ------------ | ------------------- | --------------------------------- |
-| `LINE:HASH` | `42:abc123`  | `main.rs 42:abc123` | Default - safest, dual validation |
-| `HASH`      | `abc123`     | `main.rs abc123`    | When line number unknown          |
+| Format      | Locator Only | Full Example    | Use Case                          |
+| ----------- | ------------ | --------------- | --------------------------------- |
+| `LINE:HASH` | `42:AB`      | `main.rs 42:AB` | Default - safest, dual validation |
+| `HASH`      | `AB`         | `main.rs AB`    | When line number unknown          |
 
-**Virtual line** (`0:000000`) is a special hashline for inserting at file beginning.
+**Virtual line** (`0:00`) is a special hashline for inserting at file beginning.
 
 See [locator.md](locator.md) for detailed documentation.
 

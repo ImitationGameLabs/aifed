@@ -34,17 +34,17 @@ Traditional line-number-only positioning has problems:
 The recommended format for edit operations.
 
 ```
-42:abc123
+42:AB
 ```
 
 - `42` - Line number (human-readable, helps locate quickly)
-- `abc123` - 6-character content hash (verification)
+- `AB` - 6-character content hash (verification)
 
-**Virtual Line:** The special value `0:000000` represents the position before the first line, used for inserting at the beginning of a file:
+**Virtual Line:** The special value `0:00` represents the position before the first line, used for inserting at the beginning of a file:
 
 ```bash
 # Insert at file beginning
-aifed edit main.rs + 0:000000 "// Copyright 2026"
+aifed edit main.rs + 0:00 "// Copyright 2026"
 ```
 
 ### `HASH` - Hash Only
@@ -52,7 +52,7 @@ aifed edit main.rs + 0:000000 "// Copyright 2026"
 Content-based positioning without line number.
 
 ```
-abc123
+AB
 ```
 
 **When to use:** When line number is unknown or you want pure content-based positioning.
@@ -81,22 +81,43 @@ Read a range of lines.
 
 ## Hash Algorithm
 
-aifed uses content hashing for line identification. The exact algorithm is TBD pending benchmark results.
+aifed uses xxHash64 with base32hex encoding for line identification.
 
-### Options Being Considered
+### Format
 
-| Option                    | Hash Length | Trade-offs                     |
-| ------------------------- | ----------- | ------------------------------ |
-| xxHash64 (hex)            | 6 chars     | Fast, sufficient               |
-| oh-my-pi style (xxHash32) | 2 chars     | Compact, higher collision rate |
+```
+42:AB
+```
 
-**oh-my-pi approach** (reference: [Hashline Edit Mode](https://deepwiki.com/can1357/oh-my-pi/8.1-hashline-edit-mode)):
-- Uses xxHash32, truncates to lowest byte
-- Maps to 2-char string using 16-char alphabet
-- Strips all whitespace before hashing
-- For symbol-only lines, mixes in line number as seed
+- `42` - Line number
+- `AB` - 2-character hash (10 bits, base32hex encoded)
 
-See [CLI Design Notes](../cli-design-notes.md) for the full comparison and decision rationale.
+### Algorithm
+
+- xxHash64 hashes the raw line content (whitespace preserved)
+- Top 10 bits of the hash are extracted
+- Encoded as 2 characters using base32hex (`0-9`, `A-V`)
+
+### base32hex Character Set
+
+```
+0123456789ABCDEFGHIJKLMNOPQRSTUV
+```
+
+- Digits first to avoid 0/O, 1/I/L confusion
+- 32 characters = 5 bits/char, 2 characters = 10 bits
+
+### Collision Probability
+
+| Lines | Collision Rate (10 bit) |
+| ----- | ----------------------- |
+| 100   | ~0.5%                   |
+| 1000  | ~38%                    |
+| 10000 | ~99%                    |
+
+For typical files (<1000 lines), collision rate is acceptable. When collisions occur, line number + hash combination still provides unique identification.
+
+See [CLI Design Notes](../cli-design-notes.md) for the design rationale.
 
 ## Hash Mismatch Behavior
 
@@ -105,8 +126,8 @@ When the provided hash doesn't match the current line content:
 ```
 Error: Hash mismatch
   File: main.rs
-  Expected hash: abc123
-  Actual hash: def456
+  Expected hash: AB
+  Actual hash: 3K
   Actual content: fn main() {
   Hint: Run 'aifed info main.rs' to get current hashes
 ```
@@ -114,7 +135,6 @@ Error: Hash mismatch
 ### Resolution Options
 
 1. **Re-read the file** - Get current hashes with `aifed read <FILE>`
-2. **Use `--force` flag** - Apply anyway (use with caution)
 
 ## Format Summary
 
@@ -122,12 +142,12 @@ Error: Hash mismatch
 
 ### Edit Locators (for `edit` command)
 
-| Format    | Syntax      | Locator Only | Full Example        | Use Case            |
-| --------- | ----------- | ------------ | ------------------- | ------------------- |
-| Hashline  | `LINE:HASH` | `42:abc123`  | `main.rs 42:abc123` | Default, safest     |
-| Hash only | `HASH`      | `abc123`     | `main.rs abc123`    | Line number unknown |
+| Format    | Syntax      | Locator Only | Full Example    | Use Case            |
+| --------- | ----------- | ------------ | --------------- | ------------------- |
+| Hashline  | `LINE:HASH` | `42:AB`      | `main.rs 42:AB` | Default, safest     |
+| Hash only | `HASH`      | `AB`         | `main.rs AB`    | Line number unknown |
 
-**Virtual line** (`0:000000`) is a special hashline value for inserting at file beginning.
+**Virtual line** (`0:00`) is a special hashline value for inserting at file beginning.
 
 ### Read Locators (for `read` command)
 
@@ -178,12 +198,12 @@ aifed symbols main.rs 15
 
 Output:
 ```
-15:def456  let config = load_config();
-    S1:config
-    S2:load_config
+15:3K|let config = load_config();
+S1:config
+S2:load_config
 ```
 
-The output provides everything needed for LSP operations: `15:def456` (hashline) and `S1:config` (symbol locator).
+The output provides everything needed for LSP operations: `15:3K` (hashline) and `S1:config` (symbol locator).
 
 ### When to Use
 
@@ -198,10 +218,10 @@ For LSP operations, both locators are required: `LINE:HASH` identifies the line,
 
 ```bash
 # LSP operations require both hashline and symbol locator
-aifed rename main.rs 15:def456 S1:config settings
-aifed hover main.rs 15:def456 S2:load_config
-aifed definition main.rs 15:def456 S2:load_config
-aifed references main.rs 15:def456 S1:config
+aifed rename main.rs 15:3K S1:config settings
+aifed hover main.rs 15:3K S2:load_config
+aifed definition main.rs 15:3K S2:load_config
+aifed references main.rs 15:3K S1:config
 ```
 
 ---
@@ -212,22 +232,22 @@ Locators are used with the `edit` command:
 
 ```bash
 # Replace with LINE:HASH format
-aifed edit main.rs ~ 42:abc123 "new content"
+aifed edit main.rs ~ 42:AB "new content"
 
 # Insert after a line
-aifed edit main.rs + 10:abc123 "new line"
+aifed edit main.rs + 10:AB "new line"
 
 # Insert at file beginning (virtual line)
-aifed edit main.rs + 0:000000 "// Copyright 2026"
+aifed edit main.rs + 0:00 "// Copyright 2026"
 
 # Delete a line
-aifed edit main.rs - 42:abc123
+aifed edit main.rs - 42:AB
 
 # Batch operations
 aifed edit main.rs <<EOF
-~ 42:abc123 "new content"
-+ 10:def456 "another line"
-- 15:ghi789
+~ 42:AB "new content"
++ 10:3K "another line"
+- 15:7M
 EOF
 ```
 
@@ -242,8 +262,8 @@ aifed read main.rs
 
 Output format (text):
 ```
-1:abc123  fn main() {
-2:def456      println!("hello");
+1:AB|fn main() {
+2:3K|    println!("hello");
 ```
 
 Note: The `LINE:HASH` format matches the locator syntax for easy copy-paste into edit commands.

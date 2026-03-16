@@ -48,23 +48,41 @@ See [locator.md](reference/locator.md) for usage details.
 
 ### 2. Hash Algorithm
 
-**Options considered:**
+**Decision:** xxHash64 + base32hex (2 characters, 10 bits)
 
-| Option                        | Hash Length | Pros                               | Cons                          |
-| ----------------------------- | ----------- | ---------------------------------- | ----------------------------- |
-| Full SHA-256                  | 64 chars    | No collisions                      | Too long, hurts readability   |
-| SHA-256 prefix                | 6 chars     | Good balance                       | ~0.003% collision in 1M lines |
-| Base62 encoded                | 6 chars     | More compact                       | Same entropy                  |
-| xxHash64 (hex)                | 6 chars     | Fast, sufficient                   | Non-cryptographic             |
-| **oh-my-pi style (xxHash32)** | 2 chars     | Very compact, proven in production | Higher collision rate         |
+| Option                    | Hash Length | Entropy | Pros                             |
+| ------------------------- | ----------- | ------- | -------------------------------- |
+| Full SHA-256              | 64 chars    | 256 bit | No collisions                    |
+| xxHash64 (hex)            | 6 chars     | 24 bit  | Simple encoding                  |
+| oh-my-pi style (xxHash32) | 2 chars     | 8 bit   | Very compact                     |
+| **xxHash64 + base32hex**  | 2 chars     | 10 bit  | Compact, 4x lower collision rate |
 
-**oh-my-pi approach** (reference: [Hashline Edit Mode](https://deepwiki.com/can1357/oh-my-pi/8.1-hashline-edit-mode)):
-- Uses xxHash32, truncates to lowest byte (`hash & 0xff`)
-- Maps to 2-char string using 16-char alphabet `ZPMQVRWSNKTXJBYH`
-- Strips all whitespace before hashing
-- For symbol-only lines, mixes in line number as seed to reduce collisions
+**Our approach:**
 
-**Decision:** TBD - Will benchmark both approaches (8-char hex vs 2-char oh-my-pi style) to determine optimal balance between compactness and collision rate for our use case.
+- Use xxHash64 to hash the raw line content (whitespace preserved)
+- Take the top 10 bits of the hash
+- Encode as 2 characters using base32hex (`0-9`, `A-V`)
+
+**Comparison with oh-my-pi:**
+
+| Aspect            | oh-my-pi                   | aifed             |
+| ----------------- | -------------------------- | ----------------- |
+| Hash algorithm    | xxHash32                   | xxHash64          |
+| Character set     | 16-char custom (`ZPMQ...`) | 32-char base32hex |
+| Encoded bits      | 8 bit                      | 10 bit            |
+| Collision rate    | 1/256                      | 1/1024            |
+| Whitespace        | Stripped                   | Preserved         |
+| Symbol-only lines | Mix in line number         | No special case   |
+
+**Design rationale:**
+- **base32hex**: Standard RFC 2938 encoding, good readability. Using 32 characters instead of 16 keeps the same 2-character length while reducing collision rate 4x (from 1/256 to 1/1024) at essentially no cost
+- **Preserve whitespace**: Whitespace is part of content; `foo` and `  foo` should have different hashes
+- **No symbol-only special case**: Simplifies implementation, relies on 10-bit low collision rate
+- **Independent line hashes**: Each line's hash is computed independently, not chained to neighbors
+
+1. **Preserve whitespace**: Whitespace is part of content; `foo` and `  foo` should have different hashes
+2. **No symbol-only special case**: Simplifies implementation, relies on 10-bit low collision rate
+3. **base32hex**: Standard RFC 2938 encoding, good readability, avoids confusing characters (0/O, 1/I/L)
 
 ### 3. Command Structure: Unified Edit
 
@@ -96,10 +114,10 @@ Using symbolic operators (`~`/`+`/`-`) instead of subcommands (`replace`/`insert
 
 **Virtual Line Convention:**
 
-`0:000000` represents the position before the first line, enabling insert-at-beginning:
+`0:00` represents the position before the first line, enabling insert-at-beginning:
 
 ```bash
-aifed edit main.rs + 0:000000 "// Copyright 2026"
+aifed edit main.rs + 0:00 "// Copyright 2026"
 ```
 
 ### 4. Filepath and Locator Separation
@@ -197,9 +215,8 @@ When hash doesn't match current line content:
 | Reject + show current   | Safe, clear    | Requires re-read    |
 | Reject + show diff      | More context   | More complex output |
 | Prompt for confirmation | Human-friendly | Not AI-friendly     |
-| Force flag to override  | Flexibility    | Risk of wrong edit  |
 
-**Choice:** Reject with error + show current line/hash, with `--force` override.
+**Choice:** Reject with error + show current line/hash. This forces AI to re-read the file, ensuring it has the correct current state before editing.
 
 ### Batch Operations: Line Number Drift
 
@@ -250,8 +267,8 @@ Priority (highest wins): CLI flags > Environment variables > Project config > Gl
 ```
 Error: Hash mismatch
   File: main.rs
-  Expected hash: abc123
-  Actual hash: def456
+  Expected hash: AB
+  Actual hash: 3K
   Actual content: fn main() {
   Hint: Run 'aifed info main.rs' to get current hashes
 ```

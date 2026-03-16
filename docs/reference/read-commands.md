@@ -21,9 +21,9 @@ aifed read <FILE> [LOCATOR]
 ### Output Format (default)
 
 ```
-1:abc123  fn main() {
-2:def456      println!("hello");
-3:ghi789  }
+1:AB|fn main() {
+2:3K|    println!("hello");
+3:7M|}
 ```
 
 Note: Each line prefixed with `LINE:HASH` for use in edit commands. Hashes are included by default since AI needs them for safe editing.

@@ -111,18 +111,18 @@ Symbol types depend on the LSP server and language. Use `--list-types` to discov
 Default (identifiers only, excludes keywords):
 
 ```
-15:def456  let config = load_config();
-    S1:config
-    S2:load_config
+15:3K|let config = load_config();
+S1:config
+S2:load_config
 ```
 
 With `--include-keywords`:
 
 ```
-15:def456  let config = load_config();
-    S1:let
-    S2:config
-    S3:load_config
+15:3K|let config = load_config();
+S1:let
+S2:config
+S3:load_config
 ```
 
 Note: Symbol Locator index (`S1`, `S2`, etc.) is per-line, starting from 1. For line ranges, each line shows its symbols separately.
@@ -180,12 +180,12 @@ aifed rename <FILE> <LINE:HASH> <SINDEX:NAME> <NEW_NAME>
 
 ### Arguments
 
-| Argument        | Description                                       |
-| --------------- | ------------------------------------------------- |
-| `<FILE>`        | File path                                         |
-| `<LINE:HASH>`   | Hashline locator for the line (e.g., `15:def456`) |
-| `<SINDEX:NAME>` | Symbol locator on that line (e.g., `S1:config`)   |
-| `<NEW_NAME>`    | New symbol name                                   |
+| Argument        | Description                                     |
+| --------------- | ----------------------------------------------- |
+| `<FILE>`        | File path                                       |
+| `<LINE:HASH>`   | Hashline locator for the line (e.g., `15:3K`)   |
+| `<SINDEX:NAME>` | Symbol locator on that line (e.g., `S1:config`) |
+| `<NEW_NAME>`    | New symbol name                                 |
 
 The hashline ensures the line content hasn't drifted. Symbol locator index is per-line (1-based).
 
@@ -195,13 +195,13 @@ Get both values with: `aifed symbols <FILE> <LINE>`
 
 ```bash
 # Rename symbol (hashline from symbols output)
-aifed rename main.rs 15:def456 S1:config settings
+aifed rename main.rs 15:3K S1:config settings
 
 # Preview changes
-aifed rename main.rs 15:def456 S1:config settings --dry-run
+aifed rename main.rs 15:3K S1:config settings --dry-run
 
 # Rename in file only
-aifed rename main.rs 15:def456 S1:config settings --scope file
+aifed rename main.rs 15:3K S1:config settings --scope file
 ```
 
 ### Conflict Handling
@@ -229,11 +229,11 @@ aifed references <FILE> <LINE:HASH> <SINDEX:NAME>
 
 ### Arguments
 
-| Argument        | Description                                       |
-| --------------- | ------------------------------------------------- |
-| `<FILE>`        | File path                                         |
-| `<LINE:HASH>`   | Hashline locator for the line (e.g., `15:def456`) |
-| `<SINDEX:NAME>` | Symbol locator on that line (e.g., `S1:config`)   |
+| Argument        | Description                                     |
+| --------------- | ----------------------------------------------- |
+| `<FILE>`        | File path                                       |
+| `<LINE:HASH>`   | Hashline locator for the line (e.g., `15:3K`)   |
+| `<SINDEX:NAME>` | Symbol locator on that line (e.g., `S1:config`) |
 
 The hashline ensures the line content hasn't drifted. Symbol locator index is per-line (1-based).
 
@@ -243,13 +243,13 @@ Get both values with: `aifed symbols <FILE> <LINE>`
 
 ```bash
 # Find references (hashline from symbols output)
-aifed references main.rs 15:def456 S1:config
+aifed references main.rs 15:3K S1:config
 
 # Include declaration
-aifed references main.rs 15:def456 S1:config --include-declaration
+aifed references main.rs 15:3K S1:config --include-declaration
 
 # JSON output
-aifed references main.rs 15:def456 S1:config --json
+aifed references main.rs 15:3K S1:config --json
 ```
 
 ---
@@ -269,7 +269,7 @@ aifed definition <FILE> <LINE:HASH> <SINDEX:NAME>
 | Argument        | Description                                          |
 | --------------- | ---------------------------------------------------- |
 | `<FILE>`        | File path                                            |
-| `<LINE:HASH>`   | Hashline locator for the line (e.g., `15:def456`)    |
+| `<LINE:HASH>`   | Hashline locator for the line (e.g., `15:3K`)        |
 | `<SINDEX:NAME>` | Symbol locator on that line (e.g., `S2:load_config`) |
 
 The hashline ensures the line content hasn't drifted. Symbol locator index is per-line (1-based).
@@ -280,10 +280,10 @@ Get both values with: `aifed symbols <FILE> <LINE>`
 
 ```bash
 # Go to definition (hashline from symbols output)
-aifed definition main.rs 15:def456 S2:load_config
+aifed definition main.rs 15:3K S2:load_config
 
 # JSON output
-aifed definition main.rs 15:def456 S2:load_config --json
+aifed definition main.rs 15:3K S2:load_config --json
 ```
 
 ---
@@ -300,11 +300,11 @@ aifed hover <FILE> <LINE:HASH> <SINDEX:NAME>
 
 ### Arguments
 
-| Argument        | Description                                       |
-| --------------- | ------------------------------------------------- |
-| `<FILE>`        | File path                                         |
-| `<LINE:HASH>`   | Hashline locator for the line (e.g., `15:def456`) |
-| `<SINDEX:NAME>` | Symbol locator on that line (e.g., `S1:config`)   |
+| Argument        | Description                                     |
+| --------------- | ----------------------------------------------- |
+| `<FILE>`        | File path                                       |
+| `<LINE:HASH>`   | Hashline locator for the line (e.g., `15:3K`)   |
+| `<SINDEX:NAME>` | Symbol locator on that line (e.g., `S1:config`) |
 
 The hashline ensures the line content hasn't drifted. Symbol locator index is per-line (1-based).
 
@@ -314,10 +314,10 @@ Get both values with: `aifed symbols <FILE> <LINE>`
 
 ```bash
 # Get hover info (hashline from symbols output)
-aifed hover main.rs 15:def456 S1:config
+aifed hover main.rs 15:3K S1:config
 
 # JSON output
-aifed hover main.rs 15:def456 S1:config --json
+aifed hover main.rs 15:3K S1:config --json
 ```
 
 ## See Also
