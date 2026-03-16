@@ -147,7 +147,7 @@ aifed edit main.rs + 0:000000 "// Copyright 2026"
 1. **No counting** - Index is sequential, not character offset
 2. **Verifiable** - LSP validates symbol existence
 3. **Self-documenting** - NAME makes locator readable
-4. **On-demand** - Only output when `--symbols` flag is used
+4. **On-demand** - Only output when `symbols` command is used with a line
 5. **Token efficient** - Normal edits don't pay the symbol overhead
 
 **Why no hash in Symbol Locator:**
@@ -172,7 +172,7 @@ aifed hover main.rs:15:"let user"
 ```
 
 Pros:
-- No extra `read --symbols` step
+- No extra `symbols` step
 - Works with already-read content
 
 Cons:

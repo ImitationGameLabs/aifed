@@ -142,7 +142,7 @@ Error: Hash mismatch
 
 ## Symbol Locator
 
-For LSP operations that require column-level precision (rename, hover, definition, references), use Symbol Locator instead of numeric columns.
+For LSP operations that require column-level precision (rename, hover, definition, references), use Symbol Locator combined with a hashline.
 
 ### Why Symbol Locator?
 
@@ -155,50 +155,55 @@ Symbol Locator solves this by using semantic information from LSP.
 
 ### Format
 
-| Format                 | Locator Only | Full Example         | Description         |
-| ---------------------- | ------------ | -------------------- | ------------------- |
-| `S<INDEX>:<NAME>`      | `S1:user`    | `main.rs S1:user`    | Symbol index + name |
-| `LINE:S<INDEX>:<NAME>` | `15:S1:user` | `main.rs 15:S1:user` | With line context   |
+Symbol Locator format:
 
-- `INDEX` - Sequential number (1-based) for symbols on the line
+```
+S<INDEX>:<NAME>
+```
+
+- `INDEX` - Sequential number (1-based) for symbols on that line
 - `NAME` - Symbol name for self-documentation and LSP verification
 
-**No hash needed** - LSP validates symbol existence, so hash verification is redundant.
+**Usage in LSP commands:** Symbol Locator is always paired with a hashline:
+
+```
+aifed <CMD> <FILE> <LINE:HASH> <SINDEX:NAME>
+```
 
 ### Getting Symbol Locators
 
-Use `read --symbols` to get symbol locators for a specific line:
+Use `symbols` command with a line number to get both the hashline and symbol locators:
 
 ```bash
-aifed read main.rs 15 --symbols
+aifed symbols main.rs 15
 ```
 
 Output:
 ```
-L15:def456  let user: User = get_user(user);
-            S1:user
-            S2:User
-            S3:get_user
-            S4:user
+15:def456  let config = load_config();
+    S1:config
+    S2:load_config
 ```
 
-Note: `S1:user` (variable, type `User`) and `S4:user` (parameter, e.g., type `&str`) are different symbols - renaming one does not affect the other. INDEX distinguishes position, LSP distinguishes identity.
+The output provides everything needed for LSP operations: `15:def456` (hashline) and `S1:config` (symbol locator).
 
 ### When to Use
 
 | Locator Type   | Format        | Use Case                                               |
 | -------------- | ------------- | ------------------------------------------------------ |
 | Line Locator   | `LINE:HASH`   | Edit operations (`~`, `+`, `-`)                        |
-| Symbol Locator | `SINDEX:NAME` | LSP operations (rename, hover, definition, references) |
+| Symbol Locator | `SINDEX:NAME` | Symbol identification (used with Line Locator for LSP) |
+
+For LSP operations, both locators are required: `LINE:HASH` identifies the line, `SINDEX:NAME` identifies the symbol on that line.
 
 ### Example Usage
 
 ```bash
-# LSP operations with Symbol Locator
-aifed rename main.rs S1:user new_name
-aifed hover main.rs S1:user
-aifed definition main.rs S2:User
-aifed references main.rs S4:user
+# LSP operations require both hashline and symbol locator
+aifed rename main.rs 15:def456 S1:config settings
+aifed hover main.rs 15:def456 S2:load_config
+aifed definition main.rs 15:def456 S2:load_config
+aifed references main.rs 15:def456 S1:config
 ```
 
 ---
@@ -239,8 +244,8 @@ aifed read main.rs
 
 Output format (text):
 ```
-L1:abc123  fn main() {
-L2:def456      println!("hello");
+1:abc123  fn main() {
+2:def456      println!("hello");
 ```
 
 Note: The `LINE:HASH` format matches the locator syntax for easy copy-paste into edit commands.

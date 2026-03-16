@@ -19,45 +19,70 @@ Here's how an AI agent might work with aifed in typical development scenarios:
 ### Understanding Code
 
 ```bash
-# Read a specific function with hashes for later editing
-aifed read main.go 42-80
+# Read line 15 of main.rs with hashlines for safe editing
+aifed read main.rs 15
+```
+```
+15:abc123  let count = calculate_total(items);
+```
 
-# Check a symbol's type and signature
-aifed hover main.go S1:user
+```bash
+# Get symbol locators on line 15 for LSP operations
+aifed symbols main.rs 15
+```
+```
+15:abc123  let count = calculate_total(items);
+    S1:count
+    S2:calculate_total
+    S3:items
+```
 
-# Navigate to a symbol's definition
-aifed definition main.go S1:user
+```bash
+# Get type info for calculate_total function
+aifed hover main.rs 15:abc123 S2:calculate_total
+
+# Go to definition of items
+aifed definition main.rs 15:abc123 S3:items
 ```
 
 ### Refactoring
 
 ```bash
-# Confirm the scope of a symbol's usage
-aifed references main.go --symbol oldName
+# Get symbol locators on line 10
+aifed symbols main.rs 10
+```
+```
+10:xyz789  let config = load_config();
+    S1:config
+    S2:load_config
+```
 
-# Rename across the entire codebase
-aifed rename main.go S1:oldName newName
+```bash
+# Find all references to config
+aifed references main.rs 10:xyz789 S1:config
 
-# Get current hashes, then safely edit code
-aifed read main.go 20-30
-aifed edit main.go ~ 25:abc123 "refactored code"
+# Rename config to settings across the codebase
+aifed rename main.rs 10:xyz789 S1:config settings
+
+# Edit line 10 with hashline verification
+aifed edit main.rs ~ 10:xyz789 "let settings = load_config();"
 ```
 
 ### Debugging
 
 ```bash
 # Check for errors after changes
-aifed diagnostics main.go
+aifed diagnostics main.rs
 ```
 
 ### History & Recovery
 
 ```bash
 # View recent edit history
-aifed history main.go --last 5
+aifed history main.rs --last 5
 
 # Undo if something went wrong
-aifed undo main.go
+aifed undo main.rs
 ```
 
 ## Documentation

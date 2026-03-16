@@ -14,18 +14,16 @@ aifed read <FILE> [LOCATOR]
 
 ### Options
 
-| Option          | Description                                            |
-| --------------- | ------------------------------------------------------ |
-| `--no-hashes`   | Exclude line hashes (for exploration, not editing)     |
-| `--context <N>` | Show N lines of context around target                  |
-| `--symbols`     | Include Symbol Locators for LSP operations (on-demand) |
-
+| Option          | Description                                        |
+| --------------- | -------------------------------------------------- |
+| `--no-hashes`   | Exclude line hashes (for exploration, not editing) |
+| `--context <N>` | Show N lines of context around target              |
 ### Output Format (default)
 
 ```
-L1:abc123  fn main() {
-L2:def456      println!("hello");
-L3:ghi789  }
+1:abc123  fn main() {
+2:def456      println!("hello");
+3:ghi789  }
 ```
 
 Note: Each line prefixed with `LINE:HASH` for use in edit commands. Hashes are included by default since AI needs them for safe editing.
@@ -65,57 +63,12 @@ For large files (>10,000 lines), consider:
 - Using `START-END` to read specific sections
 - Using `--context` to focus on relevant areas
 
-### `read --symbols` - Read with Symbol Locators
-
-Get Symbol Locators for LSP operations. This is an on-demand feature - use it when you need column-level precision without counting characters.
-
-```bash
-aifed read main.rs 15 --symbols
-```
-
-Output:
-```
-L15:def456  let user: User = get_user(user);
-            S1:user
-            S2:User
-            S3:get_user
-            S4:user
-```
-
-Note: Same-named symbols (e.g., `S1:user` and `S4:user`) are independent - renaming one does not affect the other. See [Locator Reference](locator.md) for details.
-
-**Output format:**
-- `L15:def456` - Line Locator (for edit operations)
-- `S1:user` - Symbol Locator (for LSP operations)
-
-**When to use:**
-- Preparing for LSP operations: rename, hover, definition, references
-- When you need to target a specific symbol on a line
-- Avoiding character counting for column positions
-
-**Token efficiency:**
-- Regular `read` (without `--symbols`) is more token-efficient for edit operations
-- Use `--symbols` only when you need Symbol Locators for LSP commands
-
-**Example workflow:**
-```bash
-# 1. Read file to understand code
-aifed read main.rs 15
-
-# 2. If you need LSP operation, get Symbol Locators
-aifed read main.rs 15 --symbols
-
-# 3. Use Symbol Locator in LSP command
-aifed hover main.rs S1:user
-```
-
-### When to Use
+## When to Use
 
 - **Understanding code** - Read file content
 - **Before editing** - Hashes included by default
 - **Exploration** - Use `--no-hashes` to save tokens when not planning to edit
 - **Focused reading** - Use ranges for specific sections
-
 
 ## `info` - Get File Metadata
 
@@ -177,7 +130,6 @@ aifed info main.rs --json
 **Use `read` for:**
 - Reading actual file content
 - Getting hashes for editing
-- Preparing for LSP operations (`--symbols`)
 
 **Use `info` for:**
 - Checking file size/line count before reading
