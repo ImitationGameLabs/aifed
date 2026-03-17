@@ -10,10 +10,10 @@ pub fn execute(path: &Path, format: OutputFormat) -> Result<()> {
     }
 
     let metadata = std::fs::metadata(path)
-        .map_err(|e| Error::IoError { path: path.to_path_buf(), source: e })?;
+        .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })?;
 
     let content = std::fs::read_to_string(path)
-        .map_err(|e| Error::IoError { path: path.to_path_buf(), source: e })?;
+        .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })?;
 
     let lines = content.lines().count();
     let size = metadata.len();

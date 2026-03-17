@@ -19,10 +19,18 @@ pub enum Error {
     InvalidOperation {
         input: String,
     },
-    IoError {
+    InvalidIo {
         path: PathBuf,
         source: std::io::Error,
     },
+    /// Failed to parse batch operation
+    InvalidBatchOp {
+        line_number: usize,
+        line_content: String,
+        reason: String,
+    },
+    /// stdin not available
+    StdinNotAvailable,
 }
 
 impl std::fmt::Display for Error {
@@ -53,8 +61,18 @@ impl std::fmt::Display for Error {
                     input
                 )
             }
-            Error::IoError { path, source } => {
+            Error::InvalidIo { path, source } => {
                 write!(f, "IO error for '{}': {}", path.display(), source)
+            }
+            Error::InvalidBatchOp { line_number, line_content, reason } => {
+                write!(
+                    f,
+                    "Batch parse error on line {}: '{}'\n  Reason: {}",
+                    line_number, line_content, reason
+                )
+            }
+            Error::StdinNotAvailable => {
+                write!(f, "stdin not available for reading")
             }
         }
     }

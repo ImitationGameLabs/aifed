@@ -17,11 +17,7 @@ pub fn hash_line(content: &str) -> String {
 fn base32hex_encode(value: u16) -> String {
     let hi = (value >> 5) as usize;
     let lo = (value & 0x1F) as usize;
-    format!(
-        "{}{}",
-        BASE32HEX_ALPHABET[hi] as char,
-        BASE32HEX_ALPHABET[lo] as char
-    )
+    format!("{}{}", BASE32HEX_ALPHABET[hi] as char, BASE32HEX_ALPHABET[lo] as char)
 }
 
 /// Virtual line hash constant for inserting at the beginning of a file.

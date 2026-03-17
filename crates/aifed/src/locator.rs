@@ -57,7 +57,10 @@ impl Locator {
             })?;
 
             // Validate hash is base32hex (0-9, A-V)
-            if !hash.chars().all(|c| c.is_ascii_digit() || ('A'..='V').contains(&c) || ('a'..='v').contains(&c)) {
+            if !hash
+                .chars()
+                .all(|c| c.is_ascii_digit() || ('A'..='V').contains(&c) || ('a'..='v').contains(&c))
+            {
                 return Err(Error::InvalidLocator {
                     input: input.to_string(),
                     reason: "Hash must be base32hex characters (0-9, A-V)".to_string(),

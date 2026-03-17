@@ -43,6 +43,28 @@ pub struct EditChange {
     pub new_content: Option<String>,
 }
 
+/// Batch operation error
+#[derive(Debug, Serialize)]
+pub struct BatchOpError {
+    pub line: usize,
+    pub operation: String,
+    pub error: String,
+}
+
+/// Batch edit result for output
+#[derive(Debug, Serialize)]
+pub struct BatchResult {
+    pub success: bool,
+    pub total: usize,
+    pub successful: usize,
+    pub failed: usize,
+    pub message: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub changes: Vec<EditChange>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub errors: Vec<BatchOpError>,
+}
+
 /// Format hashed lines for output
 pub fn format_lines(lines: &[HashedLine], format: OutputFormat, no_hashes: bool) -> String {
     match format {
@@ -107,6 +129,32 @@ pub fn format_edit_result(result: &EditResult, format: OutputFormat) -> String {
             } else {
                 format!("Error: {}", result.message)
             }
+        }
+        OutputFormat::Json => serde_json::to_string_pretty(&result).unwrap_or_default(),
+    }
+}
+
+/// Format batch result for output
+pub fn format_batch_result(result: &BatchResult, format: OutputFormat) -> String {
+    match format {
+        OutputFormat::Text => {
+            let mut output = result.message.clone();
+            if !result.changes.is_empty() {
+                output.push_str("\n\nChanges:");
+                for change in &result.changes {
+                    output.push_str(&format!("\n  {} line {}", change.operation, change.line));
+                }
+            }
+            if !result.errors.is_empty() {
+                output.push_str("\n\nErrors:");
+                for err in &result.errors {
+                    output.push_str(&format!(
+                        "\n  Line {}: {} - {}",
+                        err.line, err.operation, err.error
+                    ));
+                }
+            }
+            output
         }
         OutputFormat::Json => serde_json::to_string_pretty(&result).unwrap_or_default(),
     }

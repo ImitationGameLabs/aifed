@@ -1,3 +1,4 @@
+mod batch;
 mod cli;
 mod commands;
 mod error;
@@ -17,9 +18,14 @@ fn main() {
             commands::read(&file, locator.as_deref(), no_hashes, context, format)
         }
         Commands::Info { file } => commands::info(&file, format),
-        Commands::Edit { file, operation, locator, content, dry_run } => {
-            commands::edit(&file, &operation, &locator, content.as_deref(), dry_run, format)
-        }
+        Commands::Edit { file, operation, locator, content, dry_run } => commands::edit(
+            &file,
+            operation.as_deref(),
+            locator.as_deref(),
+            content.as_deref(),
+            dry_run,
+            format,
+        ),
     };
 
     if let Err(e) = result {
