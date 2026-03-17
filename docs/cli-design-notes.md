@@ -87,10 +87,10 @@ See [locator.md](reference/locator.md) for usage details.
 
 ### 3. Command Structure: Unified Edit
 
-**Decision:** Use a single `edit` command with operator prefixes (`~`/`+`/`-`) instead of separate `replace`/`insert`/`delete` commands.
+**Decision:** Use a single `edit` command with operator prefixes (`=`/`+`/`-`) instead of separate `replace`/`insert`/`delete` commands.
 
 ```
-~ <LOCATOR> <CONTENT>   # replace
+= <LOCATOR> <CONTENT>   # replace
 + <LOCATOR> <CONTENT>   # insert after
 - <LOCATOR>             # delete
 ```
@@ -107,11 +107,22 @@ See [locator.md](reference/locator.md) for usage details.
 
 **Why operators over subcommands:**
 
-Using symbolic operators (`~`/`+`/`-`) instead of subcommands (`replace`/`insert`/`delete`):
+Using symbolic operators (`=`/`+`/`-`) instead of subcommands (`replace`/`insert`/`delete`):
 - **Consistency:** Same syntax for single and batch operations
 - **Token efficiency:** Shorter, especially in batch mode
 - **Visual clarity:** Operators visually distinguish operation types
 - **No decision point:** Single command entry eliminates "which command?" decision
+
+**Operator choice for replace:**
+
+| Operator | Pros                              | Cons                              |
+| -------- | --------------------------------- | --------------------------------- |
+| `~`      | Common in editors (vim `~` case)  | Shell expands to `$HOME`          |
+| `=`      | Shell-safe, assignment semantics  | Less common in text editors       |
+
+**Decision:** Use `=` for replace operation.
+
+**Rationale:** `~` is expanded by shells (bash, zsh, etc.) to the user's home directory. This requires quoting (`'~'`) on every invocation, which is error-prone and adds friction. `=` is shell-safe and conveys "assignment" semantics (replace X with Y).
 
 **Virtual Line Convention:**
 

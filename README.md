@@ -67,7 +67,7 @@ aifed references main.rs 10:AB S1:config
 aifed rename main.rs 10:AB S1:config settings
 
 # Edit line 10 with hashline verification
-aifed edit main.rs ~ 10:AB "let settings = load_config();"
+aifed edit main.rs = 10:AB "let settings = load_config();"
 ```
 
 ### Debugging

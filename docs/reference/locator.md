@@ -220,7 +220,7 @@ Locators are used with the `edit` command:
 
 ```bash
 # Replace with LINE:HASH format
-aifed edit main.rs ~ 42:AB "new content"
+aifed edit main.rs = 42:AB "new content"
 
 # Insert after a line
 aifed edit main.rs + 10:AB "new line"

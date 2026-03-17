@@ -98,13 +98,13 @@ aifed read test.txt 1-2
 
 ## Replace Line with Hashline Verification
 
-**Goal:** Verify `~` (replace) operation modifies a line when hash matches.
+**Goal:** Verify `=` (replace) operation modifies a line when hash matches.
 
 **Steps:**
 ```bash
 aifed read test.txt
 # Capture hash for line 2 (e.g., 3K)
-aifed edit test.txt "~" 2:3K "modified line2"
+aifed edit test.txt = 2:3K "modified line2"
 aifed read test.txt
 ```
 
@@ -127,7 +127,7 @@ aifed read test.txt
 **Steps:**
 ```bash
 # Using stale hash (from original line content)
-aifed edit test.txt "~" 2:3K "should fail"
+aifed edit test.txt = 2:3K "should fail"
 ```
 
 **Expected:**
@@ -155,7 +155,7 @@ Hash mismatch
 ```bash
 aifed read test.txt
 # Insert after line 1 (use its current hash)
-aifed edit test.txt "+" 1:AB "inserted line"
+aifed edit test.txt + 1:AB "inserted line"
 aifed read test.txt
 ```
 
@@ -178,7 +178,7 @@ aifed read test.txt
 
 **Steps:**
 ```bash
-aifed edit test.txt "+" 0:00 "// header"
+aifed edit test.txt + 0:00 "// header"
 aifed read test.txt
 ```
 
@@ -202,7 +202,7 @@ aifed read test.txt
 ```bash
 aifed read test.txt
 # Capture hash for the line to delete
-aifed edit test.txt "-" 2:AB
+aifed edit test.txt - 2:AB
 aifed read test.txt
 ```
 
@@ -225,7 +225,7 @@ aifed read test.txt
 **Steps:**
 ```bash
 aifed read test.txt
-aifed edit test.txt "~" 1:C8 "new content" --dry-run
+aifed edit test.txt = 1:C8 "new content" --dry-run
 aifed read test.txt
 ```
 
@@ -234,7 +234,7 @@ aifed read test.txt
 - File content is unchanged
 
 ```
-Would apply ~ to test.txt
+Would apply = to test.txt
 ```
 
 ---
@@ -324,7 +324,7 @@ File not found: nonexistent.txt
 
 **Steps:**
 ```bash
-aifed edit test.txt "~"
+aifed edit test.txt =
 ```
 
 **Expected:**

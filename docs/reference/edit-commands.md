@@ -17,12 +17,12 @@ aifed edit <FILE> [OPERATIONS...]    # Multiple operations via stdin/file
 
 | Operator | Syntax                  | Description                  |
 | -------- | ----------------------- | ---------------------------- |
-| `~`      | `~ <LOCATOR> <CONTENT>` | Replace content at locator   |
+| `=`      | `= <LOCATOR> <CONTENT>` | Replace content at locator   |
 | `+`      | `+ <LOCATOR> <CONTENT>` | Insert content after locator |
 | `-`      | `- <LOCATOR>`           | Delete content at locator    |
 
 **Mnemonic:**
-- `~` - Tilde suggests "modify" or "change" (used in regex, diff)
+- `=` - Equals suggests "assignment" (replace X with Y)
 - `+` - Plus suggests "add" or "insert"
 - `-` - Minus suggests "remove" or "delete"
 
@@ -59,7 +59,7 @@ See [locator.md](locator.md) for detailed documentation on locators and hashline
 
 ```bash
 # Replace line 42 with hash verification
-aifed edit main.rs ~ 42:AB "fn main() {"
+aifed edit main.rs = 42:AB "fn main() {"
 
 # Insert after line 10
 aifed edit main.rs + 10:AB "    println!(\"hello\");"
@@ -76,7 +76,7 @@ aifed edit main.rs + 0:00 "// Copyright 2026"
 ```bash
 # Multiple operations via heredoc
 aifed edit main.rs <<EOF
-~ 42:AB "fn main() {"
+= 42:AB "fn main() {"
 + 10:3K "    println!(\"hello\");"
 - 15:7M
 EOF
@@ -95,10 +95,10 @@ aifed edit main.rs --file ops.txt --dry-run
 
 ```bash
 # With auto-format
-aifed edit main.rs ~ 42:AB "fn main(){" --auto-fmt
+aifed edit main.rs = 42:AB "fn main(){" --auto-fmt
 
 # Preview changes
-aifed edit main.rs ~ 42:AB "fn main() {" --dry-run
+aifed edit main.rs = 42:AB "fn main() {" --dry-run
 
 # Continue on failures (best-effort mode)
 aifed edit main.rs --file ops.txt --continue
@@ -108,13 +108,13 @@ aifed edit main.rs --file ops.txt --continue
 
 ```bash
 # Direct argument
-aifed edit lib.rs ~ 42:AB "content"
+aifed edit lib.rs = 42:AB "content"
 
 # From stdin (single operation)
-echo "content" | aifed edit lib.rs ~ 42:AB -
+echo "content" | aifed edit lib.rs = 42:AB -
 
 # Multi-line via heredoc
-aifed edit lib.rs ~ 10-15 - <<EOF
+aifed edit lib.rs = 10-15 - <<EOF
 fn new_func() -> Option<i32> {
     None
 }
@@ -132,9 +132,9 @@ Original:
   L3: c
 
 Edit operations:
-  ~ AB "aa"    # Hash-based, valid
+  = AB "aa"    # Hash-based, valid
   - 3K         # Hash-based, valid
-  ~ 7M "cc"    # Hash-based, valid
+  = 7M "cc"    # Hash-based, valid
 ```
 
 Hashes are content-based, so they remain valid regardless of other edits.
