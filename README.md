@@ -10,6 +10,10 @@ aifed's goal is to design a dedicated text editor for AI agents, implemented as 
 - **Progressive disclosure** - Simple commands for simple tasks, advanced features on demand
 - **Decoupled from AI Agents** - Any coding agent that supports shell can use it
 
+## Getting Started
+
+See the [Installation Guide](docs/installation-guide.md) for setup instructions.
+
 ## Usage Examples
 
 Here's how an AI agent might work with aifed in typical development scenarios:
@@ -95,14 +99,6 @@ This project was inspired by:
 - [agent-browser](https://github.com/vercel-labs/agent-browser) - A browser designed for AI agents
 - [oh-my-pi](https://github.com/can1357/oh-my-pi) - The [Hashline Edit Mode](https://deepwiki.com/can1357/oh-my-pi/8.1-hashline-edit-mode) inspired our [Locator](docs/reference/locator.md) design
 
-## Development
+## Contributing
 
-This project uses **Nix** + **direnv** + **crane** + **rust-overlay**.
-
-```bash
-# Auto-load environment with direnv (recommended)
-direnv allow
-
-# Or manually enter dev shell
-nix develop
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md) for ways to contribute to the project.
