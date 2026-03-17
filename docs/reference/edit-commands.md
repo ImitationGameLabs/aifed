@@ -10,7 +10,7 @@ The unified command for all file edits: replace, insert, and delete.
 
 ```
 aifed edit <FILE> <OPERATION> <LOCATOR> [CONTENT]
-aifed edit <FILE> [OPERATIONS...]    # Multiple operations via stdin/file
+aifed edit <FILE>                      # Multiple operations via stdin (heredoc)
 ```
 
 ### Operations
@@ -46,12 +46,9 @@ See [locator.md](locator.md) for detailed documentation on locators and hashline
 
 ### Options
 
-| Option          | Description                                   |
-| --------------- | --------------------------------------------- |
-| `--file <FILE>` | Read operations from file (use `-` for stdin) |
-| `--auto-fmt`    | Auto-format after all operations              |
-| `--dry-run`     | Preview changes without applying              |
-| `--continue`    | Continue on individual operation failures     |
+| Option      | Description                      |
+| ----------- | -------------------------------- |
+| `--dry-run` | Preview changes without applying |
 
 ### Examples
 
@@ -80,28 +77,13 @@ aifed edit main.rs <<EOF
 + 10:3K "    println!(\"hello\");"
 - 15:7M
 EOF
-
-# From file
-aifed edit main.rs --file ops.txt
-
-# From stdin
-cat ops.txt | aifed edit main.rs --file -
-
-# Preview changes
-aifed edit main.rs --file ops.txt --dry-run
 ```
 
 #### With Options
 
 ```bash
-# With auto-format
-aifed edit main.rs = 42:AB "fn main(){" --auto-fmt
-
 # Preview changes
 aifed edit main.rs = 42:AB "fn main() {" --dry-run
-
-# Continue on failures (best-effort mode)
-aifed edit main.rs --file ops.txt --continue
 ```
 
 ### Content Input Methods
@@ -141,8 +123,7 @@ Hashes are content-based, so they remain valid regardless of other edits.
 
 ### Failure Handling
 
-- **Default:** Atomic (all-or-nothing) - if any operation fails, none are applied
-- **With `--continue`:** Best-effort - continue on failures, report results
+Batch operations are **atomic** (all-or-nothing): if any operation fails, none are applied.
 
 ## Locator Quick Reference
 

@@ -28,6 +28,54 @@ Avoid multiple ways to accomplish the same task. When alternatives exist, choose
 - Single locator syntax (not `file:line` AND `file line`)
 - Long flags only (not `-f` AND `--file`)
 
+### Help as Agent Skill
+
+The main `aifed --help` output should serve as a complete, self-contained skill for AI agents.
+
+**Requirement:** An agent reading `aifed --help` alone should be able to:
+
+1. Understand the core workflow (read → get hashes → edit with verification)
+2. Know all available operators and their meanings
+3. Parse the output format (`LINE:HASH|CONTENT`)
+4. Use locators correctly (`LINE:HASH`, `0:00` virtual line)
+5. Execute common operations from examples
+
+**Rationale:**
+
+| Aspect                | Scattered Help            | Self-contained Help       |
+| --------------------- | ------------------------- | ------------------------- |
+| Context switching     | Multiple commands needed  | Single read sufficient    |
+| Token cost            | Higher (multiple calls)   | Lower (one call)          |
+| Learning curve        | Fragmented understanding  | Immediate comprehension   |
+| Discovery             | May miss subcommand help  | Everything visible at once |
+
+**Implementation:**
+
+- Main `--help` includes: workflow, output format, operators, locators, examples
+- Subcommand `--help` provides additional detail but shouldn't be required for basic usage
+- When adding new features, ensure main `--help` remains comprehensive
+
+**Anti-pattern:**
+
+```
+# Bad: forces agent to dig deeper
+Commands:
+  read   Read file content
+  edit   Edit file content
+  # ... no details on format, operators, or locators
+```
+
+**Pattern:**
+
+```
+# Good: agent can use immediately
+Commands:
+  read   Read file content with hashlines
+         Output: LINE:HASH|CONTENT
+  edit   Edit with operators: = (replace), + (insert), - (delete)
+         Locator: LINE:HASH or 0:00 for file beginning
+```
+
 ---
 
 ## Core Design Decisions
@@ -244,7 +292,7 @@ When hash doesn't match current line content:
 | Best-effort             | Some progress    | Complex partial state   |
 | Stop on first failure   | Simple           | No feedback on rest     |
 
-**Choice:** Atomic by default, `--continue` for best-effort.
+**Choice:** Atomic (all-or-nothing). If any operation fails, none are applied.
 
 ### History vs Git
 

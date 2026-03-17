@@ -161,8 +161,7 @@ aifed diagnostics --all
 ### Post-edit Verification
 
 ```bash
-# After editing
-aifed edit main.rs = 42:AB "new code" --auto-fmt
+aifed edit main.rs = 42:AB "new code"
 
 # Check for errors
 aifed diagnostics main.rs

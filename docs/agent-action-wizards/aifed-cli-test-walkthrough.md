@@ -239,6 +239,90 @@ Would apply = to test.txt
 
 ---
 
+## Batch Edit via Heredoc
+
+**Goal:** Verify batch mode applies multiple operations atomically via stdin (heredoc).
+
+**Precondition:** A fresh test file.
+
+**Steps:**
+```bash
+echo -e "line1\nline2\nline3\nline4" > batch.txt
+aifed read batch.txt
+# Capture hashes for lines, then apply batch edit
+aifed edit batch.txt <<EOF
+= 1:XX "modified line1"
++ 2:XX "inserted after line2"
+- 4:XX
+EOF
+aifed read batch.txt
+```
+
+**Expected:**
+- All operations are applied
+- Line 1 is modified
+- New line appears after line 2
+- Original line 4 is deleted
+
+---
+
+## Batch Edit Atomicity
+
+**Goal:** Verify batch edit is atomic - if any operation fails, none are applied.
+
+**Steps:**
+```bash
+echo -e "line1\nline2\nline3" > atomic.txt
+aifed read atomic.txt
+# Use invalid hash for second operation
+aifed edit atomic.txt <<EOF
+= 1:XX "this should work"
++ 2:INVALID "but this hash is wrong"
+EOF
+aifed read atomic.txt
+```
+
+**Expected:**
+- Command fails with error
+- File is unchanged (line 1 still has original content)
+
+```
+Batch parse error on line 2: '+ 2:INVALID "but this hash is wrong"'
+  Reason: Hash mismatch
+  File: atomic.txt
+  Line: 2
+  Expected hash: INVALID
+  Actual hash: TD
+  Actual content: line2
+  Hint: Run 'aifed read atomic.txt' to get current hashes
+```
+
+---
+
+## Batch Edit with Comments
+
+**Goal:** Verify comments and blank lines in batch input are ignored.
+
+**Steps:**
+```bash
+echo -e "line1\nline2\nline3" > comments.txt
+aifed read comments.txt
+aifed edit comments.txt <<EOF
+# This is a comment
+= 1:XX "modified"
+
++ 2:XX "inserted"
+# Another comment
+EOF
+aifed read comments.txt
+```
+
+**Expected:**
+- Comments and blank lines are ignored
+- Only actual operations are executed
+
+---
+
 ## JSON Output for Read
 
 **Goal:** Verify `--json` flag outputs valid JSON for programmatic parsing.
