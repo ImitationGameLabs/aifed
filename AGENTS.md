@@ -6,12 +6,14 @@ AI Agent working guide. This document provides code structure and decision rules
 
 ```
 .
-├── flake.nix              # Flake entry point
-├── crates/                # Rust workspace members
-├── docs/                  # Project documentation
+├── flake.nix                  # Flake entry point
+├── crates/                    # Rust workspace members
+├── docs/                      # Project documentation
+│   ├── agent-action-wizards/ # Step-by-step guides for AI agents
+│   └── reference/            # CLI command reference
 └── nix/
-      ├── common.nix       # Core config (crate paths, dependencies)
-      ├── packages.nix     # Flake output packages
+      ├── common.nix   # Core config (crate paths, dependencies)
+      ├── packages.nix # Flake output packages
       └── dev/
             ├── shell.nix  # Development environment
             └── checks.nix # CI checks
@@ -19,7 +21,19 @@ AI Agent working guide. This document provides code structure and decision rules
 
 ## Common Tasks
 
-For adding workspace members, see [docs/add-workspace-member.md](docs/add-workspace-member.md).
+- [Add workspace member](docs/agent-action-wizards/add-workspace-member.md)
+- [CLI test walkthrough](docs/agent-action-wizards/aifed-cli-test-walkthrough.md)
+
+## Testing aifed Commands
+
+When testing aifed commands, use the `.playground/` directory:
+
+```bash
+cd .playground
+../target/debug/aifed <command>
+```
+
+The `.playground/` directory is in `.gitignore`. Refer to the `CLI test walkthrough` for test cases.
 
 ## Dependency Management
 
