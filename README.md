@@ -14,7 +14,20 @@ aifed's goal is to design a dedicated text editor for AI agents, implemented as 
 
 See the [Installation Guide](docs/installation-guide.md) for setup instructions.
 
+## Current Status
+
+aifed is in early development. Currently implemented features:
+
+| Feature                                       | Status      |
+| --------------------------------------------- | ----------- |
+| `read` - Read file content with hashlines     | Implemented |
+| `edit` - Edit file with hashline verification | Implemented |
+| `lsp` - LSP integration (Rust first)          | Planned     |
+| `history/undo` - Edit history and recovery    | Planned     |
+
 ## Usage Examples
+
+> **Note:** The examples below illustrate the envisioned workflow. Currently, only `read` and `edit` commands are implemented.
 
 Here's how an AI agent might work with aifed in typical development scenarios:
 
