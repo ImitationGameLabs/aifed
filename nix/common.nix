@@ -60,6 +60,7 @@ let
   # Add your binary crates here
   binaryCratePaths = mapToAbsolute {
     aifed = "crates/aifed";
+    aifed-daemon = "crates/aifed-daemon";
   };
 
   # Library-only crates (only needed for fileset dependencies, not built separately)
