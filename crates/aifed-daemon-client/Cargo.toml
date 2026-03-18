@@ -1,0 +1,15 @@
+[package]
+name = "aifed-daemon-client"
+edition = "2024"
+version.workspace = true
+
+[dependencies]
+aifed-common = { path = "../aifed-common" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+hyperlocal = { workspace = true }
+http-body-util = { workspace = true }
+dirs = { workspace = true }

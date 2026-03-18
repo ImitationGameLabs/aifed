@@ -66,7 +66,8 @@ let
   # Library-only crates (only needed for fileset dependencies, not built separately)
   # Add your library crates here
   libraryCratePaths = mapToAbsolute {
-    # my-lib = "crates/my-lib";
+    aifed-common = "crates/aifed-common";
+    aifed-daemon-client = "crates/aifed-daemon-client";
   };
 
   # All crates combined (for fileset generation)

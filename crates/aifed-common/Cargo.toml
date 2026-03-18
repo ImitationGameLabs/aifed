@@ -1,0 +1,14 @@
+[package]
+name = "aifed-common"
+edition = "2024"
+version.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+time = { workspace = true }
+xxhash-rust = { workspace = true }
+dirs = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
