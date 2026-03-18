@@ -1,0 +1,6 @@
+[package]
+name = "aifed-daemon"
+edition = "2024"
+version.workspace = true
+
+[dependencies]

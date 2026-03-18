@@ -1,7 +1,5 @@
 [workspace]
-members = [
-  "crates/aifed",
-]
+members = ["crates/aifed", "crates/aifed-daemon"]
 
 resolver = "3"
 
