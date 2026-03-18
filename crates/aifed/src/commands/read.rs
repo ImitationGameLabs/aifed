@@ -27,7 +27,7 @@ pub fn execute(
         let locator = Locator::parse(loc_str)?;
 
         match locator {
-            Locator::Hashline { line, .. } | Locator::LineOnly(line) => {
+            Locator::Hashline { line, .. } | Locator::Line(line) => {
                 if line == 0 || line > lines.len() {
                     return Err(Error::InvalidLocator {
                         input: loc_str.to_string(),
@@ -43,7 +43,7 @@ pub fn execute(
                     (line, line)
                 }
             }
-            Locator::Range { start, end } => {
+            Locator::LineRange { start, end } => {
                 if start > lines.len() {
                     return Err(Error::InvalidLocator {
                         input: loc_str.to_string(),
@@ -64,7 +64,7 @@ pub fn execute(
         .map(|line_num| {
             let content = lines[line_num - 1].to_string();
             let hash = hash_line(&content);
-            HashedLine { line: line_num, hash, content }
+            HashedLine { line: line_num, hash: Some(hash), content }
         })
         .collect();
 

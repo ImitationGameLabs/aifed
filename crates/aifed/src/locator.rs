@@ -5,10 +5,10 @@ use crate::error::{Error, Result};
 pub enum Locator {
     /// Hashline: line number + content hash (e.g., "42:AB")
     Hashline { line: usize, hash: String },
-    /// Line only: just a line number (e.g., "42")
-    LineOnly(usize),
-    /// Range: start and end line numbers (e.g., "10-20")
-    Range { start: usize, end: usize },
+    /// Single line: just a line number (e.g., "42")
+    Line(usize),
+    /// Line range: start and end line numbers (e.g., "10-20")
+    LineRange { start: usize, end: usize },
 }
 
 impl Locator {
@@ -16,8 +16,8 @@ impl Locator {
     ///
     /// Formats:
     /// - "42:AB" -> Hashline { line: 42, hash: "AB" }
-    /// - "42" -> LineOnly(42)
-    /// - "10-20" -> Range { start: 10, end: 20 }
+    /// - "42" -> Line(42)
+    /// - "10-20" -> LineRange { start: 10, end: 20 }
     pub fn parse(input: &str) -> Result<Self> {
         let input = input.trim();
 
@@ -46,7 +46,7 @@ impl Locator {
                 });
             }
 
-            return Ok(Locator::Range { start, end });
+            return Ok(Locator::LineRange { start, end });
         }
 
         // Check for hashline format (e.g., "42:AB")
@@ -76,7 +76,7 @@ impl Locator {
             reason: "Expected line number, range (START-END), or hashline (LINE:HASH)".to_string(),
         })?;
 
-        Ok(Locator::LineOnly(line))
+        Ok(Locator::Line(line))
     }
 
     /// Get the primary line number (first line for ranges).
@@ -85,8 +85,8 @@ impl Locator {
     pub fn line(&self) -> Option<usize> {
         match self {
             Locator::Hashline { line, .. } if *line > 0 => Some(*line),
-            Locator::LineOnly(line) if *line > 0 => Some(*line),
-            Locator::Range { start, .. } => Some(*start),
+            Locator::Line(line) if *line > 0 => Some(*line),
+            Locator::LineRange { start, .. } => Some(*start),
             _ => None,
         }
     }
@@ -104,8 +104,8 @@ impl std::fmt::Display for Locator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Locator::Hashline { line, hash } => write!(f, "{}:{}", line, hash),
-            Locator::LineOnly(line) => write!(f, "{}", line),
-            Locator::Range { start, end } => write!(f, "{}-{}", start, end),
+            Locator::Line(line) => write!(f, "{}", line),
+            Locator::LineRange { start, end } => write!(f, "{}-{}", start, end),
         }
     }
 }
@@ -127,15 +127,15 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_line_only() {
+    fn test_parse_line() {
         let loc = Locator::parse("42").unwrap();
-        assert_eq!(loc, Locator::LineOnly(42));
+        assert_eq!(loc, Locator::Line(42));
     }
 
     #[test]
-    fn test_parse_range() {
+    fn test_parse_line_range() {
         let loc = Locator::parse("10-20").unwrap();
-        assert_eq!(loc, Locator::Range { start: 10, end: 20 });
+        assert_eq!(loc, Locator::LineRange { start: 10, end: 20 });
     }
 
     #[test]

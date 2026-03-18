@@ -3,6 +3,7 @@ use std::path::Path;
 
 use crate::batch;
 use crate::error::{Error, Result};
+use crate::file::write_file;
 use crate::hash::{hash_line, is_virtual_hash};
 use crate::locator::Locator;
 use crate::output::{EditChange, EditResult, OutputFormat, format_edit_result};
@@ -76,8 +77,8 @@ pub fn validate_operation(
     // Get line number and hash from locator
     let (target_line, expected_hash) = match locator {
         Locator::Hashline { line, hash } => (*line, Some(hash.clone())),
-        Locator::LineOnly(line) => (*line, None),
-        Locator::Range { .. } => {
+        Locator::Line(line) => (*line, None),
+        Locator::LineRange { .. } => {
             return Err(Error::InvalidLocator {
                 input: locator.to_string(),
                 reason: "Range locators not supported for edit operations".to_string(),
@@ -245,13 +246,5 @@ fn execute_single(
     }
 
     println!("{}", format_edit_result(&result, format));
-    Ok(())
-}
-
-fn write_file(path: &Path, lines: &[String], trailing_newline: bool) -> Result<()> {
-    let content = lines.join("\n");
-    let content = if trailing_newline { content + "\n" } else { content };
-    std::fs::write(path, content)
-        .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })?;
     Ok(())
 }

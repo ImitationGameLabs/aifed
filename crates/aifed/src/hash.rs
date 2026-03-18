@@ -3,6 +3,9 @@ use xxhash_rust::xxh64;
 /// base32hex character set: 0-9, A-V
 const BASE32HEX_ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHIJKLMNOPQRSTUV";
 
+/// Virtual line hash constant for inserting at the beginning of a file.
+pub const VIRTUAL_LINE_HASH: &str = "00";
+
 /// Hash a single line of content.
 ///
 /// Uses xxHash64, takes the top 10 bits, and encodes as 2-character base32hex.
@@ -19,9 +22,6 @@ fn base32hex_encode(value: u16) -> String {
     let lo = (value & 0x1F) as usize;
     format!("{}{}", BASE32HEX_ALPHABET[hi] as char, BASE32HEX_ALPHABET[lo] as char)
 }
-
-/// Virtual line hash constant for inserting at the beginning of a file.
-pub const VIRTUAL_LINE_HASH: &str = "00";
 
 /// Check if the given hash is the virtual line hash.
 pub fn is_virtual_hash(hash: &str) -> bool {

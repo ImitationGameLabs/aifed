@@ -73,14 +73,10 @@ use std::path::PathBuf;
     disable_help_flag = true,
     disable_version_flag = true
 )]
-pub struct Cli {
+pub struct Args {
     /// Output in JSON format
     #[arg(long, global = true)]
     pub json: bool,
-
-    /// Disable colored output
-    #[arg(long, global = true)]
-    pub no_color: bool,
 
     /// Print help (see a summary with '--help')
     #[arg(long, global = true, action = clap::ArgAction::Help)]
@@ -167,7 +163,7 @@ pub enum Commands {
     },
 }
 
-impl Cli {
+impl Args {
     pub fn parse_args() -> Self {
         Self::parse()
     }

@@ -1,10 +1,14 @@
 use std::path::PathBuf;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum Error {
-    FileNotFound {
-        path: PathBuf,
-    },
+    #[error("File not found: {path}")]
+    FileNotFound { path: PathBuf },
+
+    #[error(
+        "Hash mismatch\n  File: {path}\n  Line: {line}\n  Expected hash: {expected}\n  Actual hash: {actual}\n  Actual content: {actual_content}\n  Hint: Run 'aifed read {path}' to get current hashes"
+    )]
     HashMismatch {
         path: PathBuf,
         line: usize,
@@ -12,72 +16,21 @@ pub enum Error {
         actual: String,
         actual_content: String,
     },
-    InvalidLocator {
-        input: String,
-        reason: String,
-    },
-    InvalidOperation {
-        input: String,
-    },
-    InvalidIo {
-        path: PathBuf,
-        source: std::io::Error,
-    },
-    /// Failed to parse batch operation
-    InvalidBatchOp {
-        line_number: usize,
-        line_content: String,
-        reason: String,
-    },
-    /// stdin not available
+
+    #[error("Invalid locator '{input}': {reason}")]
+    InvalidLocator { input: String, reason: String },
+
+    #[error("Invalid operation '{input}'. Expected one of: = (replace), + (insert), - (delete)")]
+    InvalidOperation { input: String },
+
+    #[error("IO error for '{path}': {source}")]
+    InvalidIo { path: PathBuf, source: std::io::Error },
+
+    #[error("Batch parse error on line {line_number}: '{line_content}'\n  Reason: {reason}")]
+    InvalidBatchOp { line_number: usize, line_content: String, reason: String },
+
+    #[error("stdin not available for reading")]
     StdinNotAvailable,
 }
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::FileNotFound { path } => {
-                write!(f, "File not found: {}", path.display())
-            }
-            Error::HashMismatch { path, line, expected, actual, actual_content } => {
-                write!(
-                    f,
-                    "Hash mismatch\n  File: {}\n  Line: {}\n  Expected hash: {}\n  Actual hash: {}\n  Actual content: {}\n  Hint: Run 'aifed read {}' to get current hashes",
-                    path.display(),
-                    line,
-                    expected,
-                    actual,
-                    actual_content,
-                    path.display()
-                )
-            }
-            Error::InvalidLocator { input, reason } => {
-                write!(f, "Invalid locator '{}': {}", input, reason)
-            }
-            Error::InvalidOperation { input } => {
-                write!(
-                    f,
-                    "Invalid operation '{}'. Expected one of: = (replace), + (insert), - (delete)",
-                    input
-                )
-            }
-            Error::InvalidIo { path, source } => {
-                write!(f, "IO error for '{}': {}", path.display(), source)
-            }
-            Error::InvalidBatchOp { line_number, line_content, reason } => {
-                write!(
-                    f,
-                    "Batch parse error on line {}: '{}'\n  Reason: {}",
-                    line_number, line_content, reason
-                )
-            }
-            Error::StdinNotAvailable => {
-                write!(f, "stdin not available for reading")
-            }
-        }
-    }
-}
-
-impl std::error::Error for Error {}
 
 pub type Result<T> = std::result::Result<T, Error>;

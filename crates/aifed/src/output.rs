@@ -12,7 +12,8 @@ pub enum OutputFormat {
 #[derive(Debug, Clone, Serialize)]
 pub struct HashedLine {
     pub line: usize,
-    pub hash: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hash: Option<String>,
     pub content: String,
 }
 
@@ -74,37 +75,27 @@ pub fn format_lines(lines: &[HashedLine], format: OutputFormat, no_hashes: bool)
             } else {
                 lines
                     .iter()
-                    .map(|l| format!("{}:{}|{}", l.line, l.hash, l.content))
+                    .map(|l| format!("{}:{}|{}", l.line, l.hash.as_ref().unwrap(), l.content))
                     .collect::<Vec<_>>()
                     .join("\n")
             }
         }
         OutputFormat::Json => {
-            if no_hashes {
-                #[derive(Serialize)]
-                struct Output {
-                    lines: Vec<OutputLine>,
-                }
-                #[derive(Serialize)]
-                struct OutputLine {
-                    line: usize,
-                    content: String,
-                }
-                let output = Output {
-                    lines: lines
-                        .iter()
-                        .map(|l| OutputLine { line: l.line, content: l.content.clone() })
-                        .collect(),
-                };
-                serde_json::to_string_pretty(&output).unwrap_or_default()
-            } else {
-                #[derive(Serialize)]
-                struct Output {
-                    lines: Vec<HashedLine>,
-                }
-                let output = Output { lines: lines.to_vec() };
-                serde_json::to_string_pretty(&output).unwrap_or_default()
+            let output_lines: Vec<HashedLine> = lines
+                .iter()
+                .map(|l| HashedLine {
+                    line: l.line,
+                    hash: if no_hashes { None } else { l.hash.clone() },
+                    content: l.content.clone(),
+                })
+                .collect();
+
+            #[derive(Serialize)]
+            struct Output {
+                lines: Vec<HashedLine>,
             }
+
+            serde_json::to_string_pretty(&Output { lines: output_lines }).unwrap_or_default()
         }
     }
 }

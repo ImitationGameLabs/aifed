@@ -5,6 +5,8 @@
 
 use std::path::Path;
 
+use crate::file::write_file;
+
 use crate::commands::edit::{Operation, apply_operation, validate_operation};
 use crate::error::{Error, Result};
 use crate::locator::Locator;
@@ -12,7 +14,7 @@ use crate::output::{BatchResult, OutputFormat, format_batch_result};
 
 /// Parsed single operation from batch input
 #[derive(Debug, Clone)]
-pub struct SingleOp {
+pub struct EditOp {
     pub operation: Operation,
     pub locator: Locator,
     pub content: Option<String>,
@@ -30,7 +32,7 @@ pub struct SingleOp {
 ///
 /// # Comments and blank lines are ignored
 /// ```
-pub fn parse_batch_operations(input: &str) -> Result<Vec<SingleOp>> {
+pub fn parse_batch_operations(input: &str) -> Result<Vec<EditOp>> {
     let mut operations = Vec::new();
 
     for (line_idx, line) in input.lines().enumerate() {
@@ -50,7 +52,7 @@ pub fn parse_batch_operations(input: &str) -> Result<Vec<SingleOp>> {
 }
 
 /// Parse a single operation line
-fn parse_single_operation(line_num: usize, line: &str) -> Result<SingleOp> {
+fn parse_single_operation(line_num: usize, line: &str) -> Result<EditOp> {
     // Split into parts: OP LOCATOR [CONTENT]
     let parts: Vec<&str> = split_operation_line(line);
 
@@ -110,7 +112,7 @@ fn parse_single_operation(line_num: usize, line: &str) -> Result<SingleOp> {
         Operation::Delete => {}
     }
 
-    Ok(SingleOp { operation, locator, content })
+    Ok(EditOp { operation, locator, content })
 }
 
 /// Split operation line into parts, respecting quoted strings
@@ -175,7 +177,7 @@ fn extract_content(parts: &[&str]) -> String {
 /// All operations must succeed, or none are applied (atomic).
 pub fn execute_batch(
     path: &Path,
-    operations: Vec<SingleOp>,
+    operations: Vec<EditOp>,
     dry_run: bool,
     format: OutputFormat,
 ) -> Result<()> {
@@ -215,7 +217,7 @@ pub fn execute_batch(
 fn execute_atomic(
     path: &Path,
     lines: &mut Vec<String>,
-    operations: Vec<SingleOp>,
+    operations: Vec<EditOp>,
     dry_run: bool,
     format: OutputFormat,
     trailing_newline: bool,
@@ -264,15 +266,7 @@ fn execute_atomic(
     Ok(())
 }
 
-fn write_file(path: &Path, lines: &[String], trailing_newline: bool) -> Result<()> {
-    let content = lines.join("\n");
-    let content = if trailing_newline { content + "\n" } else { content };
-    std::fs::write(path, content)
-        .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })?;
-    Ok(())
-}
-
-impl SingleOp {
+impl EditOp {
     /// Get string representation of the operation
     pub fn operation_str(&self) -> String {
         match self.operation {

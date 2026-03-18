@@ -1,16 +1,17 @@
+mod args;
 mod batch;
-mod cli;
 mod commands;
 mod error;
+mod file;
 mod hash;
 mod locator;
 mod output;
 
-use crate::cli::{Cli, Commands};
+use crate::args::{Args, Commands};
 use crate::output::{OutputFormat, format_error};
 
 fn main() {
-    let args = Cli::parse_args();
+    let args = Args::parse_args();
     let format = if args.json { OutputFormat::Json } else { OutputFormat::Text };
 
     let result = match args.command {
