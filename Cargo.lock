@@ -15,12 +15,15 @@ dependencies = [
 name = "aifed"
 version = "0.0.0"
 dependencies = [
+ "aifed-common",
+ "aifed-daemon-client",
  "anyhow",
  "clap",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror",
+ "tokio",
  "xxhash-rust",
 ]
 

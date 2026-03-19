@@ -1,5 +1,11 @@
 use serde::Serialize;
 
+// Re-export LSP response types for formatting
+pub use aifed_common::{
+    CompletionsResponse, DefinitionResponse, DiagnosticsResponse, HoverResponse,
+    ReferencesResponse, RenameResponse,
+};
+
 /// Output format selector
 #[derive(Debug, Clone, Copy, Default)]
 pub enum OutputFormat {
@@ -177,5 +183,129 @@ fn format_size(bytes: u64) -> String {
         format!("{:.1} KB", bytes as f64 / KB as f64)
     } else {
         format!("{} B", bytes)
+    }
+}
+
+// --- LSP Response Formatters ---
+
+/// Format hover response
+pub fn format_hover_response(resp: &HoverResponse, format: OutputFormat) -> String {
+    match format {
+        OutputFormat::Text => resp.contents.clone().unwrap_or_else(|| "No hover info".to_string()),
+        OutputFormat::Json => serde_json::to_string_pretty(&resp).unwrap_or_default(),
+    }
+}
+
+/// Format definition response
+pub fn format_definition_response(resp: &DefinitionResponse, format: OutputFormat) -> String {
+    match format {
+        OutputFormat::Text => {
+            if resp.locations.is_empty() {
+                "No definition found".to_string()
+            } else {
+                resp.locations
+                    .iter()
+                    .map(|l| {
+                        format!(
+                            "{}:{}:{}",
+                            l.file_path,
+                            l.range.start.line + 1,
+                            l.range.start.character + 1
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            }
+        }
+        OutputFormat::Json => serde_json::to_string_pretty(&resp).unwrap_or_default(),
+    }
+}
+
+/// Format references response
+pub fn format_references_response(resp: &ReferencesResponse, format: OutputFormat) -> String {
+    match format {
+        OutputFormat::Text => {
+            if resp.locations.is_empty() {
+                "No references found".to_string()
+            } else {
+                resp.locations
+                    .iter()
+                    .map(|l| {
+                        format!(
+                            "{}:{}:{}",
+                            l.file_path,
+                            l.range.start.line + 1,
+                            l.range.start.character + 1
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            }
+        }
+        OutputFormat::Json => serde_json::to_string_pretty(&resp).unwrap_or_default(),
+    }
+}
+
+/// Format completions response
+pub fn format_completions_response(resp: &CompletionsResponse, format: OutputFormat) -> String {
+    match format {
+        OutputFormat::Text => {
+            if resp.items.is_empty() {
+                "No completions available".to_string()
+            } else {
+                resp.items
+                    .iter()
+                    .map(|item| {
+                        let mut s = item.label.clone();
+                        if let Some(detail) = &item.detail {
+                            s.push_str(&format!(" - {}", detail));
+                        }
+                        s
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            }
+        }
+        OutputFormat::Json => serde_json::to_string_pretty(&resp).unwrap_or_default(),
+    }
+}
+
+/// Format diagnostics response
+pub fn format_diagnostics_response(resp: &DiagnosticsResponse, format: OutputFormat) -> String {
+    match format {
+        OutputFormat::Text => {
+            if resp.diagnostics.is_empty() {
+                "No diagnostics".to_string()
+            } else {
+                resp.diagnostics
+                    .iter()
+                    .map(|d| {
+                        format!(
+                            "[{}] line {}: {}",
+                            d.severity.to_uppercase(),
+                            d.range.start.line + 1,
+                            d.message
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            }
+        }
+        OutputFormat::Json => serde_json::to_string_pretty(&resp).unwrap_or_default(),
+    }
+}
+
+/// Format rename response
+pub fn format_rename_response(resp: &RenameResponse, format: OutputFormat) -> String {
+    match format {
+        OutputFormat::Text => {
+            if resp.changes.is_empty() {
+                "No changes".to_string()
+            } else {
+                let total_edits: usize = resp.changes.iter().map(|f| f.edits.len()).sum();
+                format!("Renamed in {} file(s), {} edit(s)", resp.changes.len(), total_edits)
+            }
+        }
+        OutputFormat::Json => serde_json::to_string_pretty(&resp).unwrap_or_default(),
     }
 }

@@ -19,6 +19,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 anyhow = { workspace = true }
 time = { workspace = true }
+aifed-common = { path = "../aifed-common" }
 
 [dev-dependencies]
 serial_test = { workspace = true }

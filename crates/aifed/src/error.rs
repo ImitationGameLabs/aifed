@@ -31,6 +31,19 @@ pub enum Error {
 
     #[error("stdin not available for reading")]
     StdinNotAvailable,
+
+    // Daemon-related errors
+    #[error("Daemon is not running for workspace: {workspace}")]
+    DaemonNotRunning { workspace: PathBuf },
+
+    #[error("LSP error: {message}")]
+    Lsp { message: String },
+
+    #[error("Socket path error: {0}")]
+    SocketError(#[from] aifed_common::SocketError),
+
+    #[error("Client error: {0}")]
+    ClientError(#[from] aifed_common::ClientError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

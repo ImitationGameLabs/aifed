@@ -47,6 +47,19 @@ use std::path::PathBuf;
 ///   Multiple operations can be provided via stdin (heredoc).
 ///   All operations must succeed, or none are applied (atomic).
 ///
+/// LSP COMMANDS (requires running daemon):
+///   aifed lsp symbols <FILE> <LINE>       - Get symbol locators for a line
+///   aifed lsp diag <FILE>                 - Get diagnostics
+///   aifed lsp hover <FILE> <LINE:HASH> <SINDEX:NAME>   - Get hover info
+///   aifed lsp def <FILE> <LINE:HASH> <SINDEX:NAME>     - Go to definition
+///   aifed lsp refs <FILE> <LINE:HASH> <SINDEX:NAME>    - Find references
+///   aifed lsp complete <FILE> <LINE:HASH> <SINDEX:NAME> - Get completions
+///   aifed lsp rename <FILE> <LINE:HASH> <SINDEX:NAME> <NAME> - Rename symbol
+///
+/// DAEMON COMMANDS:
+///   aifed daemon status   - Check daemon status
+///   aifed daemon stop     - Stop daemon
+///
 /// EXAMPLES:
 ///   ```bash
 ///   # Single edit
@@ -63,6 +76,12 @@ use std::path::PathBuf;
 ///   + 10:3K "inserted"
 ///   - 15:7M
 ///   EOF
+///
+///   # LSP operations (requires running daemon)
+///   aifed daemon status
+///   aifed lsp symbols src/main.rs 10      # Get symbols: S1:fn S2:main
+///   aifed lsp hover src/main.rs 10:3K S2:main
+///   aifed lsp def src/main.rs 10:3K S2:main
 ///   ```
 #[derive(Parser, Debug)]
 #[command(
@@ -77,6 +96,10 @@ pub struct Args {
     /// Output in JSON format
     #[arg(long, global = true)]
     pub json: bool,
+
+    /// Custom socket path (for LSP commands)
+    #[arg(long, global = true)]
+    pub socket: Option<PathBuf>,
 
     /// Print help (see a summary with '--help')
     #[arg(long, global = true, action = clap::ArgAction::Help)]
@@ -160,6 +183,108 @@ pub enum Commands {
         /// Preview changes without applying
         #[arg(long)]
         dry_run: bool,
+    },
+
+    /// Daemon management commands
+    #[command(subcommand)]
+    Daemon(DaemonCommands),
+
+    /// LSP operations (requires running daemon)
+    #[command(subcommand)]
+    Lsp(LspCommands),
+}
+
+/// Daemon management commands
+#[derive(Subcommand, Debug)]
+pub enum DaemonCommands {
+    /// Check daemon status
+    Status,
+
+    /// Stop daemon
+    Stop {
+        /// Force stop
+        #[arg(long)]
+        force: bool,
+    },
+}
+
+/// LSP operations
+///
+/// Uses locator format for precise positioning:
+/// - LINE:HASH - e.g., "15:3K" - verifies line content
+/// - SINDEX:NAME - e.g., "S1:config" - locates symbol on line
+#[derive(Subcommand, Debug)]
+pub enum LspCommands {
+    /// Get symbol locators for a line
+    ///
+    /// Outputs the line with hashline and symbol locators:
+    ///   15:3K|let config = load_config();
+    ///   S1:config
+    ///   S2:load_config
+    Symbols {
+        /// File path
+        file: PathBuf,
+        /// Line number or range (e.g., "15" or "10-20")
+        #[arg(value_name = "LINE|RANGE")]
+        locator: String,
+    },
+
+    /// Get diagnostics for file
+    Diag {
+        /// File path
+        file: PathBuf,
+    },
+
+    /// Get hover information at symbol
+    Hover {
+        /// File path
+        file: PathBuf,
+        /// Hashline locator (e.g., "15:3K")
+        hashline: String,
+        /// Symbol locator (e.g., "S1:config")
+        symbol: String,
+    },
+
+    /// Go to definition
+    Def {
+        /// File path
+        file: PathBuf,
+        /// Hashline locator (e.g., "15:3K")
+        hashline: String,
+        /// Symbol locator (e.g., "S1:config")
+        symbol: String,
+    },
+
+    /// Find references
+    Refs {
+        /// File path
+        file: PathBuf,
+        /// Hashline locator (e.g., "15:3K")
+        hashline: String,
+        /// Symbol locator (e.g., "S1:config")
+        symbol: String,
+    },
+
+    /// Get completions at symbol
+    Complete {
+        /// File path
+        file: PathBuf,
+        /// Hashline locator (e.g., "15:3K")
+        hashline: String,
+        /// Symbol locator (e.g., "S1:config")
+        symbol: String,
+    },
+
+    /// Rename symbol
+    Rename {
+        /// File path
+        file: PathBuf,
+        /// Hashline locator (e.g., "15:3K")
+        hashline: String,
+        /// Symbol locator (e.g., "S1:config")
+        symbol: String,
+        /// New name for the symbol
+        new_name: String,
     },
 }
 

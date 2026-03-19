@@ -10,8 +10,8 @@ mod idle;
 mod languages;
 mod lsp;
 mod server;
-mod socket;
 
+use aifed_common::socket_path;
 use args::Args;
 use clap::Parser;
 use detection::detect;
@@ -19,7 +19,6 @@ use idle::IdleMonitor;
 use languages::RustAnalyzerConfig;
 use lsp::LanguageServerManager;
 use server::{DaemonState, build_router};
-use socket::socket_path;
 use std::sync::Arc;
 use tokio::net::UnixListener;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};

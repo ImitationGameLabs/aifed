@@ -110,6 +110,120 @@ impl std::fmt::Display for Locator {
     }
 }
 
+/// Symbol locator for positioning within a line
+/// Format: "S<index>:<name>" (e.g., "S1:config")
+#[derive(Debug, Clone, PartialEq)]
+pub struct SymbolLocator {
+    /// 1-based index of the symbol on the line
+    pub index: u32,
+    /// Name of the symbol
+    pub name: String,
+}
+
+impl SymbolLocator {
+    /// Parse a symbol locator string.
+    ///
+    /// Format: "S<index>:<name>" (e.g., "S1:config")
+    pub fn parse(input: &str) -> Result<Self> {
+        let input = input.trim();
+
+        // Must start with 'S' or 's'
+        let rest =
+            input.strip_prefix('S').or_else(|| input.strip_prefix('s')).ok_or_else(|| {
+                Error::InvalidLocator {
+                    input: input.to_string(),
+                    reason: "Symbol locator must start with 'S'".to_string(),
+                }
+            })?;
+
+        // Split on ':'
+        let (index_str, name) = rest.split_once(':').ok_or_else(|| Error::InvalidLocator {
+            input: input.to_string(),
+            reason: "Symbol locator must be in format 'S<index>:<name>'".to_string(),
+        })?;
+
+        let index: u32 = index_str.parse().map_err(|_| Error::InvalidLocator {
+            input: input.to_string(),
+            reason: format!("Invalid symbol index: {}", index_str),
+        })?;
+
+        if index == 0 {
+            return Err(Error::InvalidLocator {
+                input: input.to_string(),
+                reason: "Symbol index must be at least 1".to_string(),
+            });
+        }
+
+        if name.is_empty() {
+            return Err(Error::InvalidLocator {
+                input: input.to_string(),
+                reason: "Symbol name cannot be empty".to_string(),
+            });
+        }
+
+        // Validate name is a valid identifier
+        if !name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '!' || c == '?') {
+            return Err(Error::InvalidLocator {
+                input: input.to_string(),
+                reason: "Symbol name must be a valid identifier".to_string(),
+            });
+        }
+
+        Ok(SymbolLocator { index, name: name.to_string() })
+    }
+
+    /// Find the character offset of this symbol in the given line content.
+    /// Returns the 0-based character offset, or None if not found.
+    pub fn find_offset(&self, line_content: &str) -> Option<u32> {
+        let mut count = 0u32;
+        let mut pos = 0usize;
+
+        while pos < line_content.len() {
+            // Skip non-identifier characters
+            while pos < line_content.len()
+                && !line_content[pos..].starts_with(|c: char| c.is_alphabetic() || c == '_')
+            {
+                // Handle UTF-8 properly
+                pos += line_content[pos..]
+                    .char_indices()
+                    .next()
+                    .map(|(_, c)| c.len_utf8())
+                    .unwrap_or(1);
+            }
+
+            if pos >= line_content.len() {
+                break;
+            }
+
+            // Find end of identifier
+            let start = pos;
+            while pos < line_content.len() {
+                let ch = line_content[pos..].chars().next().unwrap();
+                if ch.is_alphanumeric() || ch == '_' || ch == '!' || ch == '?' {
+                    pos += ch.len_utf8();
+                } else {
+                    break;
+                }
+            }
+
+            let ident = &line_content[start..pos];
+            count += 1;
+
+            if count == self.index && ident == self.name {
+                return Some(start as u32);
+            }
+        }
+
+        None
+    }
+}
+
+impl std::fmt::Display for SymbolLocator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "S{}:{}", self.index, self.name)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -162,5 +276,46 @@ mod tests {
         assert_eq!(Locator::parse("42").unwrap().line(), Some(42));
         assert_eq!(Locator::parse("10-20").unwrap().line(), Some(10));
         assert_eq!(Locator::parse("0:00").unwrap().line(), None);
+    }
+
+    // SymbolLocator tests
+
+    #[test]
+    fn test_parse_symbol_locator() {
+        let loc = SymbolLocator::parse("S1:config").unwrap();
+        assert_eq!(loc.index, 1);
+        assert_eq!(loc.name, "config");
+    }
+
+    #[test]
+    fn test_parse_symbol_locator_lowercase() {
+        let loc = SymbolLocator::parse("s2:main").unwrap();
+        assert_eq!(loc.index, 2);
+        assert_eq!(loc.name, "main");
+    }
+
+    #[test]
+    fn test_parse_symbol_locator_invalid() {
+        assert!(SymbolLocator::parse("1:config").is_err());
+        assert!(SymbolLocator::parse("S0:name").is_err());
+        assert!(SymbolLocator::parse("S1:").is_err());
+        assert!(SymbolLocator::parse("S:name").is_err());
+    }
+
+    #[test]
+    fn test_symbol_find_offset() {
+        let line = "let config = load_config();";
+        let loc = SymbolLocator::parse("S1:let").unwrap();
+        assert_eq!(loc.find_offset(line), Some(0));
+
+        let loc = SymbolLocator::parse("S2:config").unwrap();
+        assert_eq!(loc.find_offset(line), Some(4));
+
+        let loc = SymbolLocator::parse("S3:load_config").unwrap();
+        assert_eq!(loc.find_offset(line), Some(13));
+
+        // Not found
+        let loc = SymbolLocator::parse("S99:foo").unwrap();
+        assert_eq!(loc.find_offset(line), None);
     }
 }

@@ -10,7 +10,8 @@ mod output;
 use crate::args::{Args, Commands};
 use crate::output::{OutputFormat, format_error};
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = Args::parse_args();
     let format = if args.json { OutputFormat::Json } else { OutputFormat::Text };
 
@@ -27,6 +28,8 @@ fn main() {
             dry_run,
             format,
         ),
+        Commands::Daemon(cmd) => commands::daemon(&cmd, args.socket.as_deref(), format).await,
+        Commands::Lsp(cmd) => commands::lsp(&cmd, args.socket.as_deref(), format).await,
     };
 
     if let Err(e) = result {
