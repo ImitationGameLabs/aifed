@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio::sync::broadcast;
 use tokio::time::sleep;
 
@@ -17,7 +17,11 @@ impl IdleMonitor {
     /// Create a new idle monitor with the specified timeout in seconds.
     pub fn new(timeout_secs: u64) -> Self {
         let (shutdown_tx, _) = broadcast::channel(1);
-        let last_activity = Arc::new(AtomicU64::new(Instant::now().elapsed().as_secs()));
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let last_activity = Arc::new(AtomicU64::new(now));
 
         Self { last_activity, timeout_secs, shutdown_tx }
     }

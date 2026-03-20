@@ -42,7 +42,9 @@ axum = { version = "0.8", default-features = false, features = [
 tower = "0.5"
 dirs = "6"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
+libc = "0.2"
+logroller = "0.1"
 # Test dependencies for integration tests
 hyper = "1"
 hyper-util = { version = "0.1", features = ["client-legacy", "http1", "tokio"] }
@@ -54,4 +56,6 @@ time = { version = "0.3", features = [
   "serde-well-known",
   "formatting",
   "parsing",
+  "local-offset",
+  "macros",
 ] }
