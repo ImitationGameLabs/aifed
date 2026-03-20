@@ -1,5 +1,7 @@
 # Configuration
 
+> **Status: Planned** - This document describes features that are not yet implemented.
+
 Configuration commands and file format for aifed.
 
 ## `config` - Manage Configuration
@@ -78,7 +80,7 @@ aifed init --force
 
 ## Configuration File
 
-Default location: `.aifed.toml` in project root, or `~/.config/aifed/config.toml` globally.
+Default location: `aifed.toml` in project root, or `~/.config/aifed/config.toml` globally.
 
 ### Full Configuration Example
 
@@ -167,7 +169,7 @@ Configuration is loaded in layers, with later layers overriding earlier ones:
 | ----------- | --------------------- | ----------------------------- |
 | 1 (lowest)  | Built-in defaults     | -                             |
 | 2           | Global config         | `~/.config/aifed/config.toml` |
-| 3           | Project config        | `.aifed.toml`                 |
+| 3           | Project config        | `aifed.toml`                  |
 | 4           | Environment variables | `AIFED_*`                     |
 | 5 (highest) | CLI flags             | `--option`                    |
 
@@ -180,7 +182,7 @@ edit.auto_format = false
 # Global config (~/.config/aifed/config.toml)
 edit.auto_format = true
 
-# Project config (.aifed.toml)
+# Project config (aifed.toml)
 # (not set)
 
 # Environment variable

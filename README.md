@@ -22,12 +22,12 @@ aifed is in early development. Currently implemented features:
 | --------------------------------------------- | ----------- |
 | `read` - Read file content with hashlines     | Implemented |
 | `edit` - Edit file with hashline verification | Implemented |
-| `lsp` - LSP integration (Rust first)          | Planned     |
+| `lsp` - LSP integration (Rust first)          | Implemented |
 | `history/undo` - Edit history and recovery    | Planned     |
 
 ## Usage Examples
 
-> **Note:** The examples below illustrate the envisioned workflow. Currently, only `read` and `edit` commands are implemented.
+> **Note:** The examples below illustrate the envisioned workflow. Currently, `read`, `edit`, and `lsp` commands are implemented.
 
 Here's how an AI agent might work with aifed in typical development scenarios:
 
@@ -43,7 +43,7 @@ aifed read main.rs 15
 
 ```bash
 # Get symbol locators on line 15 for LSP operations
-aifed symbols main.rs 15
+aifed lsp symbols main.rs 15
 ```
 ```
 15:3K|let count = calculate_total(items);
@@ -54,17 +54,17 @@ S3:items
 
 ```bash
 # Get type info for calculate_total function
-aifed hover main.rs 15:3K S2:calculate_total
+aifed lsp hover main.rs 15:3K S2:calculate_total
 
 # Go to definition of items
-aifed definition main.rs 15:3K S3:items
+aifed lsp def main.rs 15:3K S3:items
 ```
 
 ### Refactoring
 
 ```bash
 # Get symbol locators on line 10
-aifed symbols main.rs 10
+aifed lsp symbols main.rs 10
 ```
 ```
 10:AB|let config = load_config();
@@ -74,10 +74,10 @@ S2:load_config
 
 ```bash
 # Find all references to config
-aifed references main.rs 10:AB S1:config
+aifed lsp refs main.rs 10:AB S1:config
 
 # Rename config to settings across the codebase
-aifed rename main.rs 10:AB S1:config settings
+aifed lsp rename main.rs 10:AB S1:config settings
 
 # Edit line 10 with hashline verification
 aifed edit main.rs = 10:AB "let settings = load_config();"
@@ -87,7 +87,7 @@ aifed edit main.rs = 10:AB "let settings = load_config();"
 
 ```bash
 # Check for errors after changes
-aifed diagnostics main.rs
+aifed lsp diag main.rs
 ```
 
 ### History & Recovery

@@ -1,5 +1,7 @@
 # Utilities
 
+> **Status: Planned** - This document describes features that are not yet implemented.
+
 Utility commands for comparing and formatting files.
 
 ## `diff` - Show File Differences
@@ -84,7 +86,7 @@ aifed format <PATH> --recursive
 
 ### Formatter Configuration
 
-Formatters are configured per-language in `.aifed.toml`:
+Formatters are configured per-language in `aifed.toml`:
 
 ```toml
 [format]
@@ -155,7 +157,7 @@ aifed version --json
 aifed format . --recursive --check
 
 # Check diagnostics
-aifed diagnostics --all
+aifed lsp diag .
 ```
 
 ### Post-edit Verification
@@ -164,7 +166,7 @@ aifed diagnostics --all
 aifed edit main.rs = 42:AB "new code"
 
 # Check for errors
-aifed diagnostics main.rs
+aifed lsp diag main.rs
 
 # View changes
 aifed diff main.rs --from before-edit

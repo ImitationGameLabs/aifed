@@ -1,5 +1,7 @@
 # History & Snapshots
 
+> **Status: Planned** - This document describes features that are not yet implemented.
+
 Commands for managing file history and snapshots.
 
 ## Overview
@@ -65,7 +67,7 @@ Default configuration:
 - `max_snapshots = 10` per file
 - `max_age = 7 days`
 
-Configure in `.aifed.toml`:
+Configure in `aifed.toml`:
 
 ```toml
 [snapshot]

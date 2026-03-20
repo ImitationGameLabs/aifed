@@ -42,12 +42,12 @@ The main `aifed --help` output should serve as a complete, self-contained skill 
 
 **Rationale:**
 
-| Aspect                | Scattered Help            | Self-contained Help       |
-| --------------------- | ------------------------- | ------------------------- |
-| Context switching     | Multiple commands needed  | Single read sufficient    |
-| Token cost            | Higher (multiple calls)   | Lower (one call)          |
-| Learning curve        | Fragmented understanding  | Immediate comprehension   |
-| Discovery             | May miss subcommand help  | Everything visible at once |
+| Aspect            | Scattered Help           | Self-contained Help        |
+| ----------------- | ------------------------ | -------------------------- |
+| Context switching | Multiple commands needed | Single read sufficient     |
+| Token cost        | Higher (multiple calls)  | Lower (one call)           |
+| Learning curve    | Fragmented understanding | Immediate comprehension    |
+| Discovery         | May miss subcommand help | Everything visible at once |
 
 **Implementation:**
 
@@ -163,10 +163,10 @@ Using symbolic operators (`=`/`+`/`-`) instead of subcommands (`replace`/`insert
 
 **Operator choice for replace:**
 
-| Operator | Pros                              | Cons                              |
-| -------- | --------------------------------- | --------------------------------- |
-| `~`      | Common in editors (vim `~` case)  | Shell expands to `$HOME`          |
-| `=`      | Shell-safe, assignment semantics  | Less common in text editors       |
+| Operator | Pros                             | Cons                        |
+| -------- | -------------------------------- | --------------------------- |
+| `~`      | Common in editors (vim `~` case) | Shell expands to `$HOME`    |
+| `=`      | Shell-safe, assignment semantics | Less common in text editors |
 
 **Decision:** Use `=` for replace operation.
 
@@ -313,7 +313,7 @@ Priority (highest wins): CLI flags > Environment variables > Project config > Gl
 ```
 1. Built-in defaults
 2. Global config (~/.config/aifed/config.toml)
-3. Project config (.aifed.toml)
+3. Project config (aifed.toml)
 4. Environment variables (AIFED_*)
 5. CLI flags (--option)
 ```
@@ -381,7 +381,7 @@ Daemon architecture keeps LSP servers running in background, providing instant r
 
 **Workspace management:**
 - Single daemon manages multiple project workspaces
-- Project identified by root directory (git root or `.aifed.toml` location)
+- Project identified by root directory (git root or `aifed.toml` location)
 - Detailed design TBD
 
 **Lightweight mode consideration:**
@@ -418,12 +418,12 @@ Detailed design TBD.
 
 ## Command Priority Matrix
 
-| Command             | Priority | Complexity | Dependencies  |
-| ------------------- | -------- | ---------- | ------------- |
-| edit                | P0       | Medium     | Hash system   |
-| info/read           | P0       | Low        | None          |
-| diagnostics/symbols | P1       | Medium     | LSP           |
-| rename/references   | P1       | High       | LSP           |
-| snapshot            | P1       | Medium     | File storage  |
-| history/undo        | P2       | Medium     | Storage       |
-| config/format/diff  | P2       | Low        | None/External |
+| Command            | Priority | Complexity | Dependencies  |
+| ------------------ | -------- | ---------- | ------------- |
+| edit               | P0       | Medium     | Hash system   |
+| info/read          | P0       | Low        | None          |
+| lsp (diag/symbols) | P1       | Medium     | LSP           |
+| lsp (rename/refs)  | P1       | High       | LSP           |
+| snapshot           | P1       | Medium     | File storage  |
+| history/undo       | P2       | Medium     | Storage       |
+| config/format/diff | P2       | Low        | None/External |

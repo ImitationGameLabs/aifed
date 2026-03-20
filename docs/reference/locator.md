@@ -178,10 +178,10 @@ aifed <CMD> <FILE> <LINE:HASH> <SINDEX:NAME>
 
 ### Getting Symbol Locators
 
-Use `symbols` command with a line number to get both the hashline and symbol locators:
+Use `lsp symbols` command with a line number to get both the hashline and symbol locators:
 
 ```bash
-aifed symbols main.rs 15
+aifed lsp symbols main.rs 15
 ```
 
 Output:
@@ -206,10 +206,10 @@ For LSP operations, both locators are required: `LINE:HASH` identifies the line,
 
 ```bash
 # LSP operations require both hashline and symbol locator
-aifed rename main.rs 15:3K S1:config settings
-aifed hover main.rs 15:3K S2:load_config
-aifed definition main.rs 15:3K S2:load_config
-aifed references main.rs 15:3K S1:config
+aifed lsp rename main.rs 15:3K S1:config settings
+aifed lsp hover main.rs 15:3K S2:load_config
+aifed lsp def main.rs 15:3K S2:load_config
+aifed lsp refs main.rs 15:3K S1:config
 ```
 
 ---

@@ -4,16 +4,16 @@ This directory contains reference documentation for all **aifed** commands and c
 
 ## Quick Navigation
 
-| Category                | Description                           | Reference                            |
-| ----------------------- | ------------------------------------- | ------------------------------------ |
-| **CLI Overview**        | Global options, environment variables | [cli-overview.md](cli-overview.md)   |
-| **Locator**             | Positioning mechanism for safe edits  | [locator.md](locator.md)             |
-| **Edit Commands**       | Unified edit with ~, +, - operators   | [edit-commands.md](edit-commands.md) |
-| **Read Commands**       | info, read                            | [read-commands.md](read-commands.md) |
-| **LSP Integration**     | diagnostics, symbols, rename, etc.    | [lsp.md](lsp.md)                     |
-| **History & Snapshots** | snapshot, history, undo               | [history.md](history.md)             |
-| **Configuration**       | config command and file format        | [configuration.md](configuration.md) |
-| **Utilities**           | diff, format                          | [utilities.md](utilities.md)         |
+| Category                | Description                           | Reference                            | Status      |
+| ----------------------- | ------------------------------------- | ------------------------------------ | ----------- |
+| **CLI Overview**        | Global options, workspace detection   | [cli-overview.md](cli-overview.md)   | Implemented |
+| **Locator**             | Positioning mechanism for safe edits  | [locator.md](locator.md)             | Implemented |
+| **Edit Commands**       | Unified edit with =, +, - operators   | [edit-commands.md](edit-commands.md) | Implemented |
+| **Read Commands**       | info, read                            | [read-commands.md](read-commands.md) | Implemented |
+| **LSP Integration**     | diag, symbols, rename, etc.           | [lsp.md](lsp.md)                     | Implemented |
+| **History & Snapshots** | snapshot, history, undo               | [history.md](history.md)             | Planned     |
+| **Configuration**       | config command and file format        | [configuration.md](configuration.md) | Planned     |
+| **Utilities**           | diff, format                          | [utilities.md](utilities.md)         | Planned     |
 
 ## Command Categories
 
@@ -25,23 +25,24 @@ This directory contains reference documentation for all **aifed** commands and c
 - [`info`](read-commands.md#info) - Get file metadata and stats
 
 ### LSP Integration
-- [`diagnostics`](lsp.md#diagnostics) - Get errors and warnings
-- [`symbols`](lsp.md#symbols) - List symbols in file
-- [`rename`](lsp.md#rename) - Rename symbol across references
-- [`references`](lsp.md#references) - Find all references
-- [`definition`](lsp.md#definition) - Go to definition
-- [`hover`](lsp.md#hover) - Get type information
+- [`lsp diag`](lsp.md#lsp-diag) - Get errors and warnings
+- [`lsp symbols`](lsp.md#lsp-symbols) - List symbols in file
+- [`lsp rename`](lsp.md#lsp-rename) - Rename symbol across references
+- [`lsp refs`](lsp.md#lsp-refs) - Find all references
+- [`lsp def`](lsp.md#lsp-def) - Go to definition
+- [`lsp hover`](lsp.md#lsp-hover) - Get type information
+- [`lsp complete`](lsp.md#lsp-complete) - Get completions
 
-### History & Snapshots
+### History & Snapshots *(Planned)*
 - [`snapshot`](history.md#snapshot) - Manage file snapshots
 - [`history`](history.md#history) - View edit history
 - [`undo`](history.md#undo) - Undo recent edits
 
-### Configuration
+### Configuration *(Planned)*
 - [`config`](configuration.md#config) - Manage configuration
 - [`init`](configuration.md#init) - Initialize project
 
-### Utilities
+### Utilities *(Planned)*
 - [`diff`](utilities.md#diff) - Show file differences
 - [`format`](utilities.md#format) - Format files
 

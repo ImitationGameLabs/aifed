@@ -1,6 +1,6 @@
 # CLI Overview
 
-Global options and environment variables for aifed.
+Global options for aifed.
 
 ## Usage
 
@@ -10,24 +10,20 @@ aifed [OPTIONS] <COMMAND>
 
 ## Global Options
 
-| Option            | Description                                    |
-| ----------------- | ---------------------------------------------- |
-| `--json`          | Output in JSON format                          |
-| `--no-color`      | Disable colored output                         |
-| `--quiet`         | Suppress non-essential output                  |
-| `--dir <DIR>`     | Change working directory before executing      |
-| `--config <FILE>` | Configuration file path [default: .aifed.toml] |
-| `--help`          | Print help                                     |
-| `--version`       | Print version                                  |
+| Option      | Description           |
+| ----------- | --------------------- |
+| `--json`    | Output in JSON format |
+| `--help`    | Print help            |
+| `--version` | Print version         |
 
-## Environment Variables
+## Workspace Detection
 
-| Variable         | Description                            |
-| ---------------- | -------------------------------------- |
-| `AIFED_CONFIG`   | Path to configuration file             |
-| `AIFED_NO_COLOR` | Disable colored output (`1` or `true`) |
-| `AIFED_JSON`     | Default to JSON output (`1` or `true`) |
-| `AIFED_QUIET`    | Quiet mode (`1` or `true`)             |
+aifed automatically detects the workspace root by searching upward from the current directory for:
+
+1. `aifed.toml` - Project configuration file (marks project root)
+2. `.git` - Git repository root
+
+The first match wins. If no workspace is detected, only `read` and `edit` commands are available (lightweight mode).
 
 ## AI-First Design Principles
 
@@ -41,5 +37,4 @@ aifed is designed specifically for AI agents, prioritizing:
 ## See Also
 
 - [Command Reference](README.md) - All commands
-- [Configuration](configuration.md) - Configuration file format
 - [CLI Design Notes](../cli-design-notes.md) - Design rationale
