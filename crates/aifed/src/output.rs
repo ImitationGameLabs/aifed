@@ -295,16 +295,44 @@ pub fn format_diagnostics_response(resp: &DiagnosticsResponse, format: OutputFor
     }
 }
 
-/// Format rename response
-pub fn format_rename_response(resp: &RenameResponse, format: OutputFormat) -> String {
+/// Format rename preview for dry-run mode.
+pub fn format_rename_preview(resp: &RenameResponse, format: OutputFormat) -> String {
     match format {
         OutputFormat::Text => {
             if resp.changes.is_empty() {
-                "No changes".to_string()
-            } else {
-                let total_edits: usize = resp.changes.iter().map(|f| f.edits.len()).sum();
-                format!("Renamed in {} file(s), {} edit(s)", resp.changes.len(), total_edits)
+                return "No changes".to_string();
             }
+
+            let mut output = Vec::new();
+            for file_edit in &resp.changes {
+                output.push(format!("File: {}", file_edit.file_path));
+                for edit in &file_edit.edits {
+                    output.push(format!(
+                        "  Line {}:{} - {}:{}",
+                        edit.range.start.line + 1,
+                        edit.range.start.character + 1,
+                        edit.range.end.line + 1,
+                        edit.range.end.character + 1
+                    ));
+                    output.push(format!("    -> {}", edit.new_text));
+                }
+            }
+            output.join("\n")
+        }
+        OutputFormat::Json => serde_json::to_string_pretty(&resp).unwrap_or_default(),
+    }
+}
+
+/// Format rename result summary for normal mode.
+pub fn format_rename_result(resp: &RenameResponse, format: OutputFormat) -> String {
+    match format {
+        OutputFormat::Text => {
+            if resp.changes.is_empty() {
+                return "No changes".to_string();
+            }
+
+            let total_edits: usize = resp.changes.iter().map(|f| f.edits.len()).sum();
+            format!("Renamed in {} file(s), {} edit(s)", resp.changes.len(), total_edits)
         }
         OutputFormat::Json => serde_json::to_string_pretty(&resp).unwrap_or_default(),
     }

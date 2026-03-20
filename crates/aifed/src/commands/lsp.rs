@@ -256,7 +256,7 @@ pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFor
             Ok(())
         }
 
-        LspCommands::Rename { file, hashline, symbol, new_name } => {
+        LspCommands::Rename { file, hashline, symbol, new_name, dry_run } => {
             let abs_path = canonicalize_path(file)?;
             let (line, col) = resolve_position(&abs_path, hashline, symbol)?;
             let language = detect_language(&abs_path)?;
@@ -269,7 +269,25 @@ pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFor
             };
 
             let response = client.rename(request).await?;
-            println!("{}", output::format_rename_response(&response, format));
+
+            if *dry_run {
+                // Preview mode: show detailed edit information
+                println!("{}", output::format_rename_preview(&response, format));
+            } else {
+                // Apply mode: validate all ranges, then apply edits
+                for file_edit in &response.changes {
+                    let path = PathBuf::from(&file_edit.file_path);
+                    let content = std::fs::read_to_string(&path)
+                        .map_err(|e| Error::InvalidIo { path: path.clone(), source: e })?;
+
+                    // Validate and apply (validates all ranges first, then applies)
+                    let new_content =
+                        crate::text_edit::apply_edits(&content, file_edit.edits.clone())?;
+                    std::fs::write(&path, new_content)
+                        .map_err(|e| Error::InvalidIo { path, source: e })?;
+                }
+                println!("{}", output::format_rename_result(&response, format));
+            }
             Ok(())
         }
 

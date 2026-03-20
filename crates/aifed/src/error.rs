@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 use thiserror::Error;
 
+use aifed_common::Position;
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("File not found: {path}")]
@@ -50,6 +52,9 @@ pub enum Error {
 
     #[error("Client error: {0}")]
     ClientError(#[from] aifed_common::ClientError),
+
+    #[error("Invalid range {start:?}-{end:?}: {reason}")]
+    InvalidRange { start: Position, end: Position, reason: String },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

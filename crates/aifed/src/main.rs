@@ -6,6 +6,7 @@ mod file;
 mod hash;
 mod locator;
 mod output;
+mod text_edit;
 
 use crate::args::{Args, Commands};
 use crate::error::{Error, Result};

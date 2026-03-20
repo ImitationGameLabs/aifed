@@ -281,6 +281,9 @@ pub enum LspCommands {
         symbol: String,
         /// New name for the symbol
         new_name: String,
+        /// Show preview without applying changes
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
