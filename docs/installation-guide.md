@@ -131,12 +131,20 @@ Then proceed to [Post-Installation](#post-installation-configure-your-ai-agent).
 
 ## Post-Installation: Configure Your AI Agent
 
-To get the best experience with aifed, you should configure your AI coding agent to use aifed for file operations. Copy the following prompt to your AI agent and ask it to add this to its persistent memory:
+To get the best experience with aifed, configure your AI agent to use aifed for file operations. Any AI agent can become capable of code editing with the right tools. Copy the following prompt to your AI agent:
 
 ```md
-Please add the following instruction to your persistent memory:
+Please add the following instructions to your persistent memory:
 
-"Use `aifed --help` to learn the available commands first. Whenever reading or modifying files, prioritize using `aifed` over other shell commands (like `cat`, `sed`) or built-in agent file tools. This ensures better tracking, verification, and recovery capabilities."
+"Run `aifed --skill` to learn the available commands. For all file operations:
+
+1. Use `aifed read` and `aifed edit` instead of `cat`, `sed`, or built-in file tools
+2. This applies even when only reading files, unless you are certain you are just exploring and will not make any modifications
+3. When context is compressed, preserve the complete `aifed --skill` output
+
+Why not mix tools? Alternating between aifed and built-in file tools breaks integrity checks on both sides. Modifications made through one tool are invisible to the other, causing verification failures, requiring re-reads, and wasting tokens.
+
+This ensures better tracking, verification, and recovery capabilities."
 ```
 
-Different AI agents have different ways to manage persistent memory—refer to your AI agent's documentation for the specific method.
+Different AI agents have different ways to manage persistent memory—refer to your agent's documentation for the specific method.

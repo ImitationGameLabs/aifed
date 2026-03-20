@@ -29,6 +29,11 @@ aifed is in early development. Currently implemented features:
 
 > **Note:** The examples below illustrate the envisioned workflow. Currently, `read`, `edit`, and `lsp` commands are implemented.
 
+AI agents can obtain the full usage guide with:
+```bash
+aifed --skill
+```
+
 Here's how an AI agent might work with aifed in typical development scenarios:
 
 ### Understanding Code

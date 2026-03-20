@@ -10,11 +10,12 @@ aifed [OPTIONS] <COMMAND>
 
 ## Global Options
 
-| Option      | Description           |
-| ----------- | --------------------- |
-| `--json`    | Output in JSON format |
-| `--help`    | Print help            |
-| `--version` | Print version         |
+| Option      | Description                |
+| ----------- | -------------------------- |
+| `--json`    | Output in JSON format      |
+| `--skill`   | Print complete usage guide |
+| `--help`    | Print help                 |
+| `--version` | Print version              |
 
 ## Workspace Detection
 

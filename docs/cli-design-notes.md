@@ -28,50 +28,25 @@ Avoid multiple ways to accomplish the same task. When alternatives exist, choose
 - Single locator syntax (not `file:line` AND `file line`)
 - Long flags only (not `-f` AND `--file`)
 
-### Help as Agent Skill
+### Help vs Skill
 
-The main `aifed --help` output should serve as a complete, self-contained skill for AI agents.
+aifed provides two levels of documentation:
 
-**Requirement:** An agent reading `aifed --help` alone should be able to:
+- `--help` - Quick command reference
+- `--skill` - Complete usage guide
 
-1. Understand the core workflow (read → get hashes → edit with verification)
-2. Know all available operators and their meanings
-3. Parse the output format (`LINE:HASH|CONTENT`)
-4. Use locators correctly (`LINE:HASH`, `0:00` virtual line)
-5. Execute common operations from examples
+**Design rationale:**
 
-**Rationale:**
-
-| Aspect            | Scattered Help           | Self-contained Help        |
-| ----------------- | ------------------------ | -------------------------- |
-| Context switching | Multiple commands needed | Single read sufficient     |
-| Token cost        | Higher (multiple calls)  | Lower (one call)           |
-| Learning curve    | Fragmented understanding | Immediate comprehension    |
-| Discovery         | May miss subcommand help | Everything visible at once |
+| Flag      | Purpose                 | Length |
+| --------- | ----------------------- | ------ |
+| `--help`  | Quick command discovery | Short  |
+| `--skill` | Complete usage guide    | Full   |
 
 **Implementation:**
 
-- Main `--help` includes: workflow, output format, operators, locators, examples
-- Subcommand `--help` provides additional detail but shouldn't be required for basic usage
-- When adding new features, ensure main `--help` remains comprehensive
-
-**Anti-pattern:**
-
-```
-# Bad: forces agent to dig deeper
-Commands:
-  read   Read file content
-  edit   Edit file content
-  # ... no details on format, operators, or locators
-```
-
-**Pattern:**
-
-```
-# Good: agent can use immediately
-Commands:
-  read   Read file content with hashlines
-         Output: LINE:HASH|CONTENT
+- `--help` shows available commands and brief description
+- `--skill` includes: workflow, output format, operators, locators, editing tips, examples
+- When adding new features, update skill.md for agent documentation
   edit   Edit with operators: = (replace), + (insert), - (delete)
          Locator: LINE:HASH or 0:00 for file beginning
 ```
