@@ -9,7 +9,16 @@ pub enum Error {
     FileNotFound { path: PathBuf },
 
     #[error(
-        "Hash mismatch\n  File: {path}\n  Line: {line}\n  Expected hash: {expected}\n  Actual hash: {actual}\n  Actual content: {actual_content}\n  Hint: Run 'aifed read {path}' to get current hashes"
+        "Hash mismatch\n\
+         \n\
+           File: {path}:{line}\n\
+         Expected: {expected}\n\
+           Actual: {actual}\n\
+         \n\
+         Actual content: \"{actual_content}\"\n\
+         \n\
+         The file may have been modified since you last read it.\n\
+         Hint: Run 'aifed read {path}' to get current hashes"
     )]
     HashMismatch {
         path: PathBuf,
@@ -55,6 +64,9 @@ pub enum Error {
 
     #[error("Invalid range {start:?}-{end:?}: {reason}")]
     InvalidRange { start: Position, end: Position, reason: String },
+
+    #[error("Conflict: line {0} cannot be both deleted and replaced")]
+    ConflictDeleteAndReplace(usize),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

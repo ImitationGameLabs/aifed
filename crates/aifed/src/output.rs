@@ -66,6 +66,9 @@ pub struct BatchResult {
     pub successful: usize,
     pub failed: usize,
     pub message: String,
+    /// New file content after applying changes
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub new_lines: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub changes: Vec<EditChange>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -136,12 +139,6 @@ pub fn format_batch_result(result: &BatchResult, format: OutputFormat) -> String
     match format {
         OutputFormat::Text => {
             let mut output = result.message.clone();
-            if !result.changes.is_empty() {
-                output.push_str("\n\nChanges:");
-                for change in &result.changes {
-                    output.push_str(&format!("\n  {} line {}", change.operation, change.line));
-                }
-            }
             if !result.errors.is_empty() {
                 output.push_str("\n\nErrors:");
                 for err in &result.errors {
