@@ -9,7 +9,8 @@ use aifed_common::{
     ApiResponse, ClientError, CompletionsResponse, DefinitionResponse, DiagnosticsRequest,
     DiagnosticsResponse, DidChangeRequest, DidCloseRequest, DidOpenRequest, HealthResponse,
     HoverRequest, HoverResponse, LspPositionRequest, ReferencesResponse, RenameRequest,
-    RenameResponse, ServersResponse, StartServerRequest, StatusResponse, StopServerRequest,
+    RenameResponse, ServerActionResponse, ServersResponse, StartServerRequest, StatusResponse,
+    StopServerRequest,
 };
 use http_body_util::{BodyExt, Full};
 use hyper::body::Bytes;
@@ -66,7 +67,7 @@ impl DaemonClient {
     }
 
     /// Start a language server
-    pub async fn start_server(&self, language: &str) -> Result<(), ClientError> {
+    pub async fn start_server(&self, language: &str) -> Result<ServerActionResponse, ClientError> {
         self.post(
             "/api/v1/lsp/servers/start",
             &StartServerRequest { language: language.to_string() },
@@ -75,7 +76,11 @@ impl DaemonClient {
     }
 
     /// Stop a language server
-    pub async fn stop_server(&self, language: &str, force: bool) -> Result<(), ClientError> {
+    pub async fn stop_server(
+        &self,
+        language: &str,
+        force: bool,
+    ) -> Result<ServerActionResponse, ClientError> {
         self.post(
             "/api/v1/lsp/servers/stop",
             &StopServerRequest { language: language.to_string(), force },

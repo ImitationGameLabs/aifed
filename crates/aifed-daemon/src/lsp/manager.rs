@@ -1,6 +1,7 @@
 use crate::error::{Error, Result};
 use crate::lsp::client::StdioLspClient;
 use crate::lsp::{LanguageServerConfig, LspClient};
+use aifed_common::ServerState;
 use lsp_types::{
     ClientCapabilities, CompletionParams, CompletionResponse, DidChangeTextDocumentParams,
     DidCloseTextDocumentParams, DidOpenTextDocumentParams, DocumentDiagnosticParams,
@@ -12,7 +13,6 @@ use serde::{Serialize, Serializer};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use time::OffsetDateTime;
 use tokio::sync::RwLock;
 
 /// Key for identifying a language server instance
@@ -41,47 +41,6 @@ impl Serialize for ServerStatus {
         s.serialize_field("workspace", &self.workspace.to_string_lossy())?;
         s.serialize_field("state", &self.state)?;
         s.end()
-    }
-}
-
-/// State of a language server with timestamps
-#[derive(Debug, Clone, Serialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
-pub enum ServerState {
-    Starting {
-        #[serde(with = "time::serde::rfc3339")]
-        at: OffsetDateTime,
-    },
-    Running {
-        #[serde(with = "time::serde::rfc3339")]
-        at: OffsetDateTime,
-    },
-    Stopped {
-        #[serde(with = "time::serde::rfc3339")]
-        at: OffsetDateTime,
-    },
-    Failed {
-        #[serde(with = "time::serde::rfc3339")]
-        at: OffsetDateTime,
-        reason: String,
-    },
-}
-
-impl ServerState {
-    pub fn starting() -> Self {
-        Self::Starting { at: OffsetDateTime::now_utc() }
-    }
-
-    pub fn running() -> Self {
-        Self::Running { at: OffsetDateTime::now_utc() }
-    }
-
-    pub fn stopped() -> Self {
-        Self::Stopped { at: OffsetDateTime::now_utc() }
-    }
-
-    pub fn failed(reason: impl Into<String>) -> Self {
-        Self::Failed { at: OffsetDateTime::now_utc(), reason: reason.into() }
     }
 }
 

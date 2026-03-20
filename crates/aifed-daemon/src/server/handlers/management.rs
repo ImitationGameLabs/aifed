@@ -2,6 +2,7 @@
 
 use crate::server::state::DaemonState;
 use crate::server::types::*;
+use aifed_common::{ServerActionResponse, ServerState};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Json};
@@ -12,16 +13,24 @@ pub async fn start_server(
 ) -> impl IntoResponse {
     match state.lsp_manager.start(&req.language, state.workspace.clone()).await {
         Ok(()) => {
-            let server_info = ServerStatusResponse {
+            // Get the actual server state from the manager
+            let servers = state.lsp_manager.list_servers().await;
+            let server_state = servers
+                .iter()
+                .find(|s| s.language == req.language)
+                .map(|s| s.state.clone())
+                .unwrap_or_else(ServerState::running);
+
+            let response = ServerActionResponse {
                 language: req.language,
                 workspace: state.workspace.to_string_lossy().to_string(),
-                state: "running".into(),
+                state: server_state,
             };
-            (StatusCode::OK, Json(ApiResponse::success(server_info)))
+            (StatusCode::OK, Json(ApiResponse::success(response)))
         }
         Err(e) => {
-            let resp: ApiResponse<ServerStatusResponse> =
-                ApiResponse::error("LSP_START_FAILED", e.to_string());
+            let resp: ApiResponse<ServerActionResponse> =
+                ApiResponse::error(ErrorCode::LspStartFailed, e.to_string());
             (StatusCode::INTERNAL_SERVER_ERROR, Json(resp))
         }
     }
@@ -33,20 +42,28 @@ pub async fn stop_server(
 ) -> impl IntoResponse {
     match state.lsp_manager.stop(&req.language, &state.workspace, req.force).await {
         Ok(()) => {
-            let server_info = ServerStatusResponse {
+            // Get the actual server state from the manager
+            let servers = state.lsp_manager.list_servers().await;
+            let server_state = servers
+                .iter()
+                .find(|s| s.language == req.language)
+                .map(|s| s.state.clone())
+                .unwrap_or_else(ServerState::stopped);
+
+            let response = ServerActionResponse {
                 language: req.language,
                 workspace: state.workspace.to_string_lossy().to_string(),
-                state: "stopped".into(),
+                state: server_state,
             };
-            (StatusCode::OK, Json(ApiResponse::success(server_info)))
+            (StatusCode::OK, Json(ApiResponse::success(response)))
         }
         Err(e) => {
             let code = if matches!(e, crate::error::Error::LspShutdownTimeout) {
-                "LSP_SERVER_BUSY"
+                ErrorCode::LspServerBusy
             } else {
-                "LSP_STOP_FAILED"
+                ErrorCode::LspStopFailed
             };
-            let resp = ApiResponse::<ServerStatusResponse>::error(code, e.to_string());
+            let resp = ApiResponse::<ServerActionResponse>::error(code, e.to_string());
             (StatusCode::INTERNAL_SERVER_ERROR, Json(resp))
         }
     }

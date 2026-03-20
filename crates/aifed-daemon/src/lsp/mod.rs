@@ -16,5 +16,6 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+pub use aifed_common::ServerState;
 pub use client::{LanguageServerConfig, LspClient};
-pub use manager::{LanguageServerManager, ServerState, ServerStatus};
+pub use manager::{LanguageServerManager, ServerStatus};

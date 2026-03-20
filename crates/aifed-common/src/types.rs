@@ -60,13 +60,13 @@ pub struct StatusResponse {
 pub struct ServerStatusDto {
     pub language: String,
     pub workspace: String,
-    pub state: ServerStateDto,
+    pub state: ServerState,
 }
 
-/// Server state DTO - simplified for API responses
+/// Server state with timestamps
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "status", rename_all = "snake_case")]
-pub enum ServerStateDto {
+pub enum ServerState {
     Starting {
         #[serde(with = "time::serde::rfc3339")]
         at: OffsetDateTime,
@@ -86,11 +86,29 @@ pub enum ServerStateDto {
     },
 }
 
+impl ServerState {
+    pub fn starting() -> Self {
+        Self::Starting { at: OffsetDateTime::now_utc() }
+    }
+
+    pub fn running() -> Self {
+        Self::Running { at: OffsetDateTime::now_utc() }
+    }
+
+    pub fn stopped() -> Self {
+        Self::Stopped { at: OffsetDateTime::now_utc() }
+    }
+
+    pub fn failed(reason: impl Into<String>) -> Self {
+        Self::Failed { at: OffsetDateTime::now_utc(), reason: reason.into() }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerInfo {
     pub language: String,
     pub workspace: String,
-    pub state: ServerStateDto,
+    pub state: ServerState,
     #[serde(default)]
     pub progress: Vec<ProgressInfoDto>,
 }
@@ -120,11 +138,12 @@ pub struct StopServerRequest {
     pub force: bool,
 }
 
+/// Response for server start/stop actions
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServerStatusResponse {
+pub struct ServerActionResponse {
     pub language: String,
     pub workspace: String,
-    pub state: String,
+    pub state: ServerState,
 }
 
 // --- LSP Operation Request Types ---

@@ -3,6 +3,36 @@
 use crate::lsp::ServerState;
 use serde::{Deserialize, Serialize};
 
+// --- Error Codes ---
+
+/// API error codes
+#[derive(Debug, Clone, Copy, Serialize)]
+pub enum ErrorCode {
+    InvalidPath,
+    LspStartFailed,
+    LspStopFailed,
+    LspServerBusy,
+    LspError,
+}
+
+impl ErrorCode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::InvalidPath => "INVALID_PATH",
+            Self::LspStartFailed => "LSP_START_FAILED",
+            Self::LspStopFailed => "LSP_STOP_FAILED",
+            Self::LspServerBusy => "LSP_SERVER_BUSY",
+            Self::LspError => "LSP_ERROR",
+        }
+    }
+}
+
+impl std::fmt::Display for ErrorCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
 // --- Generic API Response ---
 
 /// Generic API response wrapper
@@ -26,11 +56,11 @@ impl<T: Serialize> ApiResponse<T> {
         Self { success: true, data: Some(data), error: None }
     }
 
-    pub fn error(code: &str, message: impl Into<String>) -> Self {
+    pub fn error(code: ErrorCode, message: impl Into<String>) -> Self {
         Self {
             success: false,
             data: None,
-            error: Some(ApiError { code: code.into(), message: message.into() }),
+            error: Some(ApiError { code: code.to_string(), message: message.into() }),
         }
     }
 }
@@ -87,13 +117,6 @@ pub struct StopServerRequest {
     pub language: String,
     #[serde(default)]
     pub force: bool,
-}
-
-#[derive(Serialize)]
-pub struct ServerStatusResponse {
-    pub language: String,
-    pub workspace: String,
-    pub state: String,
 }
 
 // --- LSP Operation Request Types ---
