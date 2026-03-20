@@ -18,6 +18,13 @@ use std::time::Duration;
 
 #[tokio::main]
 async fn main() {
+    // Handle --skill before clap parsing (to avoid requiring subcommand)
+    if std::env::args().any(|arg| arg == "--skill") {
+        const AGENT_SKILL: &str = include_str!("skill.md");
+        println!("{}", AGENT_SKILL);
+        return;
+    }
+
     let args = Args::parse_args();
     let format = if args.json { OutputFormat::Json } else { OutputFormat::Text };
 

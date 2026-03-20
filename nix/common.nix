@@ -21,7 +21,13 @@ let
     }
   );
 
-  src = craneLib.cleanCargoSource root;
+  src = lib.fileset.toSource {
+    inherit root;
+    fileset = lib.fileset.unions [
+      (lib.fileset.fromSource (craneLib.cleanCargoSource root))
+      (root + /crates/aifed/src/skill.md)
+    ];
+  };
 
   # Use git shortRev as version, fallback to "dirty" if working tree is dirty
   gitVersion = inputs.self.shortRev or "dirty";

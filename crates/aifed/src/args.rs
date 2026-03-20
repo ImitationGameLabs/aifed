@@ -1,88 +1,17 @@
 // CLI Design Philosophy
 // =====================
-// The main `aifed --help` output should serve as a complete, self-contained skill
-// for AI agents. An agent reading this help alone should be able to:
+// - `--help` provides quick command reference
+// - `--skill` provides detailed usage guide
 //
-// 1. Understand the core workflow (read → get hashes → edit with verification)
-// 2. Know all available operators and their meanings
-// 3. Parse the output format (LINE:HASH|CONTENT)
-// 4. Use locators correctly (LINE:HASH, 0:00 virtual line)
-// 5. Execute common operations from examples
-//
-// Therefore, when adding new features, ensure the main --help remains comprehensive.
-// Subcommand help (--help) can provide additional detail but shouldn't be required
-// for basic usage.
+// When adding new features, update skill.md for documentation.
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 /// AI-First Editor - A text editor designed for AI agents
 ///
-/// aifed uses hashlines (LINE:HASH) to ensure deterministic, verifiable edits.
-/// This prevents AI agents from making edits based on stale file state.
-///
-/// WORKFLOW:
-///   1. Read file to get current hashes: aifed read <FILE>
-///   2. Edit with hash verification: aifed edit <FILE> <OP> <LINE:HASH> [CONTENT]
-///   3. Hash mismatch = file changed, re-read and retry
-///      Tip: Use line range (e.g., "10-20") to re-read only nearby lines
-///
-/// OUTPUT FORMAT (aifed read):
-///   LINE:HASH|CONTENT
-///   - LINE: 1-based line number
-///   - HASH: 2-char content hash (base32hex, characters 0-9 A-V)
-///   - CONTENT: the actual line text
-///     Example: "42:3K|fn main() {"
-///
-/// EDIT OPERATORS:
-///   =  Replace line at locator
-///   +  Insert new line after locator
-///   -  Delete line at locator
-///
-/// LOCATORS:
-///   LINE:HASH  Standard hashline (e.g., "42:3K")
-///   0:00       Virtual line for inserting at file beginning
-///
-/// BATCH MODE:
-///   Multiple operations can be provided via stdin (heredoc).
-///   All operations must succeed, or none are applied (atomic).
-///
-/// LSP COMMANDS (requires running daemon):
-///   aifed lsp symbols <FILE> <LINE>       - Get symbol locators for a line
-///   aifed lsp diag <FILE>                 - Get diagnostics
-///   aifed lsp hover <FILE> <LINE:HASH> <SINDEX:NAME>   - Get hover info
-///   aifed lsp def <FILE> <LINE:HASH> <SINDEX:NAME>     - Go to definition
-///   aifed lsp refs <FILE> <LINE:HASH> <SINDEX:NAME>    - Find references
-///   aifed lsp complete <FILE> <LINE:HASH> <SINDEX:NAME> - Get completions
-///   aifed lsp rename <FILE> <LINE:HASH> <SINDEX:NAME> <NAME> - Rename symbol
-///
-/// DAEMON COMMANDS:
-///   aifed daemon status   - Check daemon status
-///   aifed daemon stop     - Stop daemon
-///
-/// EXAMPLES:
-///   ```bash
-///   # Single edit
-///   aifed read main.rs              # Get hashes for all lines
-///   aifed read main.rs 10-20        # Read lines 10-20
-///   aifed edit main.rs = 42:3K "new content"    # Replace line 42
-///   aifed edit main.rs + 10:AB "inserted line"  # Insert after line 10
-///   aifed edit main.rs - 15:7M                  # Delete line 15
-///   aifed edit main.rs + 0:00 "// header"       # Insert at file beginning
-///
-///   # Batch edit (heredoc)
-///   aifed edit main.rs <<EOF
-///   = 1:AB "modified"
-///   + 10:3K "inserted"
-///   - 15:7M
-///   EOF
-///
-///   # LSP operations (requires running daemon)
-///   aifed daemon status
-///   aifed lsp symbols src/main.rs 10      # Get symbols: S1:fn S2:main
-///   aifed lsp hover src/main.rs 10:3K S2:main
-///   aifed lsp def src/main.rs 10:3K S2:main
-///   ```
+/// Uses hashlines for deterministic, verifiable edits.
+/// Run `aifed --skill` for detailed usage guide.
 #[derive(Parser, Debug)]
 #[command(
     name = "aifed",
@@ -97,7 +26,11 @@ pub struct Args {
     #[arg(long, global = true)]
     pub json: bool,
 
-    /// Print help (see a summary with '--help')
+    /// Print skill document for AI agents
+    #[arg(long, global = true, action = clap::ArgAction::SetTrue)]
+    pub skill: Option<bool>,
+
+    /// Print help
     #[arg(long, global = true, action = clap::ArgAction::Help)]
     help: Option<bool>,
 
