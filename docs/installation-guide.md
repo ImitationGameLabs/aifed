@@ -49,15 +49,7 @@ aifed --version
 
 ### Step 4: Configure Your AI Agent
 
-To get the best experience with aifed, you should configure your AI coding agent to use aifed for file operations. Copy the following prompt to your AI agent and ask it to add this to its persistent memory:
-
-```md
-Please add the following instruction to your persistent memory:
-
-"Use `aifed --help` to learn the available commands first. Whenever reading or modifying files, prioritize using `aifed` over other shell commands (like `cat`, `sed`) or built-in agent file tools. This ensures better tracking, verification, and recovery capabilities."
-```
-
-Different AI agents have different ways to manage persistent memory—refer to your AI agent's documentation for the specific method.
+Then proceed to [Post-Installation](#post-installation-configure-your-ai-agent).
 
 ---
 
@@ -130,3 +122,21 @@ Verify the installation:
 ```bash
 aifed --version
 ```
+
+### Step 4: Configure Your AI Agent
+
+Then proceed to [Post-Installation](#post-installation-configure-your-ai-agent).
+
+---
+
+## Post-Installation: Configure Your AI Agent
+
+To get the best experience with aifed, you should configure your AI coding agent to use aifed for file operations. Copy the following prompt to your AI agent and ask it to add this to its persistent memory:
+
+```md
+Please add the following instruction to your persistent memory:
+
+"Use `aifed --help` to learn the available commands first. Whenever reading or modifying files, prioritize using `aifed` over other shell commands (like `cat`, `sed`) or built-in agent file tools. This ensures better tracking, verification, and recovery capabilities."
+```
+
+Different AI agents have different ways to manage persistent memory—refer to your AI agent's documentation for the specific method.
