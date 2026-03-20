@@ -8,7 +8,13 @@ use crate::output::{self, OutputFormat};
 use aifed_common::{DiagnosticsRequest, HoverRequest, LspPositionRequest, Position, RenameRequest};
 use aifed_daemon_client::DaemonClient;
 use std::io::BufRead;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+/// Convert path to absolute path for LSP requests.
+/// LSP requires absolute paths for file:// URIs.
+fn canonicalize_path(path: &Path) -> Result<PathBuf> {
+    path.canonicalize().map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })
+}
 
 /// Detect language from file extension
 fn detect_language(file: &Path) -> Result<String> {
@@ -176,8 +182,9 @@ pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFor
 
     match cmd {
         LspCommands::Diag { file } => {
-            let language = detect_language(file)?;
-            let file_path = file.to_string_lossy().to_string();
+            let abs_path = canonicalize_path(file)?;
+            let language = detect_language(&abs_path)?;
+            let file_path = abs_path.to_string_lossy().to_string();
             let request = DiagnosticsRequest { language, file_path };
 
             let response = client.diagnostics(request).await?;
@@ -186,9 +193,10 @@ pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFor
         }
 
         LspCommands::Hover { file, hashline, symbol } => {
-            let (line, col) = resolve_position(file, hashline, symbol)?;
-            let language = detect_language(file)?;
-            let file_path = file.to_string_lossy().to_string();
+            let abs_path = canonicalize_path(file)?;
+            let (line, col) = resolve_position(&abs_path, hashline, symbol)?;
+            let language = detect_language(&abs_path)?;
+            let file_path = abs_path.to_string_lossy().to_string();
             let request = HoverRequest {
                 language,
                 file_path,
@@ -201,9 +209,10 @@ pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFor
         }
 
         LspCommands::Def { file, hashline, symbol } => {
-            let (line, col) = resolve_position(file, hashline, symbol)?;
-            let language = detect_language(file)?;
-            let file_path = file.to_string_lossy().to_string();
+            let abs_path = canonicalize_path(file)?;
+            let (line, col) = resolve_position(&abs_path, hashline, symbol)?;
+            let language = detect_language(&abs_path)?;
+            let file_path = abs_path.to_string_lossy().to_string();
             let request = LspPositionRequest {
                 language,
                 file_path,
@@ -216,9 +225,10 @@ pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFor
         }
 
         LspCommands::Refs { file, hashline, symbol } => {
-            let (line, col) = resolve_position(file, hashline, symbol)?;
-            let language = detect_language(file)?;
-            let file_path = file.to_string_lossy().to_string();
+            let abs_path = canonicalize_path(file)?;
+            let (line, col) = resolve_position(&abs_path, hashline, symbol)?;
+            let language = detect_language(&abs_path)?;
+            let file_path = abs_path.to_string_lossy().to_string();
             let request = LspPositionRequest {
                 language,
                 file_path,
@@ -231,9 +241,10 @@ pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFor
         }
 
         LspCommands::Complete { file, hashline, symbol } => {
-            let (line, col) = resolve_position(file, hashline, symbol)?;
-            let language = detect_language(file)?;
-            let file_path = file.to_string_lossy().to_string();
+            let abs_path = canonicalize_path(file)?;
+            let (line, col) = resolve_position(&abs_path, hashline, symbol)?;
+            let language = detect_language(&abs_path)?;
+            let file_path = abs_path.to_string_lossy().to_string();
             let request = LspPositionRequest {
                 language,
                 file_path,
@@ -246,9 +257,10 @@ pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFor
         }
 
         LspCommands::Rename { file, hashline, symbol, new_name } => {
-            let (line, col) = resolve_position(file, hashline, symbol)?;
-            let language = detect_language(file)?;
-            let file_path = file.to_string_lossy().to_string();
+            let abs_path = canonicalize_path(file)?;
+            let (line, col) = resolve_position(&abs_path, hashline, symbol)?;
+            let language = detect_language(&abs_path)?;
+            let file_path = abs_path.to_string_lossy().to_string();
             let request = RenameRequest {
                 language,
                 file_path,
