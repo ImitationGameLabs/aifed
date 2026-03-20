@@ -5,9 +5,7 @@ use crate::error::{Error, Result};
 use crate::hash::hash_line;
 use crate::locator::{Locator, SymbolLocator};
 use crate::output::{self, OutputFormat};
-use aifed_common::{
-    DiagnosticsRequest, HoverRequest, LspPositionRequest, Position, RenameRequest, socket_path,
-};
+use aifed_common::{DiagnosticsRequest, HoverRequest, LspPositionRequest, Position, RenameRequest};
 use aifed_daemon_client::DaemonClient;
 use std::io::BufRead;
 use std::path::Path;
@@ -39,20 +37,6 @@ fn detect_language(file: &Path) -> Result<String> {
     };
 
     Ok(lang.to_string())
-}
-
-/// Get client connected to the daemon for the given workspace
-fn get_client(socket: Option<&Path>) -> Result<(DaemonClient, std::path::PathBuf)> {
-    let socket = match socket {
-        Some(p) => p.to_path_buf(),
-        None => {
-            let cwd = std::env::current_dir()
-                .map_err(|e| Error::InvalidIo { path: Path::new(".").to_path_buf(), source: e })?;
-            socket_path(&cwd)?
-        }
-    };
-
-    Ok((DaemonClient::new(&socket), socket))
 }
 
 /// Read a specific line from a file (1-based line number)
@@ -148,7 +132,7 @@ fn resolve_position(file: &Path, hashline: &str, symbol: &str) -> Result<(u32, u
     Ok((line_num as u32, char_offset + 1)) // Convert to 1-based
 }
 
-pub async fn execute(cmd: &LspCommands, socket: Option<&Path>, format: OutputFormat) -> Result<()> {
+pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFormat) -> Result<()> {
     // Symbols command doesn't need daemon - it just reads the file
     if let LspCommands::Symbols { file, locator } = cmd {
         let loc = Locator::parse(locator)?;
@@ -183,13 +167,11 @@ pub async fn execute(cmd: &LspCommands, socket: Option<&Path>, format: OutputFor
         return Ok(());
     }
 
-    // Other LSP commands need the daemon
-    let (client, socket_path) = get_client(socket)?;
-
-    // Check if daemon is running
+    // Other LSP commands need the daemon - check if running
     if !client.is_running().await {
-        let workspace = socket_path.parent().unwrap_or(&socket_path);
-        return Err(Error::DaemonNotRunning { workspace: workspace.to_path_buf() });
+        return Err(Error::DaemonNotRunning {
+            workspace: std::env::current_dir().unwrap_or_default().to_path_buf(),
+        });
     }
 
     match cmd {

@@ -8,7 +8,9 @@
 mod error;
 mod socket;
 mod types;
+pub mod workspace;
 
 pub use error::*;
 pub use socket::*;
 pub use types::*;
+pub use workspace::{Workspace, WorkspaceError, detect_workspace};

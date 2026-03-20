@@ -97,10 +97,6 @@ pub struct Args {
     #[arg(long, global = true)]
     pub json: bool,
 
-    /// Custom socket path (for LSP commands)
-    #[arg(long, global = true)]
-    pub socket: Option<PathBuf>,
-
     /// Print help (see a summary with '--help')
     #[arg(long, global = true, action = clap::ArgAction::Help)]
     help: Option<bool>,

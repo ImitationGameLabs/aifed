@@ -32,6 +32,9 @@ pub enum Error {
     #[error("stdin not available for reading")]
     StdinNotAvailable,
 
+    #[error("Lightweight mode: workspace not detected (no aifed.toml or .git found)")]
+    LightweightMode,
+
     // Daemon-related errors
     #[error("Daemon is not running for workspace: {workspace}")]
     DaemonNotRunning { workspace: PathBuf },
@@ -41,6 +44,9 @@ pub enum Error {
 
     #[error("Socket path error: {0}")]
     SocketError(#[from] aifed_common::SocketError),
+
+    #[error("Workspace error: {0}")]
+    WorkspaceError(#[from] aifed_common::WorkspaceError),
 
     #[error("Client error: {0}")]
     ClientError(#[from] aifed_common::ClientError),

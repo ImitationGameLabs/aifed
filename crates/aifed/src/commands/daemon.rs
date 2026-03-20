@@ -3,26 +3,13 @@
 use crate::args::DaemonCommands;
 use crate::error::{Error, Result};
 use crate::output::OutputFormat;
-use aifed_common::socket_path;
 use aifed_daemon_client::DaemonClient;
-use std::path::Path;
 
 pub async fn execute(
     cmd: &DaemonCommands,
-    socket: Option<&Path>,
+    client: &DaemonClient,
     format: OutputFormat,
 ) -> Result<()> {
-    let socket = match socket {
-        Some(p) => p.to_path_buf(),
-        None => {
-            let cwd = std::env::current_dir()
-                .map_err(|e| Error::InvalidIo { path: Path::new(".").to_path_buf(), source: e })?;
-            socket_path(&cwd)?
-        }
-    };
-
-    let client = DaemonClient::new(&socket);
-
     match cmd {
         DaemonCommands::Status => {
             if !client.is_running().await {
