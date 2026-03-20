@@ -13,7 +13,7 @@ let
     cargoArtifacts
     ;
 
-  project = "my-project";
+  project = "aifed";
 in
 # Include all binary crates in checks (excludes meta packages like 'default')
 (pkgs.lib.removeAttrs myPkgs [ "default" ])
@@ -48,8 +48,7 @@ in
 
   # Audit dependencies for security issues
   "${project}-audit" = craneLib.cargoAudit {
-    inherit src;
-    advisory-db = advisory-db;
+    inherit src advisory-db;
   };
 
   # Audit licenses

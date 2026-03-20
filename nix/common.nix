@@ -50,51 +50,6 @@ let
   # Build *just* the cargo dependencies (of the entire workspace),
   # so we can reuse all of that work (e.g. via cachix) when running in CI
   cargoArtifacts = craneLib.buildDepsOnly commonArgs;
-
-  # mapToAbsolute is a function that converts relative crate paths to absolute paths.
-  # Takes an attrset like { my-app = "crates/my-app"; }
-  # and returns { my-app = /absolute/path/to/crates/my-app; }
-  mapToAbsolute = lib.mapAttrs (_: path: root + "/${path}");
-
-  # Binary crates that produce executables (need to be built individually)
-  # Add your binary crates here
-  binaryCratePaths = mapToAbsolute {
-    aifed = "crates/aifed";
-    aifed-daemon = "crates/aifed-daemon";
-  };
-
-  # Library-only crates (only needed for fileset dependencies, not built separately)
-  # Add your library crates here
-  libraryCratePaths = mapToAbsolute {
-    aifed-common = "crates/aifed-common";
-    aifed-daemon-client = "crates/aifed-daemon-client";
-  };
-
-  # All crates combined (for fileset generation)
-  allCratePaths = binaryCratePaths // libraryCratePaths;
-
-  # mkCrateSources is a function that converts a crate paths attrset to a list of filesets.
-  # Used to gather all workspace crate sources for dependency tracking.
-  mkCrateSources =
-    cratePaths:
-    lib.mapAttrsToList (_: cratepath: craneLib.fileset.commonCargoSources cratepath) cratePaths;
-
-  # mkCrateFileset is a function that creates a fileset for building a specific crate.
-  # Includes workspace-level files (Cargo.toml, Cargo.lock) and all crate sources
-  # to ensure reproducible builds with correct dependencies.
-  mkCrateFileset =
-    cratepath:
-    lib.fileset.toSource {
-      inherit root;
-      fileset = lib.fileset.unions (
-        [
-          (root + "/Cargo.toml")
-          (root + "/Cargo.lock")
-        ]
-        ++ mkCrateSources libraryCratePaths
-        ++ [ (craneLib.fileset.commonCargoSources cratepath) ]
-      );
-    };
 in
 {
   inherit
@@ -103,9 +58,5 @@ in
     commonArgs
     cargoArtifacts
     gitVersion
-    binaryCratePaths
-    libraryCratePaths
-    allCratePaths
-    mkCrateFileset
     ;
 }
