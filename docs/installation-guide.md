@@ -136,7 +136,7 @@ To get the best experience with aifed, configure your AI agent to use aifed for 
 ```md
 Please add the following instructions to your persistent memory:
 
-"Run `aifed --skill` to learn the available commands. For all file operations:
+"Before using any aifed command, you MUST run `aifed --skill` to get the complete usage guide. For all file operations:
 
 1. Use `aifed read` and `aifed edit` instead of `cat`, `sed`, or built-in file tools
 2. This applies even when only reading files, unless you are certain you are just exploring and will not make any modifications
