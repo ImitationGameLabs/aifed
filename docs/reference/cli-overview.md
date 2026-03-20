@@ -18,12 +18,18 @@ aifed [OPTIONS] <COMMAND>
 
 ## Workspace Detection
 
-aifed automatically detects the workspace root by searching upward from the current directory for:
+aifed automatically detects the workspace root by searching upward from the current directory.
+
+At each directory level, it checks for both markers:
 
 1. `aifed.toml` - Project configuration file (marks project root)
 2. `.git` - Git repository root
 
-The first match wins. If no workspace is detected, only `read` and `edit` commands are available (lightweight mode).
+The **closest** marker wins. At the same level, `aifed.toml` takes priority over `.git`.
+
+This ensures nested git repositories are not affected by external `aifed.toml` files.
+
+If no workspace is detected, only `read` and `edit` commands are available (lightweight mode).
 
 ## AI-First Design Principles
 
