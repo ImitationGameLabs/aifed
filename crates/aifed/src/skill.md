@@ -20,14 +20,27 @@ LINE:HASH|CONTENT
 
 ## EDIT OPERATORS
 
-=  Replace line at locator
-+  Insert new line after locator
--  Delete line at locator
+=   Replace line at locator
++   Insert new line after locator
+-   Delete line at locator (supports range: `- [START:HASH,END:HASH]`)
 
-## LOCATORS
+## LINE LOCATORS
 
-LINE:HASH  Standard hashline (e.g., "42:3K")
-0:00       Virtual line for inserting at file beginning
+LINE:HASH                Standard hashline (e.g., "42:3K")
+0:00                     Virtual line for inserting at file beginning
+[START:HASH,END:HASH]    Range locator for delete (e.g., "[2:AA,89:BB]" deletes lines 2-89, boundary hash verified)
+
+## STRING ESCAPING (JSON-style)
+
+Content in double quotes supports JSON escape sequences:
+- `\"` → `"` (double quote)
+- `\\` → `\` (backslash)
+- `\n` → newline
+- `\t` → tab
+- `\r` → carriage return
+- `\uXXXX` → Unicode character
+
+Example: `"code: println!(\"hello\");"` becomes `code: println!("hello");`
 
 ## BATCH MODE
 
@@ -78,11 +91,20 @@ aifed edit main.rs + 10:AB "inserted line"  # Insert after line 10
 aifed edit main.rs - 15:7M                  # Delete line 15
 aifed edit main.rs + 0:00 "// header"       # Insert at file beginning
 
-# Batch edit (heredoc)
-aifed edit main.rs <<EOF
+# Batch edit (heredoc) - use 'EOF' to prevent shell expansion
+aifed edit main.rs <<'EOF'
 = 1:AB "modified"
 + 10:3K "inserted"
 - 15:7M
+EOF
+
+# Range delete - delete lines 10-50 with boundary hash verification
+aifed edit main.rs - [10:AB,50:CD]
+
+# Content with JSON escaping
+aifed edit main.rs <<'EOF'
+= 1:AB "println!(\"result: {}\", value);"
++ 5:CD "{\"key\": \"value\"}"
 EOF
 
 # LSP operations (requires running daemon)

@@ -211,8 +211,8 @@ fn parse_single_operation(line_num: usize, line: &str) -> Result<EditOp> {
 
     // Extract content
     let content = if parts.len() > 2 {
-        // Join remaining parts as content, handling quoted strings
-        Some(extract_content(&parts[2..]))
+        // Join remaining parts as content, handling quoted strings and escapes
+        Some(extract_content(&parts[2..])?)
     } else {
         None
     };
@@ -235,45 +235,55 @@ fn parse_single_operation(line_num: usize, line: &str) -> Result<EditOp> {
     Ok(EditOp { operation, locator, content })
 }
 
-/// Split operation line into parts, respecting quoted strings
+/// Split operation line into parts, respecting quoted strings with escape support
 fn split_operation_line(line: &str) -> Vec<&str> {
     let mut parts = Vec::new();
     let mut current_start = None;
     let mut in_quotes = false;
-    let mut quote_char = ' ';
-    let chars = line.char_indices();
+    let mut idx = 0;
 
-    for (idx, ch) in chars {
+    while idx < line.len() {
+        let ch = line[idx..].chars().next().unwrap();
+
         if in_quotes {
-            if ch == quote_char {
-                // End of quoted string
-                in_quotes = false;
-                // Include the content without quotes
-                if let Some(start) = current_start {
-                    if start + 1 < idx {
-                        parts.push(&line[start + 1..idx]);
-                    } else {
-                        parts.push(""); // Empty quoted string
-                    }
+            if ch == '\\' {
+                // Skip next character (escape sequence)
+                idx += ch.len_utf8();
+                if idx < line.len() {
+                    idx += line[idx..].chars().next().unwrap().len_utf8();
                 }
+                continue;
+            } else if ch == '"' {
+                // End of quoted string - extract content without quotes
+                if let Some(start) = current_start {
+                    parts.push(&line[start + 1..idx]);
+                }
+                in_quotes = false;
                 current_start = None;
+                idx += ch.len_utf8();
+                continue;
             }
-        } else if ch == '"' || ch == '\'' {
+        } else if ch == '"' {
             // Start of quoted string
             in_quotes = true;
-            quote_char = ch;
             current_start = Some(idx);
+            idx += ch.len_utf8();
+            continue;
         } else if ch.is_whitespace() {
             if let Some(start) = current_start {
                 parts.push(&line[start..idx]);
                 current_start = None;
             }
+            idx += ch.len_utf8();
+            continue;
         } else if current_start.is_none() {
             current_start = Some(idx);
         }
+
+        idx += ch.len_utf8();
     }
 
-    // Handle remaining part
+    // Handle remaining part (unterminated string is handled elsewhere)
     if let Some(start) = current_start {
         parts.push(&line[start..]);
     }
@@ -281,15 +291,19 @@ fn split_operation_line(line: &str) -> Vec<&str> {
     parts
 }
 
-/// Extract content from parts, handling escape sequences in quoted strings
-fn extract_content(parts: &[&str]) -> String {
+/// Extract and unescape content from parts using JSON escape rules
+fn extract_content(parts: &[&str]) -> Result<String> {
     if parts.is_empty() {
-        return String::new();
+        return Ok(String::new());
     }
 
-    // If first part was a quoted string, it's already processed
-    // Just join parts with spaces for unquoted content
-    parts.join(" ")
+    let raw = parts.join(" ");
+
+    // Use json-escape to unescape
+    match json_escape::unescape(&raw).decode_utf8() {
+        Ok(cow) => Ok(cow.into_owned()),
+        Err(e) => Err(Error::InvalidEscape { sequence: raw, reason: e.to_string() }),
+    }
 }
 
 /// Execute batch operations
@@ -346,17 +360,80 @@ fn execute_atomic(
     // Phase 1: Validate all operations and build edit plan
     let mut plan = EditPlan::new();
     for (idx, op) in operations.iter().enumerate() {
-        let content_str = op.content.as_ref().map(|c| format!("\"{}\"", c)).unwrap_or_default();
-        let validated =
-            validate_operation(lines, op.operation, &op.locator, op.content.as_deref(), path)
-                .map_err(|e| Error::InvalidBatchOp {
+        // Handle HashlineRange by expanding into individual delete operations
+        if let Locator::HashlineRange { start, start_hash, end, end_hash } = &op.locator {
+            // Only Delete operation is supported for HashlineRange
+            if op.operation != Operation::Delete {
+                return Err(Error::InvalidBatchOp {
+                    line_number: idx + 1,
+                    line_content: format!("{} {}", op.operation_str(), op.locator),
+                    reason: "HashlineRange only supported for delete operations".to_string(),
+                });
+            }
+
+            // Validate start and end line numbers
+            if *start == 0 || *start > lines.len() {
+                return Err(Error::InvalidBatchOp {
+                    line_number: idx + 1,
+                    line_content: op.locator.to_string(),
+                    reason: format!("Range start {} out of bounds (1-{})", start, lines.len()),
+                });
+            }
+            if *end > lines.len() {
+                return Err(Error::InvalidBatchOp {
+                    line_number: idx + 1,
+                    line_content: op.locator.to_string(),
+                    reason: format!("Range end {} out of bounds (1-{})", end, lines.len()),
+                });
+            }
+
+            // Verify start hash
+            let actual_start_hash = crate::hash::hash_line(&lines[start - 1]);
+            if actual_start_hash != *start_hash && !crate::hash::is_virtual_hash(start_hash) {
+                return Err(Error::InvalidBatchOp {
+                    line_number: idx + 1,
+                    line_content: op.locator.to_string(),
+                    reason: format!(
+                        "Hash mismatch at line {}: expected {}, got {}",
+                        start, start_hash, actual_start_hash
+                    ),
+                });
+            }
+
+            // Verify end hash
+            let actual_end_hash = crate::hash::hash_line(&lines[end - 1]);
+            if actual_end_hash != *end_hash && !crate::hash::is_virtual_hash(end_hash) {
+                return Err(Error::InvalidBatchOp {
+                    line_number: idx + 1,
+                    line_content: op.locator.to_string(),
+                    reason: format!(
+                        "Hash mismatch at line {}: expected {}, got {}",
+                        end, end_hash, actual_end_hash
+                    ),
+                });
+            }
+
+            // Add all lines in range to the deletion set
+            for line_num in *start..=*end {
+                if plan.replacements.contains_key(&line_num) {
+                    return Err(Error::ConflictDeleteAndReplace(line_num));
+                }
+                plan.deletions.insert(line_num);
+            }
+        } else {
+            // Standard single-line operation
+            let content_str = op.content.as_ref().map(|c| format!("\"{}\"", c)).unwrap_or_default();
+            let validated =
+                validate_operation(lines, op.operation, &op.locator, op.content.as_deref(), path)
+                    .map_err(|e| Error::InvalidBatchOp {
                     line_number: idx + 1,
                     line_content: format!("{} {} {}", op.operation_str(), op.locator, content_str),
                     reason: e.to_string(),
                 })?;
 
-        // Add to plan (checks for conflicts)
-        plan.add(validated)?;
+            // Add to plan (checks for conflicts)
+            plan.add(validated)?;
+        }
     }
 
     // Phase 2: Apply the edit plan to build new content
@@ -760,5 +837,180 @@ mod tests {
         // Verify result: L1, A, NEW3, L4, L5
         let result = std::fs::read_to_string(&path).unwrap();
         assert_eq!(result, "L1\nA\nNEW3\nL4\nL5\n");
+    }
+
+    #[test]
+    fn test_batch_delete_then_replace() {
+        // Verify that "delete line 2 + replace line 3" works correctly
+        // without hash mismatch due to line number offset
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.txt");
+
+        // Create a 4-line file
+        let lines: Vec<String> = ["L1", "L2", "L3", "L4"].into_iter().map(String::from).collect();
+        write_file(&path, &lines, true).unwrap();
+
+        // Read file content and get hashes
+        let content = std::fs::read_to_string(&path).unwrap();
+        let file_lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+        let hash2 = crate::hash::hash_line(&file_lines[1]);
+        let hash3 = crate::hash::hash_line(&file_lines[2]);
+
+        // Delete line 2, Replace line 3 (operations based on original line numbers)
+        let input = format!(
+            r#"- 2:{hash2}
+= 3:{hash3} "NEW3"
+"#
+        );
+        let ops = parse_batch_operations(&input).unwrap();
+
+        execute_batch(&path, ops, false, OutputFormat::Text).unwrap();
+
+        // Verify result: L1, NEW3, L4
+        let result = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(result, "L1\nNEW3\nL4\n");
+    }
+
+    // ============================================================
+    // Quote escaping tests - currently failing (documenting issues)
+    // ============================================================
+
+    #[test]
+    fn test_parse_content_double_quote_inside_double() {
+        // Double quote inside double-quoted content
+        let input = r#"+ 10:AB "say \"hello\"""#;
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops[0].content, Some(r#"say "hello""#.to_string()));
+    }
+
+    #[test]
+    fn test_parse_content_backslash() {
+        // Backslash escaping
+        let input = r#"+ 10:AB "path\\to\\file""#;
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops[0].content, Some(r#"path\to\file"#.to_string()));
+    }
+
+    #[test]
+    fn test_parse_content_json_with_quotes() {
+        // JSON string content
+        let input = r#"+ 10:AB "{\"key\": \"value\"}""#;
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops[0].content, Some(r#"{"key": "value"}"#.to_string()));
+    }
+
+    #[test]
+    fn test_parse_content_rust_code() {
+        // Rust code containing raw string literal
+        let input = r##"+ 10:AB "let s = r#\"hello\"#;""##;
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops[0].content, Some(r###"let s = r#"hello"#;"###.to_string()));
+    }
+
+    #[test]
+    fn test_parse_content_newline_escape() {
+        // Newline escape sequence
+        let input = r#"+ 10:AB "line1\nline2""#;
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops[0].content, Some("line1\nline2".to_string()));
+    }
+
+    #[test]
+    fn test_parse_content_tab_escape() {
+        // Tab escape sequence
+        let input = r#"+ 10:AB "col1\tcol2""#;
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops[0].content, Some("col1\tcol2".to_string()));
+    }
+
+    #[test]
+    fn test_parse_content_invalid_escape() {
+        // Invalid escape sequence should return error
+        let input = r#"+ 10:AB "unknown \x escape""#;
+        let result = parse_batch_operations(input);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_content_single_quote_no_escape_needed() {
+        // Single quote inside double quotes doesn't need escaping
+        let input = r#"+ 10:AB "it's""#;
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops[0].content, Some("it's".to_string()));
+    }
+
+    // ============================================================
+    // HashlineRange delete tests
+    // ============================================================
+
+    #[test]
+    fn test_batch_range_delete() {
+        // Delete lines 2-9 from a 10-line file, keeping L1 and L10
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.txt");
+
+        // Create a 10-line file
+        let lines: Vec<String> = (1..=10).map(|i| format!("L{}", i)).collect();
+        write_file(&path, &lines, true).unwrap();
+
+        // Read file content and get hashes
+        let content = std::fs::read_to_string(&path).unwrap();
+        let file_lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+        let hash2 = crate::hash::hash_line(&file_lines[1]); // line 2 (0-indexed)
+        let hash9 = crate::hash::hash_line(&file_lines[8]); // line 9 (0-indexed)
+
+        // Delete lines 2-9 using hashline range
+        let input = format!("- [2:{hash2},9:{hash9}]");
+        let ops = parse_batch_operations(&input).unwrap();
+
+        execute_batch(&path, ops, false, OutputFormat::Text).unwrap();
+
+        // Verify result: L1, L10
+        let result = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(result, "L1\nL10\n");
+    }
+
+    #[test]
+    fn test_batch_range_delete_single_line() {
+        // [3:hash3,3:hash3] - delete only one line
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.txt");
+
+        let lines: Vec<String> = (1..=5).map(|i| format!("L{}", i)).collect();
+        write_file(&path, &lines, true).unwrap();
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        let file_lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+        let hash3 = crate::hash::hash_line(&file_lines[2]); // line 3 (0-indexed)
+
+        let input = format!("- [3:{hash3},3:{hash3}]");
+        let ops = parse_batch_operations(&input).unwrap();
+
+        execute_batch(&path, ops, false, OutputFormat::Text).unwrap();
+
+        // Verify result: L1, L2, L4, L5
+        let result = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(result, "L1\nL2\nL4\nL5\n");
+    }
+
+    #[test]
+    fn test_batch_range_delete_hash_mismatch() {
+        // Boundary line hash mismatch should fail
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.txt");
+
+        let lines: Vec<String> = (1..=10).map(|i| format!("L{}", i)).collect();
+        write_file(&path, &lines, true).unwrap();
+
+        // Use wrong hash (VV is valid format but wrong value)
+        let input = "- [2:VV,9:VV]";
+        let ops = parse_batch_operations(input).unwrap();
+
+        let result = execute_batch(&path, ops, false, OutputFormat::Text);
+
+        // Should fail with hash mismatch error
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Hash mismatch") || err.contains("line"), "Error: {}", err);
     }
 }

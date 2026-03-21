@@ -84,6 +84,12 @@ pub fn validate_operation(
                 reason: "Range locators not supported for edit operations".to_string(),
             });
         }
+        Locator::HashlineRange { .. } => {
+            return Err(Error::InvalidLocator {
+                input: locator.to_string(),
+                reason: "Hashline range only supported in batch mode".to_string(),
+            });
+        }
     };
 
     // Validate line number

@@ -11,6 +11,7 @@ xxhash-rust = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+json-escape = { workspace = true }
 aifed-daemon-client = { path = "../aifed-daemon-client" }
 aifed-common = { path = "../aifed-common" }
 

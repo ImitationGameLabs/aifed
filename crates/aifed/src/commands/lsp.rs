@@ -156,7 +156,7 @@ pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFor
                     println!("S{}:{}", idx, name);
                 }
             }
-            Locator::LineRange { start, end } => {
+            Locator::LineRange { start, end } | Locator::HashlineRange { start, end, .. } => {
                 for line_num in start..=end {
                     let line_content = read_line(file, line_num)?;
                     let hash = hash_line(&line_content);

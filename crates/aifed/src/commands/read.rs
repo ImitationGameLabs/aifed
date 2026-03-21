@@ -43,7 +43,7 @@ pub fn execute(
                     (line, line)
                 }
             }
-            Locator::LineRange { start, end } => {
+            Locator::LineRange { start, end } | Locator::HashlineRange { start, end, .. } => {
                 if start > lines.len() {
                     return Err(Error::InvalidLocator {
                         input: loc_str.to_string(),

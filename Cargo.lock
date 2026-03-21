@@ -25,6 +25,7 @@ dependencies = [
  "aifed-daemon-client",
  "anyhow",
  "clap",
+ "json-escape",
  "serde",
  "serde_json",
  "tempfile",
@@ -797,6 +798,15 @@ checksum = "b49715b7073f385ba4bc528e5747d02e66cb39c6146efb66b781f131f0fb399c"
 dependencies = [
  "once_cell",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "json-escape"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef6fd1644b881a0cb8030578c318e14840e543876e98f7bc9215270fd55ca5db"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]

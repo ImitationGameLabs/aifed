@@ -67,6 +67,9 @@ pub enum Error {
 
     #[error("Conflict: line {0} cannot be both deleted and replaced")]
     ConflictDeleteAndReplace(usize),
+
+    #[error("Invalid escape sequence in '{sequence}': {reason}")]
+    InvalidEscape { sequence: String, reason: String },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
