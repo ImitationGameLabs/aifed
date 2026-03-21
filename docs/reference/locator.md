@@ -38,13 +38,33 @@ The recommended format for edit operations.
 ```
 
 - `42` - Line number (human-readable, helps locate quickly)
-- `AB` - 6-character content hash (verification)
+- `AB` - 2-character content hash (verification)
 
 **Virtual Line:** The special value `0:00` represents the position before the first line, used for inserting at the beginning of a file:
 
 ```bash
 # Insert at file beginning
 aifed edit main.rs + 0:00 "// Copyright 2026"
+```
+
+### `[START:HASH,END:HASH]` - Hashline Range
+
+Range locator for deleting multiple lines. Only boundary hashes are verified.
+
+```
+[10:AB,50:CD]
+```
+
+- `10` - Start line number
+- `AB` - Start line content hash
+- `50` - End line number (inclusive)
+- `CD` - End line content hash
+
+**Usage:** Only supported with delete (`-`) operation.
+
+```bash
+# Delete lines 10-50 (inclusive)
+aifed edit main.rs - [10:AB,50:CD]
 ```
 
 ### `HASH` - Hash Only
@@ -130,10 +150,11 @@ Error: Hash mismatch
 
 ### Edit Locators (for `edit` command)
 
-| Format    | Syntax      | Locator Only | Full Example    | Use Case            |
-| --------- | ----------- | ------------ | --------------- | ------------------- |
-| Hashline  | `LINE:HASH` | `42:AB`      | `main.rs 42:AB` | Default, safest     |
-| Hash only | `HASH`      | `AB`         | `main.rs AB`    | Line number unknown |
+| Format        | Syntax                  | Locator Only    | Full Example            | Use Case            |
+| ------------- | ----------------------- | --------------- | ----------------------- | ------------------- |
+| Hashline      | `LINE:HASH`             | `42:AB`         | `main.rs 42:AB`         | Default, safest     |
+| HashlineRange | `[START:HASH,END:HASH]` | `[10:AB,50:CD]` | `main.rs [10:AB,50:CD]` | Range delete        |
+| Hash only     | `HASH`                  | `AB`            | `main.rs AB`            | Line number unknown |
 
 **Virtual line** (`0:00`) is a special hashline value for inserting at file beginning.
 

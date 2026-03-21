@@ -15,11 +15,11 @@ aifed edit <FILE>                      # Multiple operations via stdin (heredoc)
 
 ### Operations
 
-| Operator | Syntax                  | Description                  |
-| -------- | ----------------------- | ---------------------------- |
-| `=`      | `= <LOCATOR> <CONTENT>` | Replace content at locator   |
-| `+`      | `+ <LOCATOR> <CONTENT>` | Insert content after locator |
-| `-`      | `- <LOCATOR>`           | Delete content at locator    |
+| Operator | Syntax                  | Description                                       |
+| -------- | ----------------------- | ------------------------------------------------- |
+| `=`      | `= <LOCATOR> <CONTENT>` | Replace content at locator                        |
+| `+`      | `+ <LOCATOR> <CONTENT>` | Insert content after locator                      |
+| `-`      | `- <LOCATOR>`           | Delete content at locator (supports range delete) |
 
 **Mnemonic:**
 - `=` - Equals suggests "assignment" (replace X with Y)
@@ -30,10 +30,11 @@ aifed edit <FILE>                      # Multiple operations via stdin (heredoc)
 
 Edit commands use **hashline** locators to specify positions with verification.
 
-| Format      | Example | Description                                       |
-| ----------- | ------- | ------------------------------------------------- |
-| `LINE:HASH` | `42:AB` | Hashline - line + hash verification (recommended) |
-| `HASH`      | `AB`    | Hash only (content-based positioning)             |
+| Format                  | Example         | Description                                           |
+| ----------------------- | --------------- | ----------------------------------------------------- |
+| `LINE:HASH`             | `42:AB`         | Hashline - line + hash verification (recommended)     |
+| `[START:HASH,END:HASH]` | `[10:AB,50:CD]` | Range delete - deletes lines START to END (inclusive) |
+| `HASH`                  | `AB`            | Hash only (content-based positioning)                 |
 
 **Virtual line:** The special hashline `0:00` represents the position before the first line, used for inserting at the beginning of a file.
 
@@ -43,6 +44,30 @@ aifed edit main.rs + 0:00 "// Copyright 2026"
 ```
 
 See [locator.md](locator.md) for detailed documentation on locators and hashline.
+
+### String Escaping (JSON-style)
+
+Content in double quotes supports JSON escape sequences:
+
+| Escape   | Result             |
+| -------- | ------------------ |
+| `\"`     | `"` (double quote) |
+| `\\`     | `\` (backslash)    |
+| `\n`     | newline            |
+| `\t`     | tab                |
+| `\r`     | carriage return    |
+| `\uXXXX` | Unicode character  |
+
+**Example:**
+```bash
+# Double quotes inside content
+aifed edit main.rs = 42:AB "println!(\"hello\");"
+# Result: println!("hello");
+
+# JSON string as content
+aifed edit config.rs + 10:CD "{\"key\": \"value\"}"
+# Result: {"key": "value"}
+```
 
 ### Options
 
@@ -72,11 +97,34 @@ aifed edit main.rs + 0:00 "// Copyright 2026"
 
 ```bash
 # Multiple operations via heredoc
-aifed edit main.rs <<EOF
+aifed edit main.rs <<'EOF'
 = 42:AB "fn main() {"
 + 10:3K "    println!(\"hello\");"
 - 15:7M
 EOF
+```
+
+#### Range Delete
+
+```bash
+# Delete lines 10-50 (inclusive), with boundary hash verification
+aifed edit main.rs - [10:AB,50:CD]
+
+# Range delete in batch mode
+aifed edit main.rs <<'EOF'
+- [2:AA,89:BB]
++ 1:HH "new header"
+EOF
+```
+
+#### JSON Escaping
+
+```bash
+# Content with embedded quotes
+aifed edit main.rs = 42:AB "code: println!(\"result: {}\", value);"
+
+# JSON content
+aifed edit config.json + 10:CD "{\"name\": \"test\", \"value\": 123}"
 ```
 
 #### With Options
