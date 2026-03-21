@@ -70,6 +70,9 @@ pub enum Error {
 
     #[error("Invalid escape sequence in '{sequence}': {reason}")]
     InvalidEscape { sequence: String, reason: String },
+
+    #[error("Unterminated string literal")]
+    UnterminatedString,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

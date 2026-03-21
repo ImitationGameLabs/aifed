@@ -174,7 +174,11 @@ pub fn parse_batch_operations(input: &str) -> Result<Vec<EditOp>> {
 /// Parse a single operation line
 fn parse_single_operation(line_num: usize, line: &str) -> Result<EditOp> {
     // Split into parts: OP LOCATOR [CONTENT]
-    let parts: Vec<&str> = split_operation_line(line);
+    let parts = split_operation_line(line).map_err(|e| Error::InvalidBatchOp {
+        line_number: line_num,
+        line_content: line.to_string(),
+        reason: e.to_string(),
+    })?;
 
     if parts.is_empty() {
         return Err(Error::InvalidBatchOp {
@@ -236,7 +240,7 @@ fn parse_single_operation(line_num: usize, line: &str) -> Result<EditOp> {
 }
 
 /// Split operation line into parts, respecting quoted strings with escape support
-fn split_operation_line(line: &str) -> Vec<&str> {
+fn split_operation_line(line: &str) -> Result<Vec<&str>> {
     let mut parts = Vec::new();
     let mut current_start = None;
     let mut in_quotes = false;
@@ -283,12 +287,17 @@ fn split_operation_line(line: &str) -> Vec<&str> {
         idx += ch.len_utf8();
     }
 
-    // Handle remaining part (unterminated string is handled elsewhere)
+    // Check for unterminated string
+    if in_quotes {
+        return Err(Error::UnterminatedString);
+    }
+
+    // Handle remaining unquoted part
     if let Some(start) = current_start {
         parts.push(&line[start..]);
     }
 
-    parts
+    Ok(parts)
 }
 
 /// Extract and unescape content from parts using JSON escape rules
@@ -937,6 +946,16 @@ mod tests {
         let input = r#"+ 10:AB "it's""#;
         let ops = parse_batch_operations(input).unwrap();
         assert_eq!(ops[0].content, Some("it's".to_string()));
+    }
+
+    #[test]
+    fn test_parse_content_unterminated_string() {
+        // Unterminated string should return error
+        let input = r#"+ 10:AB "unterminated"#;
+        let result = parse_batch_operations(input);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Unterminated string"));
     }
 
     // ============================================================
