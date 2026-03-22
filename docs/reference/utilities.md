@@ -24,32 +24,24 @@ aifed diff <FILE1> <FILE2>
 
 ### Comparison Modes
 
-| Mode                | Syntax                                  | Description                       |
-| ------------------- | --------------------------------------- | --------------------------------- |
-| Snapshot to current | `diff <FILE> --from <TAG>`              | Compare snapshot to current state |
-| Between snapshots   | `diff <FILE> --from <TAG1> --to <TAG2>` | Compare two snapshots             |
-| Between files       | `diff <FILE1> <FILE2>`                  | Compare two files                 |
+| Mode          | Syntax                | Description         |
+| ------------- | --------------------- | ------------------- |
+| Between files | `diff <FILE1> <FILE2>` | Compare two files   |
 
 ### Examples
 
 ```bash
-# Compare snapshot to current
-aifed diff main.rs --from before-refactor
-
-# Compare two snapshots
-aifed diff main.rs --from v1 --to v2
-
 # Compare two files
 aifed diff old.rs new.rs
 
 # Show diffstat only
-aifed diff main.rs --from before-refactor --stat
+aifed diff old.rs new.rs --stat
 
 # More context lines
-aifed diff main.rs --from before-refactor --unified 5
+aifed diff old.rs new.rs --unified 5
 
 # JSON output
-aifed diff main.rs --from before-refactor --json
+aifed diff old.rs new.rs --json
 ```
 
 ### Output Format
@@ -167,29 +159,10 @@ aifed edit main.rs = 42:AB "new code"
 
 # Check for errors
 aifed lsp diag main.rs
-
-# View changes
-aifed diff main.rs --from before-edit
-```
-
-### Compare Before/After
-
-```bash
-# Create snapshot
-aifed snapshot create main.rs --tag before
-
-# Make changes
-aifed edit main.rs = 42:AB "new code"
-
-# View diff
-aifed diff main.rs --from before
-
-# Restore if needed
-aifed snapshot restore main.rs --tag before
 ```
 
 ## See Also
 
-- [History & Snapshots](history.md) - Creating and managing snapshots
+- [History & Recovery](history.md) - Undo and redo edits
 - [Configuration](configuration.md) - Configuring formatters
 - [LSP Integration](lsp.md) - Using diagnostics

@@ -1,4 +1,4 @@
-# aifed - AI-First Editor (Early Stage)
+# aifed - AI-First Editor
 
 A text editor designed for AI agents.
 
@@ -16,18 +16,20 @@ See the [Installation Guide](docs/installation-guide.md) for setup instructions.
 
 ## Current Status
 
-aifed is in early development. Currently implemented features:
+Core features are implemented and available for experimental use in real scenarios:
 
-| Feature                                       | Status      |
-| --------------------------------------------- | ----------- |
-| `read` - Read file content with hashlines     | Implemented |
-| `edit` - Edit file with hashline verification | Implemented |
-| `lsp` - LSP integration (Rust first)          | Implemented |
-| `history/undo` - Edit history and recovery    | Planned     |
+| Feature                                         | Status |
+| ----------------------------------------------- | ------ |
+| `read` - Read file content with hashlines       | Ready  |
+| `edit` - Edit file with hashline verification   | Ready  |
+| `lsp` - LSP integration (Rust first)            | Ready  |
+| `history/undo/redo` - Edit history and recovery | Ready  |
+
+**Current focus:** Optimizing the AI agent experience through real-world usage. Testing and refining the workflow in actual coding tasks.
 
 ## Usage Examples
 
-> **Note:** The examples below illustrate the envisioned workflow. Currently, `read`, `edit`, and `lsp` commands are implemented.
+> **Note:** The examples below illustrate the typical workflow. All core commands (`read`, `edit`, `lsp`, `history/undo/redo`) are implemented.
 
 AI agents can obtain the full usage guide with:
 ```bash
@@ -99,10 +101,13 @@ aifed lsp diag main.rs
 
 ```bash
 # View recent edit history
-aifed history main.rs --last 5
+aifed history main.rs --count 5
 
 # Undo if something went wrong
 aifed undo main.rs
+
+# Redo if you change your mind
+aifed redo main.rs
 ```
 
 ## Documentation

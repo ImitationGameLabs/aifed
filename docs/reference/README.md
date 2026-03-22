@@ -11,7 +11,7 @@ This directory contains reference documentation for all **aifed** commands and c
 | **Edit Commands**       | Unified edit with =, +, - operators   | [edit-commands.md](edit-commands.md) | Implemented |
 | **Read Commands**       | info, read                            | [read-commands.md](read-commands.md) | Implemented |
 | **LSP Integration**     | diag, symbols, rename, etc.           | [lsp.md](lsp.md)                     | Implemented |
-| **History & Snapshots** | snapshot, history, undo               | [history.md](history.md)             | Planned     |
+| **History & Recovery**  | history, undo, redo                   | [history.md](history.md)             | Implemented |
 | **Configuration**       | config command and file format        | [configuration.md](configuration.md) | Planned     |
 | **Utilities**           | diff, format                          | [utilities.md](utilities.md)         | Planned     |
 
@@ -33,10 +33,10 @@ This directory contains reference documentation for all **aifed** commands and c
 - [`lsp hover`](lsp.md#lsp-hover) - Get type information
 - [`lsp complete`](lsp.md#lsp-complete) - Get completions
 
-### History & Snapshots *(Planned)*
-- [`snapshot`](history.md#snapshot) - Manage file snapshots
+### History & Recovery *(Implemented)*
 - [`history`](history.md#history) - View edit history
 - [`undo`](history.md#undo) - Undo recent edits
+- [`redo`](history.md#redo) - Redo undone edits
 
 ### Configuration *(Planned)*
 - [`config`](configuration.md#config) - Manage configuration

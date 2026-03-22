@@ -1,87 +1,12 @@
-# History & Snapshots
+# History & Recovery
 
-> **Status: Planned** - This document describes features that are not yet implemented.
+> **Status: Implemented** - History (in-memory, per-file), Undo/Redo
 
-Commands for managing file history and snapshots.
+Commands for managing file edit history and recovery.
 
 ## Overview
 
-aifed provides two mechanisms for tracking and reverting changes:
-
-- **History** - Automatic tracking of every edit
-- **Snapshots** - Explicit save points for recovery
-
----
-
-## `snapshot` - Manage File Snapshots
-
-Create, list, or restore file snapshots for safe editing.
-
-### Usage
-
-```
-aifed snapshot create <FILE> [--tag <TAG>]
-aifed snapshot list <FILE>
-aifed snapshot restore <FILE> [--tag <TAG>]
-aifed snapshot delete <FILE> --tag <TAG>
-```
-
-### Subcommands
-
-| Subcommand | Description               |
-| ---------- | ------------------------- |
-| `create`   | Create a new snapshot     |
-| `list`     | List snapshots for a file |
-| `restore`  | Restore to a snapshot     |
-| `delete`   | Delete a snapshot         |
-
-### Options
-
-| Option        | Description               |
-| ------------- | ------------------------- |
-| `--tag <TAG>` | Tag name for the snapshot |
-
-### Storage
-
-Snapshots are stored in `.aifed/snapshots/` within the project directory.
-
-### Examples
-
-```bash
-# Create snapshot before risky edit
-aifed snapshot create main.rs --tag before-refactor
-
-# List snapshots
-aifed snapshot list main.rs
-
-# Restore to previous state
-aifed snapshot restore main.rs --tag before-refactor
-
-# Delete old snapshot
-aifed snapshot delete main.rs --tag old-snapshot
-```
-
-### Snapshot Retention
-
-Default configuration:
-- `max_snapshots = 10` per file
-- `max_age = 7 days`
-
-Configure in `aifed.toml`:
-
-```toml
-[snapshot]
-dir = ".aifed/snapshots"
-max_snapshots = 10
-max_age = "7d"
-```
-
-### Snapshot Content
-
-Snapshots store full file content (not diffs) for:
-- Simple restore operation
-- No dependency chain issues
-- Fast recovery
+aifed automatically tracks every edit operation, enabling undo/redo functionality for recovery.
 
 ---
 
@@ -92,15 +17,21 @@ View edit history for a file.
 ### Usage
 
 ```
-aifed history <FILE>
+aifed history <FILE> [--count <N>] [--stat]
 ```
+
+### Arguments
+
+| Argument | Description      |
+| -------- | ---------------- |
+| `<FILE>` | Path to the file |
 
 ### Options
 
-| Option       | Description                     |
-| ------------ | ------------------------------- |
-| `--last <N>` | Show last N edits [default: 10] |
-| `--full`     | Show full diff for each edit    |
+| Option        | Description                     |
+| ------------- | ------------------------------- |
+| `--count <N>` | Show last N edits [default: 10] |
+| `--stat`      | Show summaries only (no diffs)  |
 
 ### Examples
 
@@ -109,16 +40,125 @@ aifed history <FILE>
 aifed history main.rs
 
 # Show last 20 edits
-aifed history main.rs --last 20
+aifed history main.rs --count 20
 
-# Show full diffs
-aifed history main.rs --full
+# Show summaries only
+aifed history main.rs --stat
 
 # JSON output
 aifed history main.rs --json
 ```
 
-### History vs Git
+### Output Format
+
+Each history entry shows:
+- Entry ID (for reference)
+- Timestamp
+- Summary of changes
+- Line diffs (unless `--stat` is used)
+
+---
+
+## `undo` - Undo Recent Edits
+
+Undo the last edit for a file.
+
+### Usage
+
+```
+aifed undo <FILE> [--dry-run]
+```
+
+### Arguments
+
+| Argument | Description      |
+| -------- | ---------------- |
+| `<FILE>` | Path to the file |
+
+### Options
+
+| Option      | Description                  |
+| ----------- | ---------------------------- |
+| `--dry-run` | Preview what would be undone |
+
+### Examples
+
+```bash
+# Undo last edit
+aifed undo main.rs
+
+# Preview undo without applying
+aifed undo main.rs --dry-run
+```
+
+### Undo Behavior
+
+- Undo reverts the most recent edit operation
+- Each undo moves back one entry in the history
+- After undo, you can use `redo` to reapply
+
+---
+
+## `redo` - Redo Undone Edits
+
+Redo the last undone edit for a file.
+
+### Usage
+
+```
+aifed redo <FILE> [--dry-run]
+```
+
+### Arguments
+
+| Argument | Description      |
+| -------- | ---------------- |
+| `<FILE>` | Path to the file |
+
+### Options
+
+| Option      | Description                  |
+| ----------- | ---------------------------- |
+| `--dry-run` | Preview what would be redone |
+
+### Examples
+
+```bash
+# Redo last undone edit
+aifed redo main.rs
+
+# Preview redo without applying
+aifed redo main.rs --dry-run
+```
+
+### Redo Behavior
+
+- Redo reapplies the most recently undone edit
+- Redo is only available after an undo
+- New edits clear the redo stack
+
+---
+
+## Storage
+
+History is stored in daemon memory with the following characteristics:
+
+| Aspect      | Behavior                             |
+| ----------- | ------------------------------------ |
+| Location    | Daemon memory (not persisted)        |
+| Scope       | Tracked independently per file       |
+| Persistence | Lost on daemon restart               |
+| Max entries | Configurable (default: 100 per file) |
+
+### Implications
+
+- **Daemon restart clears all history** - Use git commits for persistent checkpoints
+- **Per-file tracking** - History is isolated between files
+- **Fast operations** - In-memory storage provides quick undo/redo
+
+---
+
+## History vs Git
 
 | Feature     | aifed History | Git             |
 | ----------- | ------------- | --------------- |
@@ -129,126 +169,38 @@ aifed history main.rs --json
 **Use history for:**
 - Quick undo without git operations
 - Debug what changed
-- Audit trail
+- Short-term recovery
 
 **Use git for:**
 - Intentional checkpoints
 - Collaboration
+- Long-term history
 - Branching
 
-### Storage Implementation
-
-aifed uses a daemon architecture (required for LSP performance), but history storage backend is configurable:
-
-| Option          | Pros                                       | Cons                                          | Use Case           |
-| --------------- | ------------------------------------------ | --------------------------------------------- | ------------------ |
-| **Memory**      | Fastest access, simple                     | State loss on crash                           | Default            |
-| **File-system** | Persistent, no dependencies, portable      | Slower for large histories, file I/O overhead | Simple persistence |
-| **SQLite**      | Efficient queries, indexing, atomic writes | External dependency, database management      | Large histories    |
-
-**Memory (default):**
-- Daemon maintains history in memory
-- Fastest operations
-- State lost on daemon restart/crash
-- Use snapshots for intentional save points
-
-**File-system:**
-- Direct file storage in `.aifed/history/`
-- Each edit stored as a separate file or appended to a log
-- Persistent across daemon restarts
-- No external dependencies
-
-**SQLite:**
-- Single database file `.aifed/history.db`
-- Efficient querying with indexes
-- Built-in support for transactions and atomic operations
-- Best for large history volumes
-
-**Configuration:**
-
-```toml
-[history]
-backend = "memory"  # Options: memory, filesystem, sqlite
-max_entries = 100
-```
-
 ---
-
-## `undo` - Undo Recent Edits
-
-Undo recent edits.
-
-### Usage
-
-```
-aifed undo <FILE>
-```
-
-### Options
-
-| Option        | Description                          |
-| ------------- | ------------------------------------ |
-| `--steps <N>` | Number of edits to undo [default: 1] |
-| `--dry-run`   | Preview what would be undone         |
-
-### Examples
-
-```bash
-# Undo last edit
-aifed undo main.rs
-
-# Undo last 3 edits
-aifed undo main.rs --steps 3
-
-# Preview undo
-aifed undo main.rs --dry-run
-```
-
-### Undo Granularity
-
-| Method             | Scope             |
-| ------------------ | ----------------- |
-| `undo`             | Single edit       |
-| `undo --steps N`   | Multiple edits    |
-| `snapshot restore` | To specific point |
 
 ## Workflow Example
 
 ```bash
-# 1. Create snapshot before major changes
-aifed snapshot create main.rs --tag before-refactor
-
-# 2. Make edits
+# 1. Make edits
 aifed edit main.rs = 42:AB "new code"
 
-# 3. Check history
+# 2. Check history
 aifed history main.rs
 
-# 4. If something went wrong, undo
+# 3. If something went wrong, undo
 aifed undo main.rs
 
-# 5. Or restore to snapshot
-aifed snapshot restore main.rs --tag before-refactor
+# 4. Or preview the undo first
+aifed undo main.rs --dry-run
 
-# 6. Clean up snapshot when done
-aifed snapshot delete main.rs --tag before-refactor
+# 5. If you change your mind, redo
+aifed redo main.rs
 ```
 
-## Configuration
-
-```toml
-[history]
-enabled = true
-max_entries = 100
-
-[snapshot]
-dir = ".aifed/snapshots"
-max_snapshots = 10
-max_age = "7d"
-```
+---
 
 ## See Also
 
 - [Edit Commands](edit-commands.md) - Making edits
-- [Configuration](configuration.md) - History and snapshot settings
-- [Utilities](utilities.md) - Using diff to compare versions
+- [Read Commands](read-commands.md) - Reading files with hashlines

@@ -388,17 +388,3 @@ Detailed design TBD.
 ### v2 Candidates
 - Deeper git integration
 - Plugin system
-
----
-
-## Command Priority Matrix
-
-| Command            | Priority | Complexity | Dependencies  |
-| ------------------ | -------- | ---------- | ------------- |
-| edit               | P0       | Medium     | Hash system   |
-| info/read          | P0       | Low        | None          |
-| lsp (diag/symbols) | P1       | Medium     | LSP           |
-| lsp (rename/refs)  | P1       | High       | LSP           |
-| snapshot           | P1       | Medium     | File storage  |
-| history/undo       | P2       | Medium     | Storage       |
-| config/format/diff | P2       | Low        | None/External |

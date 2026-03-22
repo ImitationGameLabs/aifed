@@ -190,4 +190,4 @@ See [locator.md](locator.md) for detailed documentation.
 
 - [Locator Reference](locator.md) - Detailed locator documentation
 - [Read Commands](read-commands.md) - Getting hashes with info/read
-- [History & Snapshots](history.md) - Undoing edits
+- [History & Recovery](history.md) - Undoing edits

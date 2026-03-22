@@ -55,16 +55,35 @@ Example: `~/.cache/aifed/aifed-8f3a2b1c9d4e5f6a.sock`
 
 ### 1. Daemon Management
 
-| Method | Endpoint         | Description                                |
-| ------ | ---------------- | ------------------------------------------ |
-| GET    | `/api/v1/health` | Health check                               |
-| GET    | `/api/v1/status` | Daemon status (workspace, uptime, servers) |
+| Method | Endpoint            | Description                                |
+| ------ | ------------------- | ------------------------------------------ |
+| GET    | `/api/v1/health`    | Health check                               |
+| POST   | `/api/v1/heartbeat` | Record activity (prevent idle timeout)     |
+| GET    | `/api/v1/status`    | Daemon status (workspace, uptime, servers) |
 
 #### Health Check
 
 ```
 GET /api/v1/health
 ```
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "status": "ok"
+  }
+}
+```
+
+#### Heartbeat
+
+```
+POST /api/v1/heartbeat
+```
+
+Record activity to prevent daemon idle timeout. The daemon automatically shuts down after 30 minutes of inactivity. Calling this endpoint resets the idle timer.
 
 Response:
 ```json
@@ -550,6 +569,184 @@ Response:
 }
 ```
 
+### 5. History Operations
+
+| Method | Endpoint                      | Description                  |
+| ------ | ----------------------------- | ---------------------------- |
+| POST   | `/api/v1/history/access`      | Record file access (read op) |
+| POST   | `/api/v1/history/edit`        | Record an edit operation     |
+| GET    | `/api/v1/history/{file}`      | Get history for a file       |
+| POST   | `/api/v1/history/{file}/undo` | Undo last edit               |
+| POST   | `/api/v1/history/{file}/redo` | Redo last undone edit        |
+
+These operations track edit history per file, enabling undo/redo functionality.
+
+#### Record Access
+
+Records a file read operation. Call this before reading a file to track its state.
+
+```
+POST /api/v1/history/access
+Content-Type: application/json
+
+{
+  "file": "/home/user/projects/myapp/src/main.rs"
+}
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "hash": "A1B2C3D4E5F6G7H8"
+  }
+}
+```
+
+The returned hash represents the current file state and should be used when recording edits.
+
+#### Record Edit
+
+Records an edit operation with line-level diffs.
+
+```
+POST /api/v1/history/edit
+Content-Type: application/json
+
+{
+  "file": "/home/user/projects/myapp/src/main.rs",
+  "expected_hash": "A1B2C3D4E5F6G7H8",
+  "new_hash": "H8G7F6E5D4C3B2A1",
+  "diffs": [
+    {
+      "line_num": 10,
+      "old_hash": "OLDHASH1",
+      "old_content": "let x = 1;",
+      "new_content": "let x = 2;"
+    }
+  ]
+}
+```
+
+| Field           | Type   | Description                            |
+| --------------- | ------ | -------------------------------------- |
+| `file`          | string | Absolute path to the file              |
+| `expected_hash` | string | Hash of file before edit (from access) |
+| `new_hash`      | string | Hash of file after edit                |
+| `diffs`         | array  | Line-level changes                     |
+
+**LineDiffDto fields:**
+
+| Field         | Type   | Description                 |
+| ------------- | ------ | --------------------------- |
+| `line_num`    | number | Line number (1-indexed)     |
+| `old_hash`    | string | Hash of old line (optional) |
+| `old_content` | string | Original content (optional) |
+| `new_content` | string | New content (optional)      |
+
+- For **insertions**: `old_content` is `null`, `new_content` has value
+- For **deletions**: `old_content` has value, `new_content` is `null`
+- For **replacements**: both have values
+
+Response (success):
+```json
+{
+  "success": true,
+  "data": null
+}
+```
+
+Response (hash mismatch):
+```json
+{
+  "success": false,
+  "error": {
+    "code": "HASH_MISMATCH",
+    "message": "File modified externally. Expected hash: A1B2..., actual: X9Y8..."
+  }
+}
+```
+
+#### Get History
+
+```
+GET /api/v1/history/{file}?count=10&stat=true
+```
+
+| Query Parameter | Type    | Description                      |
+| --------------- | ------- | -------------------------------- |
+| `count`         | number  | Maximum entries to return        |
+| `stat`          | boolean | Return summaries only (no diffs) |
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "entries": [
+      {
+        "id": 3,
+        "timestamp": "2024-01-15T10:30:00Z",
+        "summary": "3 lines changed",
+        "diffs": [
+          {
+            "line_num": 10,
+            "old_hash": "OLDHASH1",
+            "old_content": "let x = 1;",
+            "new_content": "let x = 2;"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+When `stat=true`, the `diffs` array is empty (summaries only).
+
+#### Undo
+
+```
+POST /api/v1/history/{file}/undo?dry_run=true
+```
+
+| Query Parameter | Type    | Description                      |
+| --------------- | ------- | -------------------------------- |
+| `dry_run`       | boolean | Preview without applying changes |
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "diffs": [
+      {
+        "line_num": 10,
+        "old_hash": null,
+        "old_content": "let x = 2;",
+        "new_content": "let x = 1;"
+      }
+    ],
+    "current_hash": "A1B2C3D4E5F6G7H8"
+  }
+}
+```
+
+The returned `diffs` are the reverse changes to apply. The `current_hash` is the expected hash of the file before applying undo.
+
+#### Redo
+
+```
+POST /api/v1/history/{file}/redo?dry_run=true
+```
+
+| Query Parameter | Type    | Description                      |
+| --------------- | ------- | -------------------------------- |
+| `dry_run`       | boolean | Preview without applying changes |
+
+Response format is the same as undo.
+
 ---
 
 ## CLI Usage
@@ -609,6 +806,11 @@ The daemon automatically detects languages by checking for project files in the 
 | `LSP_STOP_FAILED`  | Failed to stop LSP server             |
 | `LSP_SERVER_BUSY`  | LSP server is busy (try with `force`) |
 | `LSP_ERROR`        | General LSP operation error           |
+| `HASH_MISMATCH`    | File modified externally              |
+| `NO_HISTORY`       | No history available for file         |
+| `NO_REDO`          | No redo available for file            |
+| `FILE_ERROR`       | File operation failed                 |
+| `HISTORY_ERROR`    | General history operation error       |
 
 ---
 
@@ -616,6 +818,7 @@ The daemon automatically detects languages by checking for project files in the 
 
 | Module    | Endpoints |
 | --------- | --------- |
-| Daemon    | 2         |
+| Daemon    | 3         |
 | LSP       | 12        |
-| **Total** | **14**    |
+| History   | 5         |
+| **Total** | **20**    |

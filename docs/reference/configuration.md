@@ -104,11 +104,6 @@ typescript = "typescript-language-server --stdio"
 [history]
 enabled = true
 max_entries = 100
-
-[snapshot]
-dir = ".aifed/snapshots"
-max_snapshots = 10
-max_age = "7d"
 ```
 
 ### Configuration Sections
@@ -150,14 +145,6 @@ python = "pylsp"
 | ------------- | ------ | ------- | -------------------------------- |
 | `enabled`     | bool   | `true`  | Enable edit history              |
 | `max_entries` | number | `100`   | Maximum history entries per file |
-
-#### `[snapshot]`
-
-| Key             | Type   | Default            | Description                |
-| --------------- | ------ | ------------------ | -------------------------- |
-| `dir`           | string | `.aifed/snapshots` | Snapshot storage directory |
-| `max_snapshots` | number | `10`               | Maximum snapshots per file |
-| `max_age`       | string | `7d`               | Maximum snapshot age       |
 
 ---
 
