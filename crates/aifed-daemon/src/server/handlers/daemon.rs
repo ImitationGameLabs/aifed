@@ -12,6 +12,11 @@ pub async fn health(State(_state): State<DaemonState>) -> impl IntoResponse {
     Json(ApiResponse::success(HealthResponse { status: "ok".into() }))
 }
 
+pub async fn heartbeat(State(state): State<DaemonState>) -> impl IntoResponse {
+    state.idle_monitor.record_activity();
+    Json(ApiResponse::success(HealthResponse { status: "ok".into() }))
+}
+
 pub async fn status(State(state): State<DaemonState>) -> impl IntoResponse {
     let start = START_TIME.get_or_init(Instant::now);
     let uptime_secs = start.elapsed().as_secs();

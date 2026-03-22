@@ -17,8 +17,6 @@ pub async fn definition(
     State(state): State<DaemonState>,
     Json(req): Json<LspPositionRequest>,
 ) -> impl IntoResponse {
-    state.idle_monitor.record_activity();
-
     let params = match text_document_position(&req.file_path, &req.position) {
         Ok(p) => GotoDefinitionParams {
             text_document_position_params: p,
@@ -69,8 +67,6 @@ pub async fn references(
     State(state): State<DaemonState>,
     Json(req): Json<LspPositionRequest>,
 ) -> impl IntoResponse {
-    state.idle_monitor.record_activity();
-
     let text_doc_pos = match text_document_position(&req.file_path, &req.position) {
         Ok(p) => p,
         Err(e) => {
@@ -107,8 +103,6 @@ pub async fn hover(
     State(state): State<DaemonState>,
     Json(req): Json<HoverRequest>,
 ) -> impl IntoResponse {
-    state.idle_monitor.record_activity();
-
     let params = match text_document_position(&req.file_path, &req.position) {
         Ok(p) => HoverParams {
             text_document_position_params: p,
@@ -139,8 +133,6 @@ pub async fn completions(
     State(state): State<DaemonState>,
     Json(req): Json<LspPositionRequest>,
 ) -> impl IntoResponse {
-    state.idle_monitor.record_activity();
-
     let text_doc_pos = match text_document_position(&req.file_path, &req.position) {
         Ok(p) => p,
         Err(e) => {
@@ -191,8 +183,6 @@ pub async fn diagnostics(
     State(state): State<DaemonState>,
     Json(req): Json<DiagnosticsRequest>,
 ) -> impl IntoResponse {
-    state.idle_monitor.record_activity();
-
     let uri = match file_path_to_uri(&req.file_path) {
         Ok(u) => u,
         Err(e) => {
@@ -227,8 +217,6 @@ pub async fn rename(
     State(state): State<DaemonState>,
     Json(req): Json<RenameRequest>,
 ) -> impl IntoResponse {
-    state.idle_monitor.record_activity();
-
     let text_doc_pos = match text_document_position(&req.file_path, &req.position) {
         Ok(p) => p,
         Err(e) => {
@@ -264,8 +252,6 @@ pub async fn did_open(
     State(state): State<DaemonState>,
     Json(req): Json<DidOpenRequest>,
 ) -> impl IntoResponse {
-    state.idle_monitor.record_activity();
-
     let uri = match file_path_to_uri(&req.file_path) {
         Ok(u) => u,
         Err(e) => {
@@ -298,8 +284,6 @@ pub async fn did_change(
     State(state): State<DaemonState>,
     Json(req): Json<DidChangeRequest>,
 ) -> impl IntoResponse {
-    state.idle_monitor.record_activity();
-
     let uri = match file_path_to_uri(&req.file_path) {
         Ok(u) => u,
         Err(e) => {
@@ -328,8 +312,6 @@ pub async fn did_close(
     State(state): State<DaemonState>,
     Json(req): Json<DidCloseRequest>,
 ) -> impl IntoResponse {
-    state.idle_monitor.record_activity();
-
     let uri = match file_path_to_uri(&req.file_path) {
         Ok(u) => u,
         Err(e) => {

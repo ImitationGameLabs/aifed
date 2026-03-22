@@ -121,8 +121,9 @@ async fn ensure_daemon(workspace: &Workspace) -> Option<DaemonClient> {
 
     let client = DaemonClient::new(&socket_path);
 
-    // Already running?
+    // Already running? Send heartbeat to keep it alive
     if client.is_running().await {
+        let _ = client.heartbeat().await;
         return Some(client);
     }
 

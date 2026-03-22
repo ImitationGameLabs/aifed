@@ -56,7 +56,6 @@ pub async fn record_access(
     State(state): State<DaemonState>,
     Json(req): Json<RecordAccessRequest>,
 ) -> Result<Json<ApiResponse<RecordAccessResponse>>, (StatusCode, Json<ApiResponse<()>>)> {
-    state.idle_monitor.record_activity();
     let path = PathBuf::from(&req.file);
     tracing::info!("Record access for: {:?}", path);
 
@@ -88,7 +87,6 @@ pub async fn record_edit(
     State(state): State<DaemonState>,
     Json(req): Json<RecordEditRequest>,
 ) -> Result<Json<ApiResponse<()>>, (StatusCode, Json<ApiResponse<()>>)> {
-    state.idle_monitor.record_activity();
     let path = PathBuf::from(&req.file);
 
     // Convert DTO diffs to internal diffs
@@ -136,7 +134,6 @@ pub async fn get_history(
     Path(file): Path<String>,
     Query(query): Query<HistoryQuery>,
 ) -> Json<ApiResponse<HistoryListResponse>> {
-    state.idle_monitor.record_activity();
     let path = PathBuf::from(&file);
     let entries = state.history_manager.get_history(&path, query.count);
 
@@ -166,7 +163,6 @@ pub async fn undo(
     Path(file): Path<String>,
     Query(query): Query<UndoRedoQuery>,
 ) -> Result<Json<ApiResponse<UndoRedoResponse>>, (StatusCode, Json<ApiResponse<()>>)> {
-    state.idle_monitor.record_activity();
     let path = PathBuf::from(&file);
 
     let result = match state.history_manager.undo(&path, query.dry_run) {
@@ -200,7 +196,6 @@ pub async fn redo(
     Path(file): Path<String>,
     Query(query): Query<UndoRedoQuery>,
 ) -> Result<Json<ApiResponse<UndoRedoResponse>>, (StatusCode, Json<ApiResponse<()>>)> {
-    state.idle_monitor.record_activity();
     let path = PathBuf::from(&file);
 
     let result = match state.history_manager.redo(&path, query.dry_run) {

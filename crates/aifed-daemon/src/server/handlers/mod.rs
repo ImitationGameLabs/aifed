@@ -5,7 +5,7 @@ pub mod history;
 pub mod management;
 pub mod operations;
 
-pub use daemon::{health, list_servers, status};
+pub use daemon::{health, heartbeat, list_servers, status};
 pub use history::{get_history, record_access, record_edit, redo, undo};
 pub use management::{start_server, stop_server};
 pub use operations::{

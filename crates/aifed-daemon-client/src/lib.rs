@@ -51,6 +51,11 @@ impl DaemonClient {
         self.get("/api/v1/health").await
     }
 
+    /// Send heartbeat to keep daemon alive
+    pub async fn heartbeat(&self) -> Result<HealthResponse, ClientError> {
+        self.post_empty("/api/v1/heartbeat").await
+    }
+
     /// Get daemon status
     pub async fn status(&self) -> Result<StatusResponse, ClientError> {
         self.get("/api/v1/status").await
