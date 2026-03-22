@@ -80,6 +80,27 @@ aifed lsp rename <FILE> <LINE:HASH> <SINDEX:NAME> <NAME> - Rename symbol
 aifed daemon status   - Check daemon status
 aifed daemon stop     - Stop daemon
 
+Notes:
+- `daemon status` shows bin path, log path, and socket path for troubleshooting
+- Daemon auto-starts when needed (on first command requiring it)
+- Daemon auto-exits after idle timeout (default: 30 minutes)
+
+## HISTORY COMMANDS (requires running daemon)
+
+aifed history <FILE> [--count N] [--stat]   - View edit history
+aifed undo <FILE> [--dry-run]               - Undo last edit
+aifed redo <FILE> [--dry-run]               - Redo last undone edit
+
+Notes:
+- History is stored in daemon memory (not persisted to disk)
+- History is tracked independently per file
+- Restarting the daemon clears all history
+
+Options:
+  --count N   Limit number of history entries
+  --stat      Show compact summary instead of detailed diffs
+  --dry-run   Preview changes without applying
+
 ## EXAMPLES
 
 ```bash
@@ -113,4 +134,12 @@ aifed lsp symbols src/main.rs 10      # Get symbols: S1:fn S2:main
 aifed lsp hover src/main.rs 10:3K S2:main
 aifed lsp def src/main.rs 10:3K S2:main
 aifed lsp rename src/main.rs 10:3K S2:args cli_args  # Rename all occurrences
+
+# History operations (requires running daemon)
+aifed history src/main.rs             # View all edit history
+aifed history src/main.rs --count 5   # View last 5 entries
+aifed history src/main.rs --stat      # View compact summary
+aifed undo src/main.rs                # Undo last edit
+aifed undo src/main.rs --dry-run      # Preview undo without applying
+aifed redo src/main.rs                # Redo last undone edit
 ```
