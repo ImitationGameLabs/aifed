@@ -26,5 +26,11 @@ pub fn build_router(state: DaemonState) -> Router {
         .route("/api/v1/lsp/didOpen", post(handlers::did_open))
         .route("/api/v1/lsp/didChange", post(handlers::did_change))
         .route("/api/v1/lsp/didClose", post(handlers::did_close))
+        // History operations
+        .route("/api/v1/history/access", post(handlers::record_access))
+        .route("/api/v1/history/edit", post(handlers::record_edit))
+        .route("/api/v1/history/{file}", get(handlers::get_history))
+        .route("/api/v1/history/{file}/undo", post(handlers::undo))
+        .route("/api/v1/history/{file}/redo", post(handlers::redo))
         .with_state(state)
 }

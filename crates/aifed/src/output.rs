@@ -40,7 +40,7 @@ pub struct EditResult {
     pub changes: Option<Vec<EditChange>>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct EditChange {
     pub operation: String,
     pub line: usize,
@@ -120,35 +120,124 @@ pub fn format_file_info(info: &FileInfo, format: OutputFormat) -> String {
     }
 }
 
-/// Format edit result for output
-pub fn format_edit_result(result: &EditResult, format: OutputFormat) -> String {
+/// Format edit result with diff view for output
+pub fn format_edit_result_with_diff(
+    result: &EditResult,
+    format: OutputFormat,
+    original_lines: &[String],
+) -> String {
     match format {
         OutputFormat::Text => {
+            let mut output = Vec::new();
+
+            // Message line
             if result.success {
-                result.message.clone()
+                output.push(result.message.clone());
             } else {
-                format!("Error: {}", result.message)
+                output.push(format!("Error: {}", result.message));
+                return output.join("\n");
             }
+
+            // Summary line
+            if let Some(changes) = &result.changes {
+                let summary = compute_change_summary(changes);
+                if summary != "no changes" {
+                    output.push(summary);
+                }
+
+                // Diff view with context
+                let diffs = changes_to_diffs(changes);
+                let diff_view = crate::diff::format_diffs_with_context(&diffs, original_lines, 3);
+                if diff_view != "  (no changes)" {
+                    output.push(diff_view);
+                }
+            }
+
+            output.join("\n")
         }
         OutputFormat::Json => serde_json::to_string_pretty(&result).unwrap_or_default(),
     }
 }
 
-/// Format batch result for output
-pub fn format_batch_result(result: &BatchResult, format: OutputFormat) -> String {
+/// Compute diff summary from edit changes
+pub fn compute_change_summary(changes: &[EditChange]) -> String {
+    let mut insertions = 0;
+    let mut deletions = 0;
+
+    for change in changes {
+        match change.operation.as_str() {
+            "insert" => insertions += 1,
+            "delete" => deletions += 1,
+            "replace" => {
+                deletions += 1;
+                insertions += 1;
+            }
+            _ => {}
+        }
+    }
+
+    let mut parts = Vec::new();
+    if insertions > 0 {
+        parts.push(format!("{} insertion{}(+)", insertions, if insertions > 1 { "s" } else { "" }));
+    }
+    if deletions > 0 {
+        parts.push(format!("{} deletion{}(-)", deletions, if deletions > 1 { "s" } else { "" }));
+    }
+
+    if parts.is_empty() { "no changes".to_string() } else { parts.join(", ") }
+}
+
+/// Convert EditChange to LineDiffDto for diff formatting
+fn changes_to_diffs(changes: &[EditChange]) -> Vec<aifed_common::LineDiffDto> {
+    changes
+        .iter()
+        .map(|c| aifed_common::LineDiffDto {
+            line_num: c.line,
+            old_hash: None,
+            old_content: c.old_content.clone(),
+            new_content: c.new_content.clone(),
+        })
+        .collect()
+}
+
+/// Format batch result with diff view for output
+pub fn format_batch_result_with_diff(
+    result: &BatchResult,
+    format: OutputFormat,
+    original_lines: &[String],
+) -> String {
     match format {
         OutputFormat::Text => {
-            let mut output = result.message.clone();
-            if !result.errors.is_empty() {
-                output.push_str("\n\nErrors:");
-                for err in &result.errors {
-                    output.push_str(&format!(
-                        "\n  Line {}: {} - {}",
-                        err.line, err.operation, err.error
-                    ));
+            let mut output = Vec::new();
+
+            // Message line
+            output.push(result.message.clone());
+
+            // Summary line
+            if !result.changes.is_empty() {
+                let summary = compute_change_summary(&result.changes);
+                if summary != "no changes" {
+                    output.push(summary);
+                }
+
+                // Diff view with context
+                let diffs = changes_to_diffs(&result.changes);
+                let diff_view = crate::diff::format_diffs_with_context(&diffs, original_lines, 3);
+                if diff_view != "  (no changes)" {
+                    output.push(diff_view);
                 }
             }
-            output
+
+            // Errors
+            if !result.errors.is_empty() {
+                output.push(String::new());
+                output.push("Errors:".to_string());
+                for err in &result.errors {
+                    output.push(format!("  Line {}: {} - {}", err.line, err.operation, err.error));
+                }
+            }
+
+            output.join("\n")
         }
         OutputFormat::Json => serde_json::to_string_pretty(&result).unwrap_or_default(),
     }

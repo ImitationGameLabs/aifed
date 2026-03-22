@@ -4,9 +4,11 @@ use std::path::Path;
 use crate::batch;
 use crate::error::{Error, Result};
 use crate::file::write_file;
-use crate::hash::{hash_line, is_virtual_hash};
+use crate::hash::{hash_file, hash_line, is_virtual_hash};
 use crate::locator::Locator;
-use crate::output::{EditChange, EditResult, OutputFormat, format_edit_result};
+use crate::output::{EditChange, EditResult, OutputFormat, format_edit_result_with_diff};
+use aifed_common::LineDiffDto;
+use aifed_daemon_client::DaemonClient;
 
 /// Edit operation types
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -178,13 +180,14 @@ pub fn apply_operation(lines: &mut Vec<String>, validated: ValidatedOp) -> EditC
 ///
 /// Supports both single-edit mode (when operation and locator are provided)
 /// and batch mode (when stdin contains operations).
-pub fn execute(
+pub async fn execute(
     path: &Path,
     operation_str: Option<&str>,
     locator_str: Option<&str>,
     content: Option<&str>,
     dry_run: bool,
     format: OutputFormat,
+    daemon_client: Option<&DaemonClient>,
 ) -> Result<()> {
     if !path.exists() {
         return Err(Error::FileNotFound { path: path.to_path_buf() });
@@ -199,7 +202,7 @@ pub fn execute(
         let mut input = String::new();
         io::stdin().read_to_string(&mut input).map_err(|_| Error::StdinNotAvailable)?;
         let operations = batch::parse_batch_operations(&input)?;
-        batch::execute_batch(path, operations, dry_run, format)
+        batch::execute_batch(path, operations, dry_run, format, daemon_client).await
     } else {
         // Single-edit mode
         let operation_str =
@@ -209,18 +212,20 @@ pub fn execute(
             reason: "Locator is required".to_string(),
         })?;
 
-        execute_single(path, operation_str, locator_str, content, dry_run, format)
+        execute_single(path, operation_str, locator_str, content, dry_run, format, daemon_client)
+            .await
     }
 }
 
 /// Execute a single edit operation
-fn execute_single(
+async fn execute_single(
     path: &Path,
     operation_str: &str,
     locator_str: &str,
     content: Option<&str>,
     dry_run: bool,
     format: OutputFormat,
+    daemon_client: Option<&DaemonClient>,
 ) -> Result<()> {
     let operation = Operation::parse(operation_str)?;
     let locator = Locator::parse(locator_str)?;
@@ -228,8 +233,14 @@ fn execute_single(
     let file_content = std::fs::read_to_string(path)
         .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })?;
 
+    // Compute hash before edit
+    let expected_hash = hash_file(file_content.as_bytes());
+
     let original_had_trailing_newline = file_content.ends_with('\n');
     let mut lines: Vec<String> = file_content.lines().map(|s| s.to_string()).collect();
+
+    // Keep original lines for diff context display
+    let original_lines = lines.clone();
 
     // Validate
     let validated = validate_operation(&lines, operation, &locator, content, path)?;
@@ -244,13 +255,39 @@ fn execute_single(
         } else {
             format!("Applied {} to {}", operation_str, path.display())
         },
-        changes: Some(changes),
+        changes: Some(changes.clone()),
     };
 
     if !dry_run {
         write_file(path, &lines, original_had_trailing_newline)?;
+
+        // Record edit with daemon (for history tracking)
+        if let Some(client) = daemon_client {
+            // Read the new file content and compute hash (use raw bytes for consistency)
+            let new_bytes = std::fs::read(path)
+                .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })?;
+            let new_hash = hash_file(&new_bytes);
+
+            // Convert changes to LineDiffDto
+            let diffs: Vec<LineDiffDto> = changes
+                .iter()
+                .map(|c| LineDiffDto {
+                    line_num: c.line,
+                    old_hash: None, // We don't track line hashes in changes
+                    old_content: c.old_content.clone(),
+                    new_content: c.new_content.clone(),
+                })
+                .collect();
+
+            // Use canonical path to ensure consistency
+            let canonical = path
+                .canonicalize()
+                .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })?;
+            let file_str = canonical.to_string_lossy().to_string();
+            let _ = client.record_edit(&file_str, &expected_hash, &new_hash, diffs).await;
+        }
     }
 
-    println!("{}", format_edit_result(&result, format));
+    println!("{}", format_edit_result_with_diff(&result, format, &original_lines));
     Ok(())
 }

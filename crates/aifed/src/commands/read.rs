@@ -4,14 +4,16 @@ use crate::error::{Error, Result};
 use crate::hash::hash_line;
 use crate::locator::Locator;
 use crate::output::{HashedLine, OutputFormat, format_lines};
+use aifed_daemon_client::DaemonClient;
 
 /// Execute the read command
-pub fn execute(
+pub async fn execute(
     path: &Path,
     locator_str: Option<&str>,
     no_hashes: bool,
     context: Option<usize>,
     format: OutputFormat,
+    daemon_client: Option<&DaemonClient>,
 ) -> Result<()> {
     if !path.exists() {
         return Err(Error::FileNotFound { path: path.to_path_buf() });
@@ -19,6 +21,16 @@ pub fn execute(
 
     let content = std::fs::read_to_string(path)
         .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })?;
+
+    // Record access with daemon (for history tracking)
+    // Use canonical path to ensure consistency
+    if let Some(client) = daemon_client {
+        let canonical = path
+            .canonicalize()
+            .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })?;
+        let file_str = canonical.to_string_lossy().to_string();
+        let _ = client.record_access(&file_str).await;
+    }
 
     let lines: Vec<&str> = content.lines().collect();
 

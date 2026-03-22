@@ -37,6 +37,9 @@ pub enum Error {
     #[error("IO error for '{path}': {source}")]
     InvalidIo { path: PathBuf, source: std::io::Error },
 
+    #[error("Invalid UTF-8 encoding in '{path}': {source}")]
+    InvalidEncoding { path: PathBuf, source: std::string::FromUtf8Error },
+
     #[error("Batch parse error on line {line_number}: '{line_content}'\n  Reason: {reason}")]
     InvalidBatchOp { line_number: usize, line_content: String, reason: String },
 
@@ -73,6 +76,18 @@ pub enum Error {
 
     #[error("Unterminated string literal")]
     UnterminatedString,
+
+    #[error(
+        "File hash mismatch during undo/redo\n\
+         \n\
+           File: {path}\n\
+         Expected: {expected}\n\
+           Actual: {actual}\n\
+         \n\
+         The file may have been modified externally since the last aifed operation.\n\
+         Hint: Run 'aifed read {path}' to get current state"
+    )]
+    FileHashMismatch { path: PathBuf, expected: String, actual: String },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

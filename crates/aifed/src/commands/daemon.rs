@@ -23,9 +23,14 @@ pub async fn execute(
                         println!("Workspace: {}", status.workspace);
                         println!("Uptime: {}s", status.uptime_secs);
                         println!("Servers:");
-                        for server in status.servers {
+                        for server in &status.servers {
                             println!("  - {}: {:?}", server.language, server.state);
                         }
+                        println!();
+                        println!("Daemon Env:");
+                        println!("  - Bin: {}", status.bin_path);
+                        println!("  - Socket: {}", status.socket_path);
+                        println!("  - Log: {}", status.log_path);
                     }
                     OutputFormat::Json => {
                         println!("{}", serde_json::to_string_pretty(&status).unwrap());

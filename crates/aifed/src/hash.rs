@@ -1,4 +1,4 @@
-use xxhash_rust::xxh64;
+use xxhash_rust::{xxh3, xxh64};
 
 /// base32hex character set: 0-9, A-V
 const BASE32HEX_ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHIJKLMNOPQRSTUV";
@@ -26,6 +26,13 @@ fn base32hex_encode(value: u16) -> String {
 /// Check if the given hash is the virtual line hash.
 pub fn is_virtual_hash(hash: &str) -> bool {
     hash == VIRTUAL_LINE_HASH
+}
+
+/// Hash file content using xxh3 (same as daemon).
+/// Returns a 16-character hex string.
+pub fn hash_file(content: &[u8]) -> String {
+    let hash = xxh3::xxh3_64(content);
+    format!("{:016X}", hash)
 }
 
 #[cfg(test)]
@@ -75,5 +82,21 @@ mod tests {
     fn test_virtual_hash() {
         assert!(is_virtual_hash("00"));
         assert!(!is_virtual_hash("AB"));
+    }
+
+    #[test]
+    fn test_hash_file_consistent() {
+        let content = b"line1\nline2\nline3";
+        let hash1 = hash_file(content);
+        let hash2 = hash_file(content);
+        assert_eq!(hash1, hash2);
+        assert_eq!(hash1.len(), 16);
+    }
+
+    #[test]
+    fn test_hash_file_different_content() {
+        let hash1 = hash_file(b"content1");
+        let hash2 = hash_file(b"content2");
+        assert_ne!(hash1, hash2);
     }
 }

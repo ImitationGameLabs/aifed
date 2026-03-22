@@ -52,6 +52,9 @@ pub struct HealthResponse {
 pub struct StatusResponse {
     pub workspace: String,
     pub uptime_secs: u64,
+    pub bin_path: String,
+    pub socket_path: String,
+    pub log_path: String,
     pub servers: Vec<ServerStatusDto>,
 }
 
@@ -283,4 +286,64 @@ pub struct FileEdit {
 pub struct TextEdit {
     pub range: Range,
     pub new_text: String,
+}
+
+// --- History Types ---
+
+/// Request to record a file access (read operation)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecordAccessRequest {
+    pub file: String,
+}
+
+/// Response for record access
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecordAccessResponse {
+    pub hash: String,
+}
+
+/// Request to record an edit operation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecordEditRequest {
+    pub file: String,
+    pub expected_hash: String,
+    pub new_hash: String,
+    pub diffs: Vec<LineDiffDto>,
+}
+
+/// Line diff for history
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LineDiffDto {
+    pub line_num: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub old_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub old_content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_content: Option<String>,
+}
+
+/// Response for history list
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistoryListResponse {
+    pub entries: Vec<HistoryEntryDto>,
+}
+
+/// History entry for display
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistoryEntryDto {
+    pub id: u64,
+    #[serde(with = "time::serde::rfc3339")]
+    pub timestamp: OffsetDateTime,
+    pub summary: String,
+    pub diffs: Vec<LineDiffDto>,
+}
+
+/// Response for undo/redo operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UndoRedoResponse {
+    /// The diffs to apply to the file
+    pub diffs: Vec<LineDiffDto>,
+    /// The expected hash of the current file (for verification before applying)
+    pub current_hash: String,
 }

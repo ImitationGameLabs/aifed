@@ -6,6 +6,7 @@
 mod args;
 mod detection;
 mod error;
+mod history;
 mod idle;
 mod languages;
 mod lsp;
@@ -16,6 +17,7 @@ use anyhow::Context;
 use args::Args;
 use clap::Parser;
 use detection::detect;
+use history::HistoryManager;
 use idle::IdleMonitor;
 use languages::RustAnalyzerConfig;
 use lsp::LanguageServerManager;
@@ -254,11 +256,16 @@ async fn main() -> anyhow::Result<()> {
     let monitor_clone = idle_monitor.clone();
     monitor_clone.start_monitor();
 
+    // Initialize history manager
     // Create shared state
+    let history_manager = Arc::new(HistoryManager::new());
     let state = DaemonState {
         workspace: workspace.clone(),
         lsp_manager,
+        history_manager,
         idle_monitor: idle_monitor.clone(),
+        socket_path: socket.clone(),
+        log_path: log_file.to_path_buf(),
     };
 
     // Build router

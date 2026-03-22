@@ -2,10 +2,12 @@
 
 use crate::args::LspCommands;
 use crate::error::{Error, Result};
-use crate::hash::hash_line;
+use crate::hash::{hash_file, hash_line};
 use crate::locator::{Locator, SymbolLocator};
 use crate::output::{self, OutputFormat};
-use aifed_common::{DiagnosticsRequest, HoverRequest, LspPositionRequest, Position, RenameRequest};
+use aifed_common::{
+    DiagnosticsRequest, HoverRequest, LineDiffDto, LspPositionRequest, Position, RenameRequest,
+};
 use aifed_daemon_client::DaemonClient;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
@@ -95,6 +97,58 @@ fn extract_symbols(line: &str) -> Vec<(u32, String, u32)> {
     }
 
     symbols
+}
+
+/// Compute line diffs for rename operations by comparing original and new content.
+/// For rename operations, we simply compare lines at the same positions.
+fn compute_rename_diffs(
+    original_lines: &[&str],
+    new_lines: &[&str],
+    _edits: &[aifed_common::TextEdit],
+) -> Vec<LineDiffDto> {
+    let mut diffs = Vec::new();
+    let max_lines = original_lines.len().max(new_lines.len());
+
+    for i in 0..max_lines {
+        let line_num = i + 1; // 1-based
+        let orig = original_lines.get(i);
+        let new = new_lines.get(i);
+
+        match (orig, new) {
+            (Some(&old), Some(&new)) => {
+                if old != new {
+                    // Line was modified
+                    diffs.push(LineDiffDto {
+                        line_num,
+                        old_hash: None,
+                        old_content: Some(old.to_string()),
+                        new_content: Some(new.to_string()),
+                    });
+                }
+            }
+            (Some(&old), None) => {
+                // Line was deleted
+                diffs.push(LineDiffDto {
+                    line_num,
+                    old_hash: None,
+                    old_content: Some(old.to_string()),
+                    new_content: None,
+                });
+            }
+            (None, Some(&new)) => {
+                // Line was inserted
+                diffs.push(LineDiffDto {
+                    line_num,
+                    old_hash: None,
+                    old_content: None,
+                    new_content: Some(new.to_string()),
+                });
+            }
+            (None, None) => {}
+        }
+    }
+
+    diffs
 }
 
 /// Resolve position from hashline and symbol locator
@@ -280,11 +334,37 @@ pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFor
                     let content = std::fs::read_to_string(&path)
                         .map_err(|e| Error::InvalidIo { path: path.clone(), source: e })?;
 
+                    // Compute hash before edit
+                    let expected_hash = hash_file(content.as_bytes());
+
+                    // Parse original lines for diff computation
+                    let original_lines: Vec<&str> = content.lines().collect();
+
                     // Validate and apply (validates all ranges first, then applies)
                     let new_content =
                         crate::text_edit::apply_edits(&content, file_edit.edits.clone())?;
-                    std::fs::write(&path, new_content)
-                        .map_err(|e| Error::InvalidIo { path, source: e })?;
+
+                    // Compute new hash
+                    let new_hash = hash_file(new_content.as_bytes());
+
+                    // Parse new lines for diff computation
+                    let new_lines: Vec<&str> = new_content.lines().collect();
+
+                    // Convert TextEdits to LineDiffDto
+                    let diffs = compute_rename_diffs(&original_lines, &new_lines, &file_edit.edits);
+
+                    // Write the file
+                    std::fs::write(&path, &new_content)
+                        .map_err(|e| Error::InvalidIo { path: path.clone(), source: e })?;
+
+                    // Record edit with daemon (for history tracking)
+                    let file_str = path.to_string_lossy().to_string();
+                    let daemon_client = client.clone();
+                    tokio::spawn(async move {
+                        let _ = daemon_client
+                            .record_edit(&file_str, &expected_hash, &new_hash, diffs)
+                            .await;
+                    });
                 }
                 println!("{}", output::format_rename_result(&response, format));
             }

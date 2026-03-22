@@ -10,8 +10,11 @@ use crate::file::write_file;
 
 use crate::commands::edit::{Operation, ValidatedOp, validate_operation};
 use crate::error::{Error, Result};
+use crate::hash::hash_file;
 use crate::locator::Locator;
-use crate::output::{BatchResult, EditChange, OutputFormat, format_batch_result};
+use crate::output::{BatchResult, EditChange, OutputFormat, format_batch_result_with_diff};
+use aifed_common::LineDiffDto;
+use aifed_daemon_client::DaemonClient;
 
 /// Parsed single operation from batch input
 #[derive(Debug, Clone)]
@@ -128,7 +131,7 @@ impl EditPlan {
                     new_lines.push(content.clone());
                     changes.push(EditChange {
                         operation: "insert".to_string(),
-                        line: line_num,
+                        line: new_lines.len(), // The actual line number of the new line
                         old_content: None,
                         new_content: Some(content.clone()),
                     });
@@ -318,11 +321,12 @@ fn extract_content(parts: &[&str]) -> Result<String> {
 /// Execute batch operations
 ///
 /// All operations must succeed, or none are applied (atomic).
-pub fn execute_batch(
+pub async fn execute_batch(
     path: &Path,
     operations: Vec<EditOp>,
     dry_run: bool,
     format: OutputFormat,
+    daemon_client: Option<&DaemonClient>,
 ) -> Result<()> {
     if !path.exists() {
         return Err(Error::FileNotFound { path: path.to_path_buf() });
@@ -344,27 +348,45 @@ pub fn execute_batch(
             changes: Vec::new(),
             errors: Vec::new(),
         };
-        println!("{}", format_batch_result(&result, format));
+        // Empty batch has no original lines to show in diff
+        let empty_lines: Vec<String> = Vec::new();
+        println!("{}", format_batch_result_with_diff(&result, format, &empty_lines));
         return Ok(());
     }
 
     let file_content = std::fs::read_to_string(path)
         .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })?;
 
+    // Compute hash before edit
+    let expected_hash = hash_file(file_content.as_bytes());
+
     let original_had_trailing_newline = file_content.ends_with('\n');
     let lines: Vec<String> = file_content.lines().map(|s| s.to_string()).collect();
 
-    execute_atomic(path, &lines, operations, dry_run, format, original_had_trailing_newline)
+    execute_atomic(
+        path,
+        &lines,
+        operations,
+        dry_run,
+        format,
+        original_had_trailing_newline,
+        daemon_client,
+        &expected_hash,
+    )
+    .await
 }
 
 /// Execute in atomic mode: validate all, build edit plan, then apply all
-fn execute_atomic(
+#[allow(clippy::too_many_arguments)]
+async fn execute_atomic(
     path: &Path,
     lines: &[String],
     operations: Vec<EditOp>,
     dry_run: bool,
     format: OutputFormat,
     trailing_newline: bool,
+    daemon_client: Option<&DaemonClient>,
+    expected_hash: &str,
 ) -> Result<()> {
     // Phase 1: Validate all operations and build edit plan
     let mut plan = EditPlan::new();
@@ -451,6 +473,34 @@ fn execute_atomic(
     // Phase 3: Write file
     if !dry_run {
         write_file(path, &new_lines, trailing_newline)?;
+
+        // Record edit with daemon (for history tracking)
+        if let Some(client) = daemon_client {
+            // Compute new hash after edit (must match what write_file writes to disk)
+            let mut new_content = new_lines.join("\n");
+            if trailing_newline {
+                new_content.push('\n');
+            }
+            let new_hash = crate::hash::hash_file(new_content.as_bytes());
+
+            // Convert changes to LineDiffDto
+            let diffs: Vec<LineDiffDto> = changes
+                .iter()
+                .map(|c| LineDiffDto {
+                    line_num: c.line,
+                    old_hash: None, // We don't track line hashes in history
+                    old_content: c.old_content.clone(),
+                    new_content: c.new_content.clone(),
+                })
+                .collect();
+
+            // Use canonical path to ensure consistency with daemon
+            let canonical = path
+                .canonicalize()
+                .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })?;
+            let file_str = canonical.to_string_lossy().to_string();
+            let _ = client.record_edit(&file_str, expected_hash, &new_hash, diffs).await;
+        }
     }
 
     let result = BatchResult {
@@ -468,7 +518,7 @@ fn execute_atomic(
         errors: Vec::new(),
     };
 
-    println!("{}", format_batch_result(&result, format));
+    println!("{}", format_batch_result_with_diff(&result, format, lines));
     Ok(())
 }
 
@@ -750,8 +800,8 @@ mod tests {
         assert_eq!(new_lines, vec!["first", "second", "existing"]);
     }
 
-    #[test]
-    fn test_batch_insert_same_position() {
+    #[tokio::test]
+    async fn test_batch_insert_same_position() {
         // Integration test: insert multiple lines at the same position
         // Should preserve input order
         let dir = tempfile::tempdir().unwrap();
@@ -775,15 +825,15 @@ mod tests {
         );
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text).unwrap();
+        execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
 
         // Verify result: start, a, b, c (in that order)
         let result = std::fs::read_to_string(&path).unwrap();
         assert_eq!(result, "start\na\nb\nc\n");
     }
 
-    #[test]
-    fn test_batch_delete_multiple_lines() {
+    #[tokio::test]
+    async fn test_batch_delete_multiple_lines() {
         // Integration test: delete multiple lines without index shift issues
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.txt");
@@ -806,15 +856,15 @@ mod tests {
         );
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text).unwrap();
+        execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
 
         // Verify result: 1, 3, 5
         let result = std::fs::read_to_string(&path).unwrap();
         assert_eq!(result, "1\n3\n5\n");
     }
 
-    #[test]
-    fn test_batch_mixed_operations() {
+    #[tokio::test]
+    async fn test_batch_mixed_operations() {
         // Integration test: delete, replace, and insert in one batch
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.txt");
@@ -841,15 +891,15 @@ mod tests {
         );
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text).unwrap();
+        execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
 
         // Verify result: L1, A, NEW3, L4, L5
         let result = std::fs::read_to_string(&path).unwrap();
         assert_eq!(result, "L1\nA\nNEW3\nL4\nL5\n");
     }
 
-    #[test]
-    fn test_batch_delete_then_replace() {
+    #[tokio::test]
+    async fn test_batch_delete_then_replace() {
         // Verify that "delete line 2 + replace line 3" works correctly
         // without hash mismatch due to line number offset
         let dir = tempfile::tempdir().unwrap();
@@ -873,7 +923,7 @@ mod tests {
         );
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text).unwrap();
+        execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
 
         // Verify result: L1, NEW3, L4
         let result = std::fs::read_to_string(&path).unwrap();
@@ -962,8 +1012,8 @@ mod tests {
     // HashlineRange delete tests
     // ============================================================
 
-    #[test]
-    fn test_batch_range_delete() {
+    #[tokio::test]
+    async fn test_batch_range_delete() {
         // Delete lines 2-9 from a 10-line file, keeping L1 and L10
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.txt");
@@ -982,15 +1032,15 @@ mod tests {
         let input = format!("- [2:{hash2},9:{hash9}]");
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text).unwrap();
+        execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
 
         // Verify result: L1, L10
         let result = std::fs::read_to_string(&path).unwrap();
         assert_eq!(result, "L1\nL10\n");
     }
 
-    #[test]
-    fn test_batch_range_delete_single_line() {
+    #[tokio::test]
+    async fn test_batch_range_delete_single_line() {
         // [3:hash3,3:hash3] - delete only one line
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.txt");
@@ -1005,15 +1055,15 @@ mod tests {
         let input = format!("- [3:{hash3},3:{hash3}]");
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text).unwrap();
+        execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
 
         // Verify result: L1, L2, L4, L5
         let result = std::fs::read_to_string(&path).unwrap();
         assert_eq!(result, "L1\nL2\nL4\nL5\n");
     }
 
-    #[test]
-    fn test_batch_range_delete_hash_mismatch() {
+    #[tokio::test]
+    async fn test_batch_range_delete_hash_mismatch() {
         // Boundary line hash mismatch should fail
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.txt");
@@ -1025,7 +1075,7 @@ mod tests {
         let input = "- [2:VV,9:VV]";
         let ops = parse_batch_operations(input).unwrap();
 
-        let result = execute_batch(&path, ops, false, OutputFormat::Text);
+        let result = execute_batch(&path, ops, false, OutputFormat::Text, None).await;
 
         // Should fail with hash mismatch error
         assert!(result.is_err());

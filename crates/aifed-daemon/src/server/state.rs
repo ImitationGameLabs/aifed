@@ -1,5 +1,6 @@
 //! Shared state for the HTTP server
 
+use crate::history::HistoryManager;
 use crate::idle::IdleMonitor;
 use crate::lsp::LanguageServerManager;
 use std::path::PathBuf;
@@ -14,4 +15,10 @@ pub struct DaemonState {
     pub lsp_manager: Arc<LanguageServerManager>,
     /// Idle timeout monitor
     pub idle_monitor: Arc<IdleMonitor>,
+    /// History manager for undo/redo
+    pub history_manager: Arc<HistoryManager>,
+    /// Socket path
+    pub socket_path: PathBuf,
+    /// Log file path
+    pub log_path: PathBuf,
 }

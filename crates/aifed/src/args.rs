@@ -121,6 +121,40 @@ pub enum Commands {
     /// LSP operations (requires running daemon)
     #[command(subcommand)]
     Lsp(LspCommands),
+
+    /// View edit history for a file
+    History {
+        /// File path
+        file: PathBuf,
+
+        /// Number of entries to show
+        #[arg(long, value_name = "N")]
+        count: Option<usize>,
+
+        /// Show compact summary instead of detailed diffs
+        #[arg(long)]
+        stat: bool,
+    },
+
+    /// Undo the last edit for a file
+    Undo {
+        /// File path
+        file: PathBuf,
+
+        /// Preview changes without applying
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Redo the last undone edit for a file
+    Redo {
+        /// File path
+        file: PathBuf,
+
+        /// Preview changes without applying
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 /// Daemon management commands

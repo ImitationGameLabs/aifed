@@ -17,9 +17,17 @@ pub async fn status(State(state): State<DaemonState>) -> impl IntoResponse {
     let uptime_secs = start.elapsed().as_secs();
     let servers = state.lsp_manager.list_servers().await;
 
+    // Get current executable path
+    let bin_path = std::env::current_exe()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| "unknown".to_string());
+
     Json(ApiResponse::success(StatusResponse {
         workspace: state.workspace.to_string_lossy().to_string(),
         uptime_secs,
+        bin_path,
+        socket_path: state.socket_path.to_string_lossy().to_string(),
+        log_path: state.log_path.to_string_lossy().to_string(),
         servers,
     }))
 }

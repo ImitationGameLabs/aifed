@@ -5,13 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
-use aifed_common::{
-    ApiResponse, ClientError, CompletionsResponse, DefinitionResponse, DiagnosticsRequest,
-    DiagnosticsResponse, DidChangeRequest, DidCloseRequest, DidOpenRequest, HealthResponse,
-    HoverRequest, HoverResponse, LspPositionRequest, ReferencesResponse, RenameRequest,
-    RenameResponse, ServerActionResponse, ServersResponse, StartServerRequest, StatusResponse,
-    StopServerRequest,
-};
+use aifed_common::*;
 use http_body_util::{BodyExt, Full};
 use hyper::body::Bytes;
 use hyper::{Method, Request, Uri as HyperUri};
@@ -21,6 +15,7 @@ use hyperlocal::{UnixConnector, Uri};
 use serde::de::DeserializeOwned;
 
 /// HTTP client for aifed-daemon
+#[derive(Clone)]
 pub struct DaemonClient {
     socket_path: PathBuf,
     client: Client<UnixConnector, Full<Bytes>>,
@@ -147,7 +142,73 @@ impl DaemonClient {
         self.post("/api/v1/lsp/didClose", &request).await
     }
 
+    // --- History Operations ---
+
+    /// Record a file access (read operation)
+    pub async fn record_access(&self, file: &str) -> Result<RecordAccessResponse, ClientError> {
+        self.post("/api/v1/history/access", &RecordAccessRequest { file: file.to_string() }).await
+    }
+
+    /// Record an edit operation
+    pub async fn record_edit(
+        &self,
+        file: &str,
+        expected_hash: &str,
+        new_hash: &str,
+        diffs: Vec<LineDiffDto>,
+    ) -> Result<(), ClientError> {
+        self.post(
+            "/api/v1/history/edit",
+            &RecordEditRequest {
+                file: file.to_string(),
+                expected_hash: expected_hash.to_string(),
+                new_hash: new_hash.to_string(),
+                diffs,
+            },
+        )
+        .await
+    }
+
+    /// Get history for a file
+    pub async fn get_history(
+        &self,
+        file: &str,
+        count: Option<usize>,
+    ) -> Result<HistoryListResponse, ClientError> {
+        let path = match count {
+            Some(n) => format!("/api/v1/history/{}?count={}", Self::urlencoding_encode(file), n),
+            None => format!("/api/v1/history/{}", Self::urlencoding_encode(file)),
+        };
+        self.get(&path).await
+    }
+
+    /// Undo the last edit for a file
+    pub async fn undo(&self, file: &str, dry_run: bool) -> Result<UndoRedoResponse, ClientError> {
+        let path = if dry_run {
+            format!("/api/v1/history/{}/undo?dry_run=true", Self::urlencoding_encode(file))
+        } else {
+            format!("/api/v1/history/{}/undo", Self::urlencoding_encode(file))
+        };
+        self.post_empty(&path).await
+    }
+
+    /// Redo the last undone edit for a file
+    pub async fn redo(&self, file: &str, dry_run: bool) -> Result<UndoRedoResponse, ClientError> {
+        let path = if dry_run {
+            format!("/api/v1/history/{}/redo?dry_run=true", Self::urlencoding_encode(file))
+        } else {
+            format!("/api/v1/history/{}/redo", Self::urlencoding_encode(file))
+        };
+        self.post_empty(&path).await
+    }
+
     // --- HTTP Helpers ---
+
+    /// URL-encode a path segment
+    fn urlencoding_encode(s: &str) -> String {
+        // Simple URL encoding for file paths
+        s.replace('%', "%25").replace('/', "%2F").replace(' ', "%20").replace('+', "%2B")
+    }
 
     /// Make a GET request
     async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, ClientError> {
@@ -193,6 +254,25 @@ impl DaemonClient {
         self.parse_response(resp).await
     }
 
+    /// Make a POST request without a body
+    async fn post_empty<T: DeserializeOwned>(&self, path: &str) -> Result<T, ClientError> {
+        let uri = self.uri(path);
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri(uri)
+            .header("Content-Type", "application/json")
+            .body(Full::new(Bytes::new()))
+            .map_err(|e| ClientError::RequestFailed { message: e.to_string() })?;
+
+        let resp = self
+            .client
+            .request(req)
+            .await
+            .map_err(|e| ClientError::ConnectionFailed { message: e.to_string() })?;
+
+        self.parse_response(resp).await
+    }
+
     /// Parse HTTP response
     async fn parse_response<T: DeserializeOwned>(
         &self,
@@ -206,26 +286,25 @@ impl DaemonClient {
             .map_err(|e| ClientError::RequestFailed { message: e.to_string() })?
             .to_bytes();
 
-        if !status.is_success() {
-            let error_text = String::from_utf8_lossy(&body_bytes);
-            return Err(ClientError::RequestFailed {
-                message: format!("HTTP {}: {}", status, error_text),
-            });
+        // Try to parse as ApiResponse first (works for both success and error responses)
+        let api_response: Result<ApiResponse<T>, _> = serde_json::from_slice(&body_bytes);
+
+        if let Ok(api_response) = api_response {
+            if api_response.success {
+                return api_response.data.ok_or_else(|| ClientError::SerializationError {
+                    message: "No data in response".to_string(),
+                });
+            } else {
+                let error = api_response.error.unwrap_or_else(|| aifed_common::ApiError {
+                    code: "UNKNOWN".to_string(),
+                    message: "Unknown error".to_string(),
+                });
+                return Err(ClientError::ApiError { code: error.code, message: error.message });
+            }
         }
 
-        let api_response: ApiResponse<T> = serde_json::from_slice(&body_bytes)
-            .map_err(|e| ClientError::SerializationError { message: e.to_string() })?;
-
-        if !api_response.success {
-            let error = api_response.error.unwrap_or_else(|| aifed_common::ApiError {
-                code: "UNKNOWN".to_string(),
-                message: "Unknown error".to_string(),
-            });
-            return Err(ClientError::ApiError { code: error.code, message: error.message });
-        }
-
-        api_response.data.ok_or_else(|| ClientError::SerializationError {
-            message: "No data in response".to_string(),
-        })
+        // If JSON parsing failed, return a generic HTTP error
+        let error_text = String::from_utf8_lossy(&body_bytes);
+        Err(ClientError::RequestFailed { message: format!("HTTP {}: {}", status, error_text) })
     }
 }

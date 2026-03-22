@@ -1,6 +1,7 @@
 mod args;
 mod batch;
 mod commands;
+mod diff;
 mod error;
 mod file;
 mod hash;
@@ -49,17 +50,29 @@ async fn run(args: Args, format: OutputFormat) -> Result<()> {
     match args.command {
         // Commands that don't need workspace - daemon_client is optional
         Commands::Read { file, locator, no_hashes, context } => {
-            commands::read(&file, locator.as_deref(), no_hashes, context, format)
+            commands::read(
+                &file,
+                locator.as_deref(),
+                no_hashes,
+                context,
+                format,
+                daemon_client.as_ref(),
+            )
+            .await
         }
         Commands::Info { file } => commands::info(&file, format),
-        Commands::Edit { file, operation, locator, content, dry_run } => commands::edit(
-            &file,
-            operation.as_deref(),
-            locator.as_deref(),
-            content.as_deref(),
-            dry_run,
-            format,
-        ),
+        Commands::Edit { file, operation, locator, content, dry_run } => {
+            commands::edit(
+                &file,
+                operation.as_deref(),
+                locator.as_deref(),
+                content.as_deref(),
+                dry_run,
+                format,
+                daemon_client.as_ref(),
+            )
+            .await
+        }
 
         // Commands that require workspace
         Commands::Daemon(cmd) => {
@@ -73,6 +86,24 @@ async fn run(args: Args, format: OutputFormat) -> Result<()> {
             let client = daemon_client
                 .ok_or_else(|| Error::DaemonNotRunning { workspace: ws.root().to_path_buf() })?;
             commands::lsp(&cmd, &client, format).await
+        }
+        Commands::History { file, count, stat } => {
+            let ws = workspace.ok_or(Error::LightweightMode)?;
+            let client = daemon_client
+                .ok_or_else(|| Error::DaemonNotRunning { workspace: ws.root().to_path_buf() })?;
+            commands::history(&file, count, stat, &client, format).await
+        }
+        Commands::Undo { file, dry_run } => {
+            let ws = workspace.ok_or(Error::LightweightMode)?;
+            let client = daemon_client
+                .ok_or_else(|| Error::DaemonNotRunning { workspace: ws.root().to_path_buf() })?;
+            commands::undo(&file, dry_run, &client, format).await
+        }
+        Commands::Redo { file, dry_run } => {
+            let ws = workspace.ok_or(Error::LightweightMode)?;
+            let client = daemon_client
+                .ok_or_else(|| Error::DaemonNotRunning { workspace: ws.root().to_path_buf() })?;
+            commands::redo(&file, dry_run, &client, format).await
         }
     }
 }
