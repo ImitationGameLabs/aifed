@@ -24,13 +24,17 @@ pub fn format_diffs_with_context(
         affected.insert(diff.line_num);
     }
 
-    // Expand to include context
+    // Expand to include context, and always include affected lines
     let mut show_lines = HashSet::new();
     for &line_num in &affected {
+        // Always add the affected line itself (may be beyond original file length for insertions)
+        show_lines.insert(line_num);
+
+        // Add context lines (only within original file bounds)
         let start = line_num.saturating_sub(context_lines);
         let end = (line_num + context_lines).min(original_lines.len());
         for l in start..=end {
-            if l >= 1 {
+            if l >= 1 && l <= original_lines.len() {
                 show_lines.insert(l);
             }
         }
@@ -51,7 +55,12 @@ pub fn format_diffs_with_context(
             output.push(String::new()); // Blank line between hunks
         }
 
-        let content = original_lines.get(line_num - 1).map(|s| s.as_str()).unwrap_or("");
+        // Get content from original file (line_num is 1-based, so line 0 has no content)
+        let content = if line_num >= 1 {
+            original_lines.get(line_num - 1).map(|s| s.as_str()).unwrap_or("")
+        } else {
+            ""
+        };
 
         if affected.contains(&line_num) {
             // Find the diff for this line
@@ -308,8 +317,7 @@ mod tests {
         let result = format_diffs_with_context(&diffs, &lines, 3);
         // Lines 1-5 with line 3 replaced
         // Expected: context (1,2), -3, +3, context (4,5)
-        let expected =
-            vec![" 1|line1", " 2|line2", "-3|line3", "+3|modified", " 4|line4", " 5|line5"];
+        let expected = [" 1|line1", " 2|line2", "-3|line3", "+3|modified", " 4|line4", " 5|line5"];
         assert_eq!(result, expected.join("\n"));
     }
 
@@ -318,7 +326,7 @@ mod tests {
         let diffs = vec![make_diff(3, None, Some("inserted"))];
         let lines: Vec<String> = (1..=5).map(|i| format!("line{}", i)).collect();
         let result = format_diffs_with_context(&diffs, &lines, 3);
-        let expected = vec![" 1|line1", " 2|line2", "+3|inserted", " 4|line4", " 5|line5"];
+        let expected = [" 1|line1", " 2|line2", "+3|inserted", " 4|line4", " 5|line5"];
         assert_eq!(result, expected.join("\n"));
     }
 
@@ -327,7 +335,7 @@ mod tests {
         let diffs = vec![make_diff(3, Some("line3"), None)];
         let lines: Vec<String> = (1..=5).map(|i| format!("line{}", i)).collect();
         let result = format_diffs_with_context(&diffs, &lines, 3);
-        let expected = vec![" 1|line1", " 2|line2", "-3|line3", " 4|line4", " 5|line5"];
+        let expected = [" 1|line1", " 2|line2", "-3|line3", " 4|line4", " 5|line5"];
         assert_eq!(result, expected.join("\n"));
     }
 
@@ -337,8 +345,7 @@ mod tests {
         let diffs = vec![make_diff(2, Some("line2"), Some("modified"))];
         let lines: Vec<String> = (1..=5).map(|i| format!("line{}", i)).collect();
         let result = format_diffs_with_context(&diffs, &lines, 3);
-        let expected =
-            vec![" 1|line1", "-2|line2", "+2|modified", " 3|line3", " 4|line4", " 5|line5"];
+        let expected = [" 1|line1", "-2|line2", "+2|modified", " 3|line3", " 4|line4", " 5|line5"];
         assert_eq!(result, expected.join("\n"));
     }
 
@@ -357,7 +364,7 @@ mod tests {
         let result = format_diffs_with_context(&diffs, &lines, 3);
 
         // Expected: single continuous block with no duplicates
-        let expected = vec![
+        let expected = [
             " 1|line1",
             " 2|line2",
             "-3|line3",
@@ -372,6 +379,37 @@ mod tests {
             " 10|line10",
             " 11|line11",
         ];
+        assert_eq!(result, expected.join("\n"));
+    }
+
+    #[test]
+    fn test_format_diffs_with_context_insertion_at_end() {
+        // Insert at line 6 (after 5-line file ends) - should show inserted content
+        let diffs =
+            vec![make_diff(6, None, Some("inserted1")), make_diff(7, None, Some("inserted2"))];
+        let lines: Vec<String> = (1..=5).map(|i| format!("line{}", i)).collect();
+        let result = format_diffs_with_context(&diffs, &lines, 3);
+        // Context starts at line 6-3=3, ends at original file end (line 5)
+        // Then shows inserted lines 6 and 7
+        let expected = [" 3|line3", " 4|line4", " 5|line5", "+6|inserted1", "+7|inserted2"];
+        assert_eq!(result, expected.join("\n"));
+    }
+
+    #[test]
+    fn test_format_diffs_with_context_insertion_at_start() {
+        // Insert at beginning of file - header1 at line 1, header2 at line 2
+        let diffs = vec![make_diff(1, None, Some("header1")), make_diff(2, None, Some("header2"))];
+        // Pass the NEW file content (after insertion), not original
+        let new_lines: Vec<String> =
+            ["header1", "header2", "line1", "line2", "line3", "line4", "line5"]
+                .into_iter()
+                .map(String::from)
+                .collect();
+        let result = format_diffs_with_context(&diffs, &new_lines, 3);
+        // Insertions at lines 1, 2; context for line 2 expands to lines 1-5
+        // Lines 1, 2 are affected (insertions), so context is lines 3, 4, 5
+        // Line 3 = line1, Line 4 = line2, Line 5 = line3 (from new_lines)
+        let expected = ["+1|header1", "+2|header2", " 3|line1", " 4|line2", " 5|line3"];
         assert_eq!(result, expected.join("\n"));
     }
 }

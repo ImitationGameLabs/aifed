@@ -92,7 +92,7 @@ impl EditPlan {
             new_lines.push(content.clone());
             changes.push(EditChange {
                 operation: "insert".to_string(),
-                line: 0,
+                line: new_lines.len(), // Actual line number in new file
                 old_content: None,
                 new_content: Some(content.clone()),
             });
@@ -518,7 +518,7 @@ async fn execute_atomic(
         errors: Vec::new(),
     };
 
-    println!("{}", format_batch_result_with_diff(&result, format, lines));
+    println!("{}", format_batch_result_with_diff(&result, format, &result.new_lines));
     Ok(())
 }
 

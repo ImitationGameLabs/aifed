@@ -124,7 +124,7 @@ pub fn format_file_info(info: &FileInfo, format: OutputFormat) -> String {
 pub fn format_edit_result_with_diff(
     result: &EditResult,
     format: OutputFormat,
-    original_lines: &[String],
+    new_lines: &[String],
 ) -> String {
     match format {
         OutputFormat::Text => {
@@ -145,9 +145,9 @@ pub fn format_edit_result_with_diff(
                     output.push(summary);
                 }
 
-                // Diff view with context
+                // Diff view with context (using new file content for context)
                 let diffs = changes_to_diffs(changes);
-                let diff_view = crate::diff::format_diffs_with_context(&diffs, original_lines, 3);
+                let diff_view = crate::diff::format_diffs_with_context(&diffs, new_lines, 3);
                 if diff_view != "  (no changes)" {
                     output.push(diff_view);
                 }
@@ -204,7 +204,7 @@ fn changes_to_diffs(changes: &[EditChange]) -> Vec<aifed_common::LineDiffDto> {
 pub fn format_batch_result_with_diff(
     result: &BatchResult,
     format: OutputFormat,
-    original_lines: &[String],
+    new_lines: &[String],
 ) -> String {
     match format {
         OutputFormat::Text => {
@@ -220,9 +220,9 @@ pub fn format_batch_result_with_diff(
                     output.push(summary);
                 }
 
-                // Diff view with context
+                // Diff view with context (using new file content for context)
                 let diffs = changes_to_diffs(&result.changes);
-                let diff_view = crate::diff::format_diffs_with_context(&diffs, original_lines, 3);
+                let diff_view = crate::diff::format_diffs_with_context(&diffs, new_lines, 3);
                 if diff_view != "  (no changes)" {
                     output.push(diff_view);
                 }

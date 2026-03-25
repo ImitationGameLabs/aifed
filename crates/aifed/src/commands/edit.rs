@@ -239,9 +239,6 @@ async fn execute_single(
     let original_had_trailing_newline = file_content.ends_with('\n');
     let mut lines: Vec<String> = file_content.lines().map(|s| s.to_string()).collect();
 
-    // Keep original lines for diff context display
-    let original_lines = lines.clone();
-
     // Validate
     let validated = validate_operation(&lines, operation, &locator, content, path)?;
 
@@ -288,6 +285,6 @@ async fn execute_single(
         }
     }
 
-    println!("{}", format_edit_result_with_diff(&result, format, &original_lines));
+    println!("{}", format_edit_result_with_diff(&result, format, &lines));
     Ok(())
 }
