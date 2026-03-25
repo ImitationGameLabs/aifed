@@ -7,7 +7,7 @@ pub enum Locator {
     Hashline { line: usize, hash: String },
     /// Single line: just a line number (e.g., "42")
     Line(usize),
-    /// Line range: start and end line numbers (e.g., "10-20")
+    /// Line range: start and end line numbers (e.g., "[10,20]")
     LineRange { start: usize, end: usize },
     /// Hashline range: start/end lines with hashes for range delete (e.g., "[2:AA,89:BB]")
     HashlineRange { start: usize, start_hash: String, end: usize, end_hash: String },
@@ -19,80 +19,62 @@ impl Locator {
     /// Formats:
     /// - "42:AB" -> Hashline { line: 42, hash: "AB" }
     /// - "42" -> Line(42)
-    /// - "10-20" -> LineRange { start: 10, end: 20 }
+    /// - "[10,20]" -> LineRange { start: 10, end: 20 }
     /// - "[2:AA,89:BB]" -> HashRange { start: 2, start_hash: "AA", end: 89, end_hash: "BB" }
     pub fn parse(input: &str) -> Result<Self> {
         let input = input.trim();
 
-        // Check for hash range format first: [START:HASH,END:HASH]
+        // Check for bracket format: [LEFT,RIGHT]
         if input.starts_with('[') && input.ends_with(']') {
             let inner = &input[1..input.len() - 1];
             let (left, right) = inner.split_once(',').ok_or_else(|| Error::InvalidLocator {
                 input: input.to_string(),
-                reason: "Hash range must have comma separator".to_string(),
+                reason: "Bracket format must have comma separator".to_string(),
             })?;
 
-            let start_loc = Self::parse(left.trim())?;
-            let end_loc = Self::parse(right.trim())?;
+            let left_loc = Self::parse(left.trim())?;
+            let right_loc = Self::parse(right.trim())?;
 
-            let (start, start_hash) = match start_loc {
-                Locator::Hashline { line, hash } => (line, hash),
+            // Determine if this is LineRange or HashlineRange
+            match (left_loc, right_loc) {
+                (Locator::Line(start), Locator::Line(end)) => {
+                    // Line range: [10,20]
+                    if start > end {
+                        return Err(Error::InvalidLocator {
+                            input: input.to_string(),
+                            reason: "Range start cannot be greater than end".to_string(),
+                        });
+                    }
+                    if start == 0 {
+                        return Err(Error::InvalidLocator {
+                            input: input.to_string(),
+                            reason: "Range start must be at least 1".to_string(),
+                        });
+                    }
+                    return Ok(Locator::LineRange { start, end });
+                }
+                (
+                    Locator::Hashline { line: start, hash: start_hash },
+                    Locator::Hashline { line: end, hash: end_hash },
+                ) => {
+                    // Hashline range: [2:AA,89:BB]
+                    if start > end {
+                        return Err(Error::InvalidLocator {
+                            input: input.to_string(),
+                            reason: "Hash range start cannot be greater than end".to_string(),
+                        });
+                    }
+                    return Ok(Locator::HashlineRange { start, start_hash, end, end_hash });
+                }
                 _ => {
                     return Err(Error::InvalidLocator {
                         input: input.to_string(),
-                        reason: "Hash range boundaries must be hashline format (LINE:HASH)"
-                            .to_string(),
+                        reason:
+                            "Bracket format boundaries must be both line numbers or both hashlines"
+                                .to_string(),
                     });
                 }
-            };
-
-            let (end, end_hash) = match end_loc {
-                Locator::Hashline { line, hash } => (line, hash),
-                _ => {
-                    return Err(Error::InvalidLocator {
-                        input: input.to_string(),
-                        reason: "Hash range boundaries must be hashline format (LINE:HASH)"
-                            .to_string(),
-                    });
-                }
-            };
-
-            if start > end {
-                return Err(Error::InvalidLocator {
-                    input: input.to_string(),
-                    reason: "Hash range start cannot be greater than end".to_string(),
-                });
             }
-
-            return Ok(Locator::HashlineRange { start, start_hash, end, end_hash });
-        }
-
-        // Check for range format (e.g., "10-20")
-        if let Some((start_str, end_str)) = input.split_once('-') {
-            let start: usize = start_str.parse().map_err(|_| Error::InvalidLocator {
-                input: input.to_string(),
-                reason: format!("Invalid range start: {}", start_str),
-            })?;
-            let end: usize = end_str.parse().map_err(|_| Error::InvalidLocator {
-                input: input.to_string(),
-                reason: format!("Invalid range end: {}", end_str),
-            })?;
-
-            if start > end {
-                return Err(Error::InvalidLocator {
-                    input: input.to_string(),
-                    reason: "Range start cannot be greater than end".to_string(),
-                });
-            }
-
-            if start == 0 {
-                return Err(Error::InvalidLocator {
-                    input: input.to_string(),
-                    reason: "Range start must be at least 1".to_string(),
-                });
-            }
-
-            return Ok(Locator::LineRange { start, end });
         }
 
         // Check for hashline format (e.g., "42:AB")
@@ -119,7 +101,7 @@ impl Locator {
         // Must be line-only format (e.g., "42")
         let line: usize = input.parse().map_err(|_| Error::InvalidLocator {
             input: input.to_string(),
-            reason: "Expected line number, range (START-END), or hashline (LINE:HASH)".to_string(),
+            reason: "Expected line number, range [START,END], or hashline LINE:HASH".to_string(),
         })?;
 
         Ok(Locator::Line(line))
@@ -151,7 +133,7 @@ impl std::fmt::Display for Locator {
         match self {
             Locator::Hashline { line, hash } => write!(f, "{}:{}", line, hash),
             Locator::Line(line) => write!(f, "{}", line),
-            Locator::LineRange { start, end } => write!(f, "{}-{}", start, end),
+            Locator::LineRange { start, end } => write!(f, "[{},{}]", start, end),
             Locator::HashlineRange { start, start_hash, end, end_hash } => {
                 write!(f, "[{}:{},{}:{}]", start, start_hash, end, end_hash)
             }
@@ -297,7 +279,13 @@ mod tests {
 
     #[test]
     fn test_parse_line_range() {
-        let loc = Locator::parse("10-20").unwrap();
+        let loc = Locator::parse("[10,20]").unwrap();
+        assert_eq!(loc, Locator::LineRange { start: 10, end: 20 });
+    }
+
+    #[test]
+    fn test_parse_line_range_with_spaces() {
+        let loc = Locator::parse("[ 10 , 20 ]").unwrap();
         assert_eq!(loc, Locator::LineRange { start: 10, end: 20 });
     }
 
@@ -309,7 +297,7 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_range() {
-        let result = Locator::parse("20-10");
+        let result = Locator::parse("[20,10]");
         assert!(result.is_err());
     }
 
@@ -323,7 +311,7 @@ mod tests {
     fn test_line_method() {
         assert_eq!(Locator::parse("42:AB").unwrap().line(), Some(42));
         assert_eq!(Locator::parse("42").unwrap().line(), Some(42));
-        assert_eq!(Locator::parse("10-20").unwrap().line(), Some(10));
+        assert_eq!(Locator::parse("[10,20]").unwrap().line(), Some(10));
         assert_eq!(Locator::parse("0:00").unwrap().line(), None);
     }
 

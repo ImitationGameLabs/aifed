@@ -8,13 +8,123 @@ use std::path::Path;
 
 use crate::file::write_file;
 
-use crate::commands::edit::{Operation, ValidatedOp, validate_operation};
 use crate::error::{Error, Result};
-use crate::hash::hash_file;
+use crate::hash::{hash_file, hash_line, is_virtual_hash};
 use crate::locator::Locator;
 use crate::output::{BatchResult, EditChange, OutputFormat, format_batch_result_with_diff};
 use aifed_common::LineDiffDto;
 use aifed_daemon_client::DaemonClient;
+
+/// Edit operation types
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Operation {
+    Replace,
+    Insert,
+    Delete,
+}
+
+impl Operation {
+    pub fn parse(s: &str) -> Result<Self> {
+        match s {
+            "=" => Ok(Operation::Replace),
+            "+" => Ok(Operation::Insert),
+            "-" => Ok(Operation::Delete),
+            _ => Err(Error::InvalidOperation { input: s.to_string() }),
+        }
+    }
+}
+
+/// Validated operation ready to apply
+#[derive(Debug)]
+pub struct ValidatedOp {
+    pub operation: Operation,
+    pub target_line: usize,
+    pub new_content: Option<String>,
+}
+
+/// Validate an operation against the current file state
+pub fn validate_operation(
+    lines: &[String],
+    operation: Operation,
+    locator: &Locator,
+    content: Option<&str>,
+    path: &Path,
+) -> Result<ValidatedOp> {
+    // Validate content requirement
+    match operation {
+        Operation::Replace | Operation::Insert => {
+            if content.is_none() {
+                return Err(Error::InvalidLocator {
+                    input: "".to_string(),
+                    reason: "Content is required for replace and insert operations".to_string(),
+                });
+            }
+        }
+        Operation::Delete => {}
+    }
+
+    // Handle virtual line (insert at beginning)
+    if locator.is_virtual() {
+        if operation != Operation::Insert {
+            return Err(Error::InvalidLocator {
+                input: locator.to_string(),
+                reason: "Virtual line (0:00) is only valid for insert operations".to_string(),
+            });
+        }
+
+        return Ok(ValidatedOp {
+            operation,
+            target_line: 0,
+            new_content: content.map(|s| s.to_string()),
+        });
+    }
+
+    // Get line number and hash from locator
+    let (target_line, expected_hash) = match locator {
+        Locator::Hashline { line, hash } => (*line, Some(hash.clone())),
+        Locator::Line(line) => (*line, None),
+        Locator::LineRange { .. } => {
+            return Err(Error::InvalidLocator {
+                input: locator.to_string(),
+                reason: "Range locators not supported for edit operations".to_string(),
+            });
+        }
+        Locator::HashlineRange { .. } => {
+            return Err(Error::InvalidLocator {
+                input: locator.to_string(),
+                reason: "Hashline range only supported for delete operations".to_string(),
+            });
+        }
+    };
+
+    // Validate line number
+    if target_line == 0 || target_line > lines.len() {
+        return Err(Error::InvalidLocator {
+            input: locator.to_string(),
+            reason: format!("Line {} out of range (1-{})", target_line, lines.len()),
+        });
+    }
+
+    // Get actual content and hash
+    let actual_content = lines[target_line - 1].clone();
+    let actual_hash = hash_line(&actual_content);
+
+    // Verify hash if provided
+    if let Some(expected) = &expected_hash
+        && !is_virtual_hash(expected)
+        && actual_hash != *expected
+    {
+        return Err(Error::HashMismatch {
+            path: path.to_path_buf(),
+            line: target_line,
+            expected: expected.clone(),
+            actual: actual_hash,
+            actual_content,
+        });
+    }
+
+    Ok(ValidatedOp { operation, target_line, new_content: content.map(|s| s.to_string()) })
+}
 
 /// Parsed single operation from batch input
 #[derive(Debug, Clone)]
@@ -674,20 +784,10 @@ mod tests {
     fn test_edit_plan_delete() {
         // Delete lines 2 and 4 - order doesn't matter since all ops based on original
         let mut plan = EditPlan::new();
-        plan.add(ValidatedOp {
-            operation: Operation::Delete,
-            target_line: 2,
-            old_content: Some("line2".to_string()),
-            new_content: None,
-        })
-        .unwrap();
-        plan.add(ValidatedOp {
-            operation: Operation::Delete,
-            target_line: 4,
-            old_content: Some("line4".to_string()),
-            new_content: None,
-        })
-        .unwrap();
+        plan.add(ValidatedOp { operation: Operation::Delete, target_line: 2, new_content: None })
+            .unwrap();
+        plan.add(ValidatedOp { operation: Operation::Delete, target_line: 4, new_content: None })
+            .unwrap();
 
         let original: Vec<String> =
             ["1", "2", "3", "4", "5"].into_iter().map(String::from).collect();
@@ -703,21 +803,21 @@ mod tests {
         plan.add(ValidatedOp {
             operation: Operation::Insert,
             target_line: 1,
-            old_content: None,
+
             new_content: Some("a".to_string()),
         })
         .unwrap();
         plan.add(ValidatedOp {
             operation: Operation::Insert,
             target_line: 1,
-            old_content: None,
+
             new_content: Some("b".to_string()),
         })
         .unwrap();
         plan.add(ValidatedOp {
             operation: Operation::Insert,
             target_line: 1,
-            old_content: None,
+
             new_content: Some("c".to_string()),
         })
         .unwrap();
@@ -732,18 +832,13 @@ mod tests {
     fn test_edit_plan_conflict() {
         // Same line cannot be both deleted and replaced
         let mut plan = EditPlan::new();
-        plan.add(ValidatedOp {
-            operation: Operation::Delete,
-            target_line: 3,
-            old_content: Some("line3".to_string()),
-            new_content: None,
-        })
-        .unwrap();
+        plan.add(ValidatedOp { operation: Operation::Delete, target_line: 3, new_content: None })
+            .unwrap();
 
         let result = plan.add(ValidatedOp {
             operation: Operation::Replace,
             target_line: 3,
-            old_content: Some("line3".to_string()),
+
             new_content: Some("new".to_string()),
         });
 
@@ -754,24 +849,19 @@ mod tests {
     fn test_edit_plan_mixed() {
         // Mixed operations: delete line 2, replace line 3, insert after line 1
         let mut plan = EditPlan::new();
-        plan.add(ValidatedOp {
-            operation: Operation::Delete,
-            target_line: 2,
-            old_content: Some("L2".to_string()),
-            new_content: None,
-        })
-        .unwrap();
+        plan.add(ValidatedOp { operation: Operation::Delete, target_line: 2, new_content: None })
+            .unwrap();
         plan.add(ValidatedOp {
             operation: Operation::Replace,
             target_line: 3,
-            old_content: Some("L3".to_string()),
+
             new_content: Some("NEW3".to_string()),
         })
         .unwrap();
         plan.add(ValidatedOp {
             operation: Operation::Insert,
             target_line: 1,
-            old_content: None,
+
             new_content: Some("A".to_string()),
         })
         .unwrap();
@@ -791,14 +881,14 @@ mod tests {
         plan.add(ValidatedOp {
             operation: Operation::Insert,
             target_line: 0,
-            old_content: None,
+
             new_content: Some("first".to_string()),
         })
         .unwrap();
         plan.add(ValidatedOp {
             operation: Operation::Insert,
             target_line: 0,
-            old_content: None,
+
             new_content: Some("second".to_string()),
         })
         .unwrap();

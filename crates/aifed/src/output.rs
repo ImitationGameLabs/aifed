@@ -31,15 +31,6 @@ pub struct FileInfo {
     pub size: u64,
 }
 
-/// Edit result for output
-#[derive(Debug, Serialize)]
-pub struct EditResult {
-    pub success: bool,
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub changes: Option<Vec<EditChange>>,
-}
-
 #[derive(Debug, Clone, Serialize)]
 pub struct EditChange {
     pub operation: String,
@@ -117,45 +108,6 @@ pub fn format_file_info(info: &FileInfo, format: OutputFormat) -> String {
             format!("Path: {}\nLines: {}\nSize: {}", info.path, info.lines, size_str)
         }
         OutputFormat::Json => serde_json::to_string_pretty(&info).unwrap_or_default(),
-    }
-}
-
-/// Format edit result with diff view for output
-pub fn format_edit_result_with_diff(
-    result: &EditResult,
-    format: OutputFormat,
-    new_lines: &[String],
-) -> String {
-    match format {
-        OutputFormat::Text => {
-            let mut output = Vec::new();
-
-            // Message line
-            if result.success {
-                output.push(result.message.clone());
-            } else {
-                output.push(format!("Error: {}", result.message));
-                return output.join("\n");
-            }
-
-            // Summary line
-            if let Some(changes) = &result.changes {
-                let summary = compute_change_summary(changes);
-                if summary != "no changes" {
-                    output.push(summary);
-                }
-
-                // Diff view with context (using new file content for context)
-                let diffs = changes_to_diffs(changes);
-                let diff_view = crate::diff::format_diffs_with_context(&diffs, new_lines, 3);
-                if diff_view != "  (no changes)" {
-                    output.push(diff_view);
-                }
-            }
-
-            output.join("\n")
-        }
-        OutputFormat::Json => serde_json::to_string_pretty(&result).unwrap_or_default(),
     }
 }
 

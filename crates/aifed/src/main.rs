@@ -90,17 +90,8 @@ async fn run(args: Args, format: OutputFormat) -> Result<()> {
             .await
         }
         Commands::Info { file } => commands::info(&file, format),
-        Commands::Edit { file, operation, locator, content, dry_run } => {
-            commands::edit(
-                &file,
-                operation.as_deref(),
-                locator.as_deref(),
-                content.as_deref(),
-                dry_run,
-                format,
-                daemon_client.as_ref(),
-            )
-            .await
+        Commands::Edit { file, dry_run } => {
+            commands::edit(&file, dry_run, format, daemon_client.as_ref()).await
         }
 
         // Commands that require workspace

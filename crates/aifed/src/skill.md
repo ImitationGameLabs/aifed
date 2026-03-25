@@ -6,7 +6,7 @@ This prevents AI agents from making edits based on stale file state.
 ## WORKFLOW
 
 1. Read file to get current hashes: aifed read <FILE>
-2. Edit with hash verification: aifed edit <FILE> <OP> <LINE:HASH> [CONTENT]
+2. Edit with hash verification via heredoc: aifed edit <FILE> <<'EOF' ... EOF
 3. Hash mismatch = file changed, re-read and retry
    Tip: Use line range (e.g., "10-20") to re-read only nearby lines
 
@@ -44,7 +44,7 @@ Example: `"code: println!(\"hello\");"` becomes `code: println!("hello");`
 
 ## BATCH MODE
 
-Multiple operations can be provided via stdin (heredoc).
+All edits use heredoc syntax. Multiple operations can be provided in one heredoc.
 All operations must succeed, or none are applied (atomic).
 
 ## EDITING TIPS
@@ -104,15 +104,31 @@ Options:
 ## EXAMPLES
 
 ```bash
-# Single edit
+# Read file
 aifed read main.rs              # Get hashes for all lines
-aifed read main.rs 10-20        # Read lines 10-20
-aifed edit main.rs = 42:3K "new content"    # Replace line 42
-aifed edit main.rs + 10:AB "inserted line"  # Insert after line 10
-aifed edit main.rs - 15:7M                  # Delete line 15
-aifed edit main.rs + 0:00 "// header"       # Insert at file beginning
+aifed read main.rs [10,20]      # Read lines 10-20
 
-# Batch edit (heredoc) - use 'EOF' to prevent shell expansion
+# Single edit - use heredoc with 'EOF' to prevent shell expansion
+aifed edit main.rs <<'EOF'
+= 42:3K "new content"
+EOF
+
+# Insert after line 10
+aifed edit main.rs <<'EOF'
++ 10:AB "inserted line"
+EOF
+
+# Delete line 15
+aifed edit main.rs <<'EOF'
+- 15:7M
+EOF
+
+# Insert at file beginning
+aifed edit main.rs <<'EOF'
++ 0:00 "// header"
+EOF
+
+# Batch edit - multiple operations in one heredoc
 aifed edit main.rs <<'EOF'
 = 1:AB "modified"
 + 10:3K "inserted"
@@ -120,7 +136,9 @@ aifed edit main.rs <<'EOF'
 EOF
 
 # Range delete - delete lines 10-50 with boundary hash verification
-aifed edit main.rs - [10:AB,50:CD]
+aifed edit main.rs <<'EOF'
+- [10:AB,50:CD]
+EOF
 
 # Content with JSON escaping
 aifed edit main.rs <<'EOF'

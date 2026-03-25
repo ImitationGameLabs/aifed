@@ -78,36 +78,23 @@ pub enum Commands {
     #[command(verbatim_doc_comment)]
     /// Edit file content with hashline verification
     ///
-    /// Operations:
-    ///   =  Replace line at locator
-    ///   +  Insert new line after locator
-    ///   -  Delete line at locator
-    ///
-    /// Batch mode (from stdin or file):
+    /// Operations are read from stdin:
     ///   ```bash
-    ///   aifed edit main.rs <<EOF
+    ///   aifed edit main.rs <<'EOF'
     ///   = 42:AB "new content"
     ///   + 10:3K "inserted line"
     ///   - 15:7M
+    ///   - [20:XX,30:YY]
     ///   EOF
     ///   ```
+    ///
+    /// Operations:
+    ///   =  Replace line at locator
+    ///   +  Insert new line after locator
+    ///   -  Delete line at locator (or range with [start:end])
     Edit {
         /// File to edit
         file: PathBuf,
-
-        /// Operation: = (replace), + (insert after), - (delete)
-        /// Optional when using stdin for batch mode
-        #[arg(value_name = "OP")]
-        operation: Option<String>,
-
-        /// Locator: LINE:HASH (e.g., "42:AB") or use 0:00 to insert at file beginning
-        /// Optional when using stdin for batch mode
-        #[arg(value_name = "LOCATOR")]
-        locator: Option<String>,
-
-        /// Content for replace/insert operations (use - for stdin)
-        #[arg(value_name = "CONTENT")]
-        content: Option<String>,
 
         /// Preview changes without applying
         #[arg(long)]
