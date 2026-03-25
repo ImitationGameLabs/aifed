@@ -32,6 +32,37 @@ This ensures nested git repositories are not affected by external `aifed.toml` f
 
 If no workspace is detected, only `read` and `edit` commands are available (lightweight mode).
 
+## Daemon Auto-Start Behavior
+
+The CLI automatically manages the daemon lifecycle based on the command being executed.
+
+### Daemon Requirements by Command
+
+| Command         | Auto-Start | Heartbeat | When Unavailable                                    |
+| --------------- | :--------: | :-------: | --------------------------------------------------- |
+| `--help`        |     No     |    No     | N/A                                                 |
+| `--skill`       |     No     |    No     | N/A                                                 |
+| `info`          |     No     |    No     | N/A                                                 |
+| `daemon status` |     No     |    No     | Reports "Daemon not running" + workspace + log path |
+| `daemon stop`   |     No     |    No     | Reports "Daemon not running"                        |
+| `read`          |    Yes     |    Yes    | Warning + degraded mode                             |
+| `edit`          |    Yes     |    Yes    | Warning + degraded mode                             |
+| `lsp *`         |    Yes     |    Yes    | Error, cannot execute                               |
+| `history`       |    Yes     |    Yes    | Error, cannot execute                               |
+| `undo`          |    Yes     |    Yes    | Error, cannot execute                               |
+| `redo`          |    Yes     |    Yes    | Error, cannot execute                               |
+
+### Degraded Mode Warning
+
+When `read` or `edit` commands cannot connect to the daemon, they operate in degraded mode:
+
+```
+Warning: daemon unavailable. The following features are disabled:
+  - Edit history tracking (undo/redo)
+  - Concurrent modification detection
+File operations will proceed without these protections.
+```
+
 ## AI-First Design Principles
 
 aifed is designed specifically for AI agents, prioritizing:
