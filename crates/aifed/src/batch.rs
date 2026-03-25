@@ -216,6 +216,15 @@ fn parse_single_operation(line_num: usize, line: &str) -> Result<EditOp> {
         reason: e.to_string(),
     })?;
 
+    // Validate: edit operations require hash verification
+    if let Locator::Line(_) | Locator::LineRange { .. } = &locator {
+        return Err(Error::InvalidBatchOp {
+            line_number: line_num,
+            line_content: line.to_string(),
+            reason: "Locator must include hash (e.g., \"42:AB\" or \"[2:AA,5:BB]\")".to_string(),
+        });
+    }
+
     // Extract content
     let content = if parts.len() > 2 {
         // Join remaining parts as content, handling quoted strings and escapes
