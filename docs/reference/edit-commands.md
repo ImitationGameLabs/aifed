@@ -9,9 +9,10 @@ The unified command for all file edits: replace, insert, and delete.
 ### Usage
 
 ```
-aifed edit <FILE> <OPERATION> <LOCATOR> [CONTENT]
-aifed edit <FILE>                      # Multiple operations via stdin (heredoc)
+aifed edit <FILE> [--dry-run]   # Operations via stdin (heredoc)
 ```
+
+All edit operations are provided via stdin using heredoc syntax.
 
 ### Operations
 
@@ -34,13 +35,14 @@ Edit commands use **hashline** locators to specify positions with verification.
 | ----------------------- | --------------- | ----------------------------------------------------- |
 | `LINE:HASH`             | `42:AB`         | Hashline - line + hash verification (recommended)     |
 | `[START:HASH,END:HASH]` | `[10:AB,50:CD]` | Range delete - deletes lines START to END (inclusive) |
-| `HASH`                  | `AB`            | Hash only (content-based positioning)                 |
 
 **Virtual line:** The special hashline `0:00` represents the position before the first line, used for inserting at the beginning of a file.
 
 ```bash
 # Insert a copyright header at the very start of a file
-aifed edit main.rs + 0:00 "// Copyright 2026"
+aifed edit main.rs <<'EOF'
++ 0:00 "// Copyright 2026"
+EOF
 ```
 
 See [locator.md](locator.md) for detailed documentation on locators and hashline.
@@ -61,11 +63,15 @@ Content in double quotes supports JSON escape sequences:
 **Example:**
 ```bash
 # Double quotes inside content
-aifed edit main.rs = 42:AB "println!(\"hello\");"
+aifed edit main.rs <<'EOF'
+= 42:AB "println!(\"hello\");"
+EOF
 # Result: println!("hello");
 
 # JSON string as content
-aifed edit config.rs + 10:CD "{\"key\": \"value\"}"
+aifed edit config.rs <<'EOF'
++ 10:CD "{\"key\": \"value\"}"
+EOF
 # Result: {"key": "value"}
 ```
 
@@ -81,22 +87,30 @@ aifed edit config.rs + 10:CD "{\"key\": \"value\"}"
 
 ```bash
 # Replace line 42 with hash verification
-aifed edit main.rs = 42:AB "fn main() {"
+aifed edit main.rs <<'EOF'
+= 42:AB "fn main() {"
+EOF
 
 # Insert after line 10
-aifed edit main.rs + 10:AB "    println!(\"hello\");"
+aifed edit main.rs <<'EOF'
++ 10:AB "    println!(\"hello\");"
+EOF
 
 # Delete line 42
-aifed edit main.rs - 42:AB
+aifed edit main.rs <<'EOF'
+- 42:AB
+EOF
 
 # Insert at file beginning
-aifed edit main.rs + 0:00 "// Copyright 2026"
+aifed edit main.rs <<'EOF'
++ 0:00 "// Copyright 2026"
+EOF
 ```
 
 #### Batch Operations
 
 ```bash
-# Multiple operations via heredoc
+# Multiple operations in one heredoc
 aifed edit main.rs <<'EOF'
 = 42:AB "fn main() {"
 + 10:3K "    println!(\"hello\");"
@@ -108,9 +122,11 @@ EOF
 
 ```bash
 # Delete lines 10-50 (inclusive), with boundary hash verification
-aifed edit main.rs - [10:AB,50:CD]
+aifed edit main.rs <<'EOF'
+- [10:AB,50:CD]
+EOF
 
-# Range delete in batch mode
+# Range delete combined with other operations
 aifed edit main.rs <<'EOF'
 - [2:AA,89:BB]
 + 1:HH "new header"
@@ -121,33 +137,22 @@ EOF
 
 ```bash
 # Content with embedded quotes
-aifed edit main.rs = 42:AB "code: println!(\"result: {}\", value);"
+aifed edit main.rs <<'EOF'
+= 42:AB "code: println!(\"result: {}\", value);"
+EOF
 
 # JSON content
-aifed edit config.json + 10:CD "{\"name\": \"test\", \"value\": 123}"
+aifed edit config.json <<'EOF'
++ 10:CD "{\"name\": \"test\", \"value\": 123}"
+EOF
 ```
 
 #### With Options
 
 ```bash
 # Preview changes
-aifed edit main.rs = 42:AB "fn main() {" --dry-run
-```
-
-### Content Input Methods
-
-```bash
-# Direct argument
-aifed edit lib.rs = 42:AB "content"
-
-# From stdin (single operation)
-echo "content" | aifed edit lib.rs = 42:AB -
-
-# Multi-line via heredoc
-aifed edit lib.rs = 10-15 - <<EOF
-fn new_func() -> Option<i32> {
-    None
-}
+aifed edit main.rs --dry-run <<'EOF'
+= 42:AB "fn main() {"
 EOF
 ```
 
@@ -172,19 +177,6 @@ Hashes are content-based, so they remain valid regardless of other edits.
 ### Failure Handling
 
 Batch operations are **atomic** (all-or-nothing): if any operation fails, none are applied.
-
-## Locator Quick Reference
-
-**Note:** File path is a separate argument. Examples show full command-line context.
-
-| Format      | Locator Only | Full Example    | Use Case                          |
-| ----------- | ------------ | --------------- | --------------------------------- |
-| `LINE:HASH` | `42:AB`      | `main.rs 42:AB` | Default - safest, dual validation |
-| `HASH`      | `AB`         | `main.rs AB`    | When line number unknown          |
-
-**Virtual line** (`0:00`) is a special hashline for inserting at file beginning.
-
-See [locator.md](locator.md) for detailed documentation.
 
 ## See Also
 

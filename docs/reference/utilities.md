@@ -24,9 +24,9 @@ aifed diff <FILE1> <FILE2>
 
 ### Comparison Modes
 
-| Mode          | Syntax                | Description         |
-| ------------- | --------------------- | ------------------- |
-| Between files | `diff <FILE1> <FILE2>` | Compare two files   |
+| Mode          | Syntax                 | Description       |
+| ------------- | ---------------------- | ----------------- |
+| Between files | `diff <FILE1> <FILE2>` | Compare two files |
 
 ### Examples
 
@@ -155,7 +155,9 @@ aifed lsp diag .
 ### Post-edit Verification
 
 ```bash
-aifed edit main.rs = 42:AB "new code"
+aifed edit main.rs <<'EOF'
+= 42:AB "new code"
+EOF
 
 # Check for errors
 aifed lsp diag main.rs

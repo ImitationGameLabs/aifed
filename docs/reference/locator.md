@@ -241,20 +241,28 @@ Locators are used with the `edit` command:
 
 ```bash
 # Replace with LINE:HASH format
-aifed edit main.rs = 42:AB "new content"
+aifed edit main.rs <<'EOF'
+= 42:AB "new content"
+EOF
 
 # Insert after a line
-aifed edit main.rs + 10:AB "new line"
+aifed edit main.rs <<'EOF'
++ 10:AB "new line"
+EOF
 
 # Insert at file beginning (virtual line)
-aifed edit main.rs + 0:00 "// Copyright 2026"
+aifed edit main.rs <<'EOF'
++ 0:00 "// Copyright 2026"
+EOF
 
 # Delete a line
-aifed edit main.rs - 42:AB
+aifed edit main.rs <<'EOF'
+- 42:AB
+EOF
 
 # Batch operations
-aifed edit main.rs <<EOF
-~ 42:AB "new content"
+aifed edit main.rs <<'EOF'
+= 42:AB "new content"
 + 10:3K "another line"
 - 15:7M
 EOF

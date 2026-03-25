@@ -83,7 +83,7 @@ aifed read test.txt 2
 
 **Steps:**
 ```bash
-aifed read test.txt 1-2
+aifed read test.txt [1,2]
 ```
 
 **Expected:**
@@ -104,7 +104,9 @@ aifed read test.txt 1-2
 ```bash
 aifed read test.txt
 # Capture hash for line 2 (e.g., 3K)
-aifed edit test.txt = 2:3K "modified line2"
+aifed edit test.txt <<'EOF'
+= 2:3K "modified line2"
+EOF
 aifed read test.txt
 ```
 
@@ -127,7 +129,9 @@ aifed read test.txt
 **Steps:**
 ```bash
 # Using stale hash (from original line content)
-aifed edit test.txt = 2:3K "should fail"
+aifed edit test.txt <<'EOF'
+= 2:3K "should fail"
+EOF
 ```
 
 **Expected:**
@@ -155,7 +159,9 @@ Hash mismatch
 ```bash
 aifed read test.txt
 # Insert after line 1 (use its current hash)
-aifed edit test.txt + 1:AB "inserted line"
+aifed edit test.txt <<'EOF'
++ 1:AB "inserted line"
+EOF
 aifed read test.txt
 ```
 
@@ -178,7 +184,9 @@ aifed read test.txt
 
 **Steps:**
 ```bash
-aifed edit test.txt + 0:00 "// header"
+aifed edit test.txt <<'EOF'
++ 0:00 "// header"
+EOF
 aifed read test.txt
 ```
 
@@ -202,7 +210,9 @@ aifed read test.txt
 ```bash
 aifed read test.txt
 # Capture hash for the line to delete
-aifed edit test.txt - 2:AB
+aifed edit test.txt <<'EOF'
+- 2:AB
+EOF
 aifed read test.txt
 ```
 
@@ -225,7 +235,9 @@ aifed read test.txt
 **Steps:**
 ```bash
 aifed read test.txt
-aifed edit test.txt = 1:C8 "new content" --dry-run
+aifed edit test.txt --dry-run <<'EOF'
+= 1:C8 "new content"
+EOF
 aifed read test.txt
 ```
 
@@ -399,21 +411,6 @@ aifed read nonexistent.txt
 ```
 File not found: nonexistent.txt
 ```
-
----
-
-## Invalid Arguments Error
-
-**Goal:** Verify error for missing required arguments.
-
-**Steps:**
-```bash
-aifed edit test.txt =
-```
-
-**Expected:**
-- Command fails
-- Error message indicates missing arguments (from clap)
 
 ---
 

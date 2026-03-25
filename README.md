@@ -87,7 +87,9 @@ aifed lsp refs main.rs 10:AB S1:config
 aifed lsp rename main.rs 10:AB S1:config settings
 
 # Edit line 10 with hashline verification
-aifed edit main.rs = 10:AB "let settings = load_config();"
+aifed edit main.rs <<'EOF'
+= 10:AB "let settings = load_config();"
+EOF
 ```
 
 ### Debugging

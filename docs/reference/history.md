@@ -183,7 +183,9 @@ History is stored in daemon memory with the following characteristics:
 
 ```bash
 # 1. Make edits
-aifed edit main.rs = 42:AB "new code"
+aifed edit main.rs <<'EOF'
+= 42:AB "new code"
+EOF
 
 # 2. Check history
 aifed history main.rs

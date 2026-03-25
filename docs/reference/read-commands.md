@@ -45,7 +45,7 @@ Read commands use simple position specifiers (no hash verification needed since 
 aifed read main.rs
 
 # Read specific line range
-aifed read main.rs 10-20
+aifed read main.rs [10,20]
 
 # Read specific line with context
 aifed read main.rs 15 --context 5
@@ -60,7 +60,7 @@ aifed read main.rs --json
 ### Large File Handling
 
 For large files (>10,000 lines), consider:
-- Using `START-END` to read specific sections
+- Using `[START,END]` to read specific sections
 - Using `--context` to focus on relevant areas
 
 ## When to Use
