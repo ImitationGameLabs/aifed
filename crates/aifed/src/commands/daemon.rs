@@ -3,18 +3,41 @@
 use crate::args::DaemonCommands;
 use crate::error::{Error, Result};
 use crate::output::OutputFormat;
+use aifed_common::{log_path, workspace::Workspace};
 use aifed_daemon_client::DaemonClient;
 use time::format_description;
 
 pub async fn execute(
     cmd: &DaemonCommands,
-    client: &DaemonClient,
+    workspace: &Workspace,
     format: OutputFormat,
 ) -> Result<()> {
+    let socket_path = workspace.socket_path()?;
+    let client = DaemonClient::new(&socket_path);
+
     match cmd {
         DaemonCommands::Status => {
             if !client.is_running().await {
-                println!("Daemon not running");
+                match format {
+                    OutputFormat::Text => {
+                        println!("Daemon not running");
+                        println!();
+                        println!("Workspace: {}", workspace.root().display());
+                        if let Ok(log) = log_path(workspace.root()) {
+                            println!("Log: {}", log.display());
+                        }
+                    }
+                    OutputFormat::Json => {
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "status": "not_running",
+                                "workspace": workspace.root().display().to_string(),
+                                "log_path": log_path(workspace.root()).ok().map(|p| p.display().to_string())
+                            })
+                        );
+                    }
+                }
                 return Ok(());
             }
 

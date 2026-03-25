@@ -9,13 +9,37 @@ mod locator;
 mod output;
 mod text_edit;
 
-use crate::args::{Args, Commands};
+use crate::args::{Args, Commands, DaemonCommands};
 use crate::error::{Error, Result};
 use crate::output::{OutputFormat, format_error};
 use aifed_common::workspace::{Workspace, detect_workspace};
 use aifed_daemon_client::DaemonClient;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+
+/// Daemon requirement level for different commands
+enum DaemonRequirement {
+    /// Must have daemon, error if unavailable
+    Required,
+    /// Best effort - warning + degraded mode if unavailable
+    Optional,
+    /// No daemon needed
+    None,
+}
+
+fn daemon_requirement(cmd: &Commands) -> DaemonRequirement {
+    match cmd {
+        Commands::Info { .. } => DaemonRequirement::None,
+        Commands::Daemon(daemon_cmd) => match daemon_cmd {
+            DaemonCommands::Status | DaemonCommands::Stop { .. } => DaemonRequirement::None,
+        },
+        Commands::Read { .. } | Commands::Edit { .. } => DaemonRequirement::Optional,
+        Commands::Lsp { .. }
+        | Commands::History { .. }
+        | Commands::Undo { .. }
+        | Commands::Redo { .. } => DaemonRequirement::Required,
+    }
+}
 
 #[tokio::main]
 async fn main() {
@@ -38,12 +62,17 @@ async fn main() {
 }
 
 async fn run(args: Args, format: OutputFormat) -> Result<()> {
-    // Try to detect workspace and ensure daemon is running
+    // Try to detect workspace and ensure daemon is running based on command requirements
     let cwd = std::env::current_dir()
         .map_err(|e| Error::InvalidIo { path: PathBuf::from("."), source: e })?;
     let workspace = detect_workspace(&cwd);
+
     let daemon_client = match &workspace {
-        Some(ws) => ensure_daemon(ws).await,
+        Some(ws) => match daemon_requirement(&args.command) {
+            DaemonRequirement::None => None,
+            DaemonRequirement::Optional => ensure_daemon_optional(ws).await,
+            DaemonRequirement::Required => ensure_daemon(ws).await,
+        },
         None => None,
     };
 
@@ -77,9 +106,7 @@ async fn run(args: Args, format: OutputFormat) -> Result<()> {
         // Commands that require workspace
         Commands::Daemon(cmd) => {
             let ws = workspace.ok_or(Error::LightweightMode)?;
-            let client = daemon_client
-                .ok_or_else(|| Error::DaemonNotRunning { workspace: ws.root().to_path_buf() })?;
-            commands::daemon(&cmd, &client, format).await
+            commands::daemon(&cmd, &ws, format).await
         }
         Commands::Lsp(cmd) => {
             let ws = workspace.ok_or(Error::LightweightMode)?;
@@ -109,7 +136,8 @@ async fn run(args: Args, format: OutputFormat) -> Result<()> {
 }
 
 /// Ensure daemon is running for workspace, starting it if necessary.
-/// Returns a DaemonClient on success, or prints a warning and returns None on failure.
+/// Returns a DaemonClient on success, or None on failure (for Required commands,
+/// the caller should error out if this returns None).
 async fn ensure_daemon(workspace: &Workspace) -> Option<DaemonClient> {
     let socket_path = match workspace.socket_path() {
         Ok(p) => p,
@@ -132,7 +160,10 @@ async fn ensure_daemon(workspace: &Workspace) -> Option<DaemonClient> {
         Ok(()) => {
             // Wait for daemon to be ready
             match wait_for_daemon(&client, Duration::from_secs(5)).await {
-                Ok(()) => Some(client),
+                Ok(()) => {
+                    let _ = client.heartbeat().await;
+                    Some(client)
+                }
                 Err(e) => {
                     eprintln!("Warning: daemon did not start in time: {}", e);
                     None
@@ -144,6 +175,51 @@ async fn ensure_daemon(workspace: &Workspace) -> Option<DaemonClient> {
             None
         }
     }
+}
+
+/// Try to start daemon, print warning and return None on failure.
+/// For Optional commands that can work without daemon.
+async fn ensure_daemon_optional(workspace: &Workspace) -> Option<DaemonClient> {
+    let socket_path = match workspace.socket_path() {
+        Ok(p) => p,
+        Err(_) => {
+            print_daemon_unavailable_warning();
+            return None;
+        }
+    };
+
+    let client = DaemonClient::new(&socket_path);
+
+    // Already running? Send heartbeat to keep it alive
+    if client.is_running().await {
+        let _ = client.heartbeat().await;
+        return Some(client);
+    }
+
+    // Try to start daemon
+    match spawn_daemon(workspace, &socket_path) {
+        Ok(()) => match wait_for_daemon(&client, Duration::from_secs(5)).await {
+            Ok(()) => {
+                let _ = client.heartbeat().await;
+                Some(client)
+            }
+            Err(_) => {
+                print_daemon_unavailable_warning();
+                None
+            }
+        },
+        Err(_) => {
+            print_daemon_unavailable_warning();
+            None
+        }
+    }
+}
+
+fn print_daemon_unavailable_warning() {
+    eprintln!("Warning: daemon unavailable. The following features are disabled:");
+    eprintln!("  - Edit history tracking (undo/redo)");
+    eprintln!("  - Concurrent modification detection");
+    eprintln!("File operations will proceed without these protections.");
 }
 
 /// Spawn daemon process for the given workspace.
