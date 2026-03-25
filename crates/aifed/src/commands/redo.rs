@@ -39,12 +39,11 @@ pub async fn execute(
         }
 
         // Apply the diffs
-        let original_had_trailing_newline = file_content.ends_with('\n');
-        let mut lines: Vec<String> = file_content.lines().map(|s| s.to_string()).collect();
+        let mut lines = crate::file::split_lines_owned(&file_content);
         apply_diffs(&mut lines, &response.diffs);
 
         // Write file back
-        crate::file::write_file(file, &lines, original_had_trailing_newline)?;
+        crate::file::write_file(file, &lines)?;
 
         // Update daemon with new file hash via record_access
         let _ = client.record_access(&file_str).await;

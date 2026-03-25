@@ -15,7 +15,9 @@ use aifed_common::{Position, Range, TextEdit};
 /// Note: This implementation assumes ASCII content for simplicity.
 /// For proper UTF-16 handling, use unicode-segmentation crate.
 fn position_to_byte_offset(content: &str, pos: &Position) -> usize {
-    let lines: Vec<&str> = content.lines().collect();
+    // Use split('\n') to preserve \r at line endings for CRLF files.
+    // This ensures byte offset calculation is correct for files with \r\n line endings.
+    let lines = crate::file::split_lines(content);
     let mut offset = 0;
 
     // Accumulate byte length of all preceding lines (including newline)
@@ -94,7 +96,8 @@ fn extract_range_content(content: &str, range: &Range) -> Result<String> {
     }
 
     // Validate that character offsets are within their respective lines
-    let lines: Vec<&str> = content.lines().collect();
+    // Use split('\n') to preserve \r at line endings for CRLF files
+    let lines = crate::file::split_lines(content);
     if let Some(line) = lines.get(range.start.line as usize) {
         let char_count = line.chars().count();
         if range.start.character as usize > char_count {

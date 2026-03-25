@@ -18,6 +18,46 @@ LINE:HASH|CONTENT
 - CONTENT: the actual line text
   Example: "42:3K|fn main() {"
 
+## LINE SPLITTING SEMANTICS
+
+**For most files (LF line endings, standard trailing newline): you don't need to worry about this section.**
+
+aifed preserves exact file content by splitting on `\n` only:
+
+```
+File content     →  Lines after split
+"a\nb\nc\n"      →  ["a", "b", "c", ""]     # trailing "" = file ends with \n
+"a\nb\nc"        →  ["a", "b", "c"]         # no trailing "" = file ends without \n
+```
+
+### CRLF Files (Windows line endings)
+
+If you see `\r` at line endings in JSON output, the file uses CRLF:
+
+```json
+{"line": 1, "content": "line1\r"}  ← CRLF file
+```
+
+**Key rule**: Replace with identical ending to preserve, or change to control:
+
+```
+Original:  1:XX "line1\r"     (CRLF)
+
+= 1:XX "modified\r"            → keeps CRLF  (recommended for CRLF files)
+= 1:XX "modified"              → converts to LF
+```
+
+### Trailing Newline Control
+
+The last empty line `{"content": ""}` represents the trailing newline:
+
+- File has trailing newline: `{"line": 3, "content": ""}` exists
+- File lacks trailing newline: no empty line at end
+
+To change trailing newline status:
+- Remove: `- LAST:HASH` (delete the empty line)
+- Add: `+ SECOND_LAST:HASH ""` (insert empty line after last content line)
+
 ## EDIT OPERATORS
 
 =   Replace line at locator

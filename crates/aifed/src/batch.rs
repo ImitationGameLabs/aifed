@@ -479,20 +479,9 @@ pub async fn execute_batch(
     // Compute hash before edit
     let expected_hash = hash_file(file_content.as_bytes());
 
-    let original_had_trailing_newline = file_content.ends_with('\n');
-    let lines: Vec<String> = file_content.lines().map(|s| s.to_string()).collect();
+    let lines = crate::file::split_lines_owned(&file_content);
 
-    execute_atomic(
-        path,
-        &lines,
-        operations,
-        dry_run,
-        format,
-        original_had_trailing_newline,
-        daemon_client,
-        &expected_hash,
-    )
-    .await
+    execute_atomic(path, &lines, operations, dry_run, format, daemon_client, &expected_hash).await
 }
 
 /// Execute in atomic mode: validate all, build edit plan, then apply all
@@ -503,7 +492,6 @@ async fn execute_atomic(
     operations: Vec<EditOp>,
     dry_run: bool,
     format: OutputFormat,
-    trailing_newline: bool,
     daemon_client: Option<&DaemonClient>,
     expected_hash: &str,
 ) -> Result<()> {
@@ -591,15 +579,12 @@ async fn execute_atomic(
 
     // Phase 3: Write file
     if !dry_run {
-        write_file(path, &new_lines, trailing_newline)?;
+        write_file(path, &new_lines)?;
 
         // Record edit with daemon (for history tracking)
         if let Some(client) = daemon_client {
             // Compute new hash after edit (must match what write_file writes to disk)
-            let mut new_content = new_lines.join("\n");
-            if trailing_newline {
-                new_content.push('\n');
-            }
+            let new_content = new_lines.join("\n");
             let new_hash = crate::hash::hash_file(new_content.as_bytes());
 
             // Convert changes to LineDiffDto
@@ -749,15 +734,16 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.txt");
 
-        // Test WITH trailing newline
-        let lines: Vec<String> = ["line1", "line2"].into_iter().map(String::from).collect();
-        write_file(&path, &lines, true).unwrap();
+        // Test WITH trailing newline (trailing empty string indicates newline)
+        let lines: Vec<String> = ["line1", "line2", ""].into_iter().map(String::from).collect();
+        write_file(&path, &lines).unwrap();
         let mut content = String::new();
         std::fs::File::open(&path).unwrap().read_to_string(&mut content).unwrap();
         assert_eq!(content, "line1\nline2\n");
 
-        // Test WITHOUT trailing newline
-        write_file(&path, &lines, false).unwrap();
+        // Test WITHOUT trailing newline (no trailing empty string)
+        let lines: Vec<String> = ["line1", "line2"].into_iter().map(String::from).collect();
+        write_file(&path, &lines).unwrap();
         let mut content = String::new();
         std::fs::File::open(&path).unwrap().read_to_string(&mut content).unwrap();
         assert_eq!(content, "line1\nline2");
@@ -771,13 +757,13 @@ mod tests {
         let path = dir.path().join("test.txt");
 
         // Multiple trailing newlines are represented as empty strings in lines
+        // ["line1", "line2", "", ""] -> "line1\nline2\n\n"
         let lines: Vec<String> = ["line1", "line2", "", ""].into_iter().map(String::from).collect();
-        write_file(&path, &lines, true).unwrap();
+        write_file(&path, &lines).unwrap();
 
         let mut content = String::new();
         std::fs::File::open(&path).unwrap().read_to_string(&mut content).unwrap();
-        // line1\n + line2\n + \n + \n + trailing\n = line1\nline2\n\n\n
-        assert_eq!(content, "line1\nline2\n\n\n");
+        assert_eq!(content, "line1\nline2\n\n");
     }
 
     #[test]
@@ -906,13 +892,13 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.txt");
 
-        // Create a 1-line file
-        let lines: Vec<String> = ["start"].into_iter().map(String::from).collect();
-        write_file(&path, &lines, true).unwrap();
+        // Create a 1-line file with trailing newline
+        let lines: Vec<String> = ["start", ""].into_iter().map(String::from).collect();
+        write_file(&path, &lines).unwrap();
 
         // Read file content and hash
         let content = std::fs::read_to_string(&path).unwrap();
-        let file_lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+        let file_lines = crate::file::split_lines_owned(&content);
         let hash = crate::hash::hash_line(&file_lines[0]);
 
         // Parse insert operations at the same position (line 1)
@@ -926,7 +912,7 @@ mod tests {
 
         execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
 
-        // Verify result: start, a, b, c (in that order)
+        // Verify result: start, a, b, c (in that order) with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
         assert_eq!(result, "start\na\nb\nc\n");
     }
@@ -937,13 +923,14 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.txt");
 
-        // Create a 5-line file
-        let lines: Vec<String> = ["1", "2", "3", "4", "5"].into_iter().map(String::from).collect();
-        write_file(&path, &lines, true).unwrap();
+        // Create a 5-line file with trailing newline
+        let lines: Vec<String> =
+            ["1", "2", "3", "4", "5", ""].into_iter().map(String::from).collect();
+        write_file(&path, &lines).unwrap();
 
         // Read file content and get hashes
         let content = std::fs::read_to_string(&path).unwrap();
-        let file_lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+        let file_lines = crate::file::split_lines_owned(&content);
         let hash2 = crate::hash::hash_line(&file_lines[1]);
         let hash4 = crate::hash::hash_line(&file_lines[3]);
 
@@ -957,7 +944,7 @@ mod tests {
 
         execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
 
-        // Verify result: 1, 3, 5
+        // Verify result: 1, 3, 5 with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
         assert_eq!(result, "1\n3\n5\n");
     }
@@ -968,14 +955,14 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.txt");
 
-        // Create a file
+        // Create a file with trailing newline
         let lines: Vec<String> =
-            ["L1", "L2", "L3", "L4", "L5"].into_iter().map(String::from).collect();
-        write_file(&path, &lines, true).unwrap();
+            ["L1", "L2", "L3", "L4", "L5", ""].into_iter().map(String::from).collect();
+        write_file(&path, &lines).unwrap();
 
         // Read file content and get hashes
         let content = std::fs::read_to_string(&path).unwrap();
-        let file_lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+        let file_lines = crate::file::split_lines_owned(&content);
         let hash1 = crate::hash::hash_line(&file_lines[0]);
         let hash2 = crate::hash::hash_line(&file_lines[1]);
         let hash3 = crate::hash::hash_line(&file_lines[2]);
@@ -992,7 +979,7 @@ mod tests {
 
         execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
 
-        // Verify result: L1, A, NEW3, L4, L5
+        // Verify result: L1, A, NEW3, L4, L5 with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
         assert_eq!(result, "L1\nA\nNEW3\nL4\nL5\n");
     }
@@ -1004,13 +991,14 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.txt");
 
-        // Create a 4-line file
-        let lines: Vec<String> = ["L1", "L2", "L3", "L4"].into_iter().map(String::from).collect();
-        write_file(&path, &lines, true).unwrap();
+        // Create a 4-line file with trailing newline
+        let lines: Vec<String> =
+            ["L1", "L2", "L3", "L4", ""].into_iter().map(String::from).collect();
+        write_file(&path, &lines).unwrap();
 
         // Read file content and get hashes
         let content = std::fs::read_to_string(&path).unwrap();
-        let file_lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+        let file_lines = crate::file::split_lines_owned(&content);
         let hash2 = crate::hash::hash_line(&file_lines[1]);
         let hash3 = crate::hash::hash_line(&file_lines[2]);
 
@@ -1024,7 +1012,7 @@ mod tests {
 
         execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
 
-        // Verify result: L1, NEW3, L4
+        // Verify result: L1, NEW3, L4 with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
         assert_eq!(result, "L1\nNEW3\nL4\n");
     }
@@ -1117,13 +1105,14 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.txt");
 
-        // Create a 10-line file
-        let lines: Vec<String> = (1..=10).map(|i| format!("L{}", i)).collect();
-        write_file(&path, &lines, true).unwrap();
+        // Create a 10-line file with trailing newline
+        let mut lines: Vec<String> = (1..=10).map(|i| format!("L{}", i)).collect();
+        lines.push("".to_string()); // trailing newline
+        write_file(&path, &lines).unwrap();
 
         // Read file content and get hashes
         let content = std::fs::read_to_string(&path).unwrap();
-        let file_lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+        let file_lines = crate::file::split_lines_owned(&content);
         let hash2 = crate::hash::hash_line(&file_lines[1]); // line 2 (0-indexed)
         let hash9 = crate::hash::hash_line(&file_lines[8]); // line 9 (0-indexed)
 
@@ -1133,7 +1122,7 @@ mod tests {
 
         execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
 
-        // Verify result: L1, L10
+        // Verify result: L1, L10 with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
         assert_eq!(result, "L1\nL10\n");
     }
@@ -1144,11 +1133,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.txt");
 
-        let lines: Vec<String> = (1..=5).map(|i| format!("L{}", i)).collect();
-        write_file(&path, &lines, true).unwrap();
+        let mut lines: Vec<String> = (1..=5).map(|i| format!("L{}", i)).collect();
+        lines.push("".to_string()); // trailing newline
+        write_file(&path, &lines).unwrap();
 
         let content = std::fs::read_to_string(&path).unwrap();
-        let file_lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
+        let file_lines = crate::file::split_lines_owned(&content);
         let hash3 = crate::hash::hash_line(&file_lines[2]); // line 3 (0-indexed)
 
         let input = format!("- [3:{hash3},3:{hash3}]");
@@ -1156,7 +1146,7 @@ mod tests {
 
         execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
 
-        // Verify result: L1, L2, L4, L5
+        // Verify result: L1, L2, L4, L5 with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
         assert_eq!(result, "L1\nL2\nL4\nL5\n");
     }
@@ -1167,8 +1157,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.txt");
 
-        let lines: Vec<String> = (1..=10).map(|i| format!("L{}", i)).collect();
-        write_file(&path, &lines, true).unwrap();
+        let mut lines: Vec<String> = (1..=10).map(|i| format!("L{}", i)).collect();
+        lines.push("".to_string()); // trailing newline
+        write_file(&path, &lines).unwrap();
 
         // Use wrong hash (VV is valid format but wrong value)
         let input = "- [2:VV,9:VV]";

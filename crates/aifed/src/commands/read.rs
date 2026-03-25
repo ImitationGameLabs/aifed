@@ -32,7 +32,7 @@ pub async fn execute(
         let _ = client.record_access(&file_str).await;
     }
 
-    let lines: Vec<&str> = content.lines().collect();
+    let lines = crate::file::split_lines(&content);
 
     // Determine which lines to show
     let (start, end) = if let Some(loc_str) = locator_str {

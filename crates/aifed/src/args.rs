@@ -11,7 +11,8 @@ use std::path::PathBuf;
 /// AI-First Editor - A text editor designed for AI agents
 ///
 /// Uses hashlines for deterministic, verifiable edits.
-/// Run `aifed --skill` for detailed usage guide.
+///
+/// IMPORTANT: Run `aifed --skill` before any read/write operations.
 #[derive(Parser, Debug)]
 #[command(
     name = "aifed",

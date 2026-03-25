@@ -338,7 +338,7 @@ pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFor
                     let expected_hash = hash_file(content.as_bytes());
 
                     // Parse original lines for diff computation
-                    let original_lines: Vec<&str> = content.lines().collect();
+                    let original_lines = crate::file::split_lines(&content);
 
                     // Validate and apply (validates all ranges first, then applies)
                     let new_content =
@@ -348,7 +348,7 @@ pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFor
                     let new_hash = hash_file(new_content.as_bytes());
 
                     // Parse new lines for diff computation
-                    let new_lines: Vec<&str> = new_content.lines().collect();
+                    let new_lines = crate::file::split_lines(&new_content);
 
                     // Convert TextEdits to LineDiffDto
                     let diffs = compute_rename_diffs(&original_lines, &new_lines, &file_edit.edits);
