@@ -4,6 +4,7 @@ use crate::args::DaemonCommands;
 use crate::error::{Error, Result};
 use crate::output::OutputFormat;
 use aifed_daemon_client::DaemonClient;
+use time::format_description;
 
 pub async fn execute(
     cmd: &DaemonCommands,
@@ -23,8 +24,30 @@ pub async fn execute(
                         println!("Workspace: {}", status.workspace);
                         println!("Uptime: {}s", status.uptime_secs);
                         println!("Servers:");
+                        let local_offset =
+                            time::UtcOffset::current_local_offset().unwrap_or(time::UtcOffset::UTC);
                         for server in &status.servers {
-                            println!("  - {}: {:?}", server.language, server.state);
+                            let local_time = server.state.at().to_offset(local_offset);
+                            let formatted = local_time
+                                .format(
+                                    &format_description::parse(
+                                        "[year]-[month]-[day] [hour]:[minute]:[second]",
+                                    )
+                                    .unwrap(),
+                                )
+                                .unwrap();
+                            let status_line = match server.state.reason() {
+                                Some(reason) => {
+                                    format!(
+                                        "{} ({}) - {}",
+                                        server.state.status_str(),
+                                        formatted,
+                                        reason
+                                    )
+                                }
+                                None => format!("{} ({})", server.state.status_str(), formatted),
+                            };
+                            println!("  - {}: {}", server.language, status_line);
                         }
                         println!();
                         println!("Daemon Env:");
@@ -56,12 +79,17 @@ pub async fn execute(
                             eprintln!("Failed to stop {}: {}", server.language, e);
                         }
                     }
-                    println!("Daemon stopped");
                 }
                 Err(e) => {
                     return Err(Error::ClientError(e));
                 }
             }
+
+            // Shutdown daemon
+            if let Err(e) = client.shutdown().await {
+                return Err(Error::ClientError(e));
+            }
+            println!("Daemon stopped");
             Ok(())
         }
     }

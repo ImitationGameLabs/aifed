@@ -12,6 +12,7 @@ pub fn build_router(state: DaemonState) -> Router {
         .route("/api/v1/health", get(handlers::health))
         .route("/api/v1/heartbeat", post(handlers::heartbeat))
         .route("/api/v1/status", get(handlers::status))
+        .route("/api/v1/shutdown", post(handlers::shutdown))
         // LSP server management
         .route("/api/v1/lsp/servers", get(handlers::list_servers))
         .route("/api/v1/lsp/servers/start", post(handlers::start_server))

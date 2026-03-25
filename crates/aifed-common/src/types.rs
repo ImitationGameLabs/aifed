@@ -105,6 +105,31 @@ impl ServerState {
     pub fn failed(reason: impl Into<String>) -> Self {
         Self::Failed { at: OffsetDateTime::now_utc(), reason: reason.into() }
     }
+
+    pub fn status_str(&self) -> &'static str {
+        match self {
+            ServerState::Starting { .. } => "starting",
+            ServerState::Running { .. } => "running",
+            ServerState::Stopped { .. } => "stopped",
+            ServerState::Failed { .. } => "failed",
+        }
+    }
+
+    pub fn at(&self) -> &OffsetDateTime {
+        match self {
+            ServerState::Starting { at } => at,
+            ServerState::Running { at } => at,
+            ServerState::Stopped { at } => at,
+            ServerState::Failed { at, .. } => at,
+        }
+    }
+
+    pub fn reason(&self) -> Option<&str> {
+        match self {
+            ServerState::Failed { reason, .. } => Some(reason),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

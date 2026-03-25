@@ -61,3 +61,8 @@ pub async fn list_servers(State(state): State<DaemonState>) -> impl IntoResponse
 
     Json(ApiResponse::success(ServersResponse { servers }))
 }
+
+pub async fn shutdown(State(state): State<DaemonState>) -> impl IntoResponse {
+    state.idle_monitor.trigger_shutdown();
+    Json(ApiResponse::success(HealthResponse { status: "ok".into() }))
+}

@@ -40,6 +40,12 @@ impl IdleMonitor {
         self.shutdown_tx.subscribe()
     }
 
+    /// Trigger daemon shutdown programmatically.
+    pub fn trigger_shutdown(&self) {
+        tracing::info!("Shutdown triggered via API");
+        let _ = self.shutdown_tx.send(());
+    }
+
     /// Start the background idle monitoring task.
     pub fn start_monitor(self: Arc<Self>) {
         tokio::spawn(async move {

@@ -61,6 +61,11 @@ impl DaemonClient {
         self.get("/api/v1/status").await
     }
 
+    /// Shutdown the daemon
+    pub async fn shutdown(&self) -> Result<HealthResponse, ClientError> {
+        self.post_empty("/api/v1/shutdown").await
+    }
+
     /// List all servers
     pub async fn list_servers(&self) -> Result<ServersResponse, ClientError> {
         self.get("/api/v1/lsp/servers").await
