@@ -331,8 +331,7 @@ pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFor
                 // Apply mode: validate all ranges, then apply edits
                 for file_edit in &response.changes {
                     let path = PathBuf::from(&file_edit.file_path);
-                    let content = std::fs::read_to_string(&path)
-                        .map_err(|e| Error::InvalidIo { path: path.clone(), source: e })?;
+                    let content = crate::file::read_text_file(&path)?;
 
                     // Compute hash before edit
                     let expected_hash = hash_file(content.as_bytes());

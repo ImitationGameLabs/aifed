@@ -22,13 +22,11 @@ pub async fn execute(
     let response = client.undo(&file_str, dry_run).await.map_err(Error::ClientError)?;
 
     if !dry_run && !response.diffs.is_empty() {
-        // Read current file (as raw bytes for hash verification)
-        let file_bytes = std::fs::read(file)
-            .map_err(|e| Error::InvalidIo { path: file.to_path_buf(), source: e })?;
+        let file_content = crate::file::read_text_file(file)?;
 
         // Verify hash if daemon provided one
         if !response.current_hash.is_empty() {
-            let actual_hash = hash_file(&file_bytes);
+            let actual_hash = hash_file(file_content.as_bytes());
             if actual_hash != response.current_hash {
                 return Err(Error::FileHashMismatch {
                     path: file.to_path_buf(),
@@ -37,10 +35,6 @@ pub async fn execute(
                 });
             }
         }
-
-        // Convert to string for processing
-        let file_content = String::from_utf8(file_bytes.clone())
-            .map_err(|e| Error::InvalidEncoding { path: file.to_path_buf(), source: e })?;
 
         // Apply the diffs
         let mut lines = crate::file::split_lines_owned(&file_content);

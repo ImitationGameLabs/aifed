@@ -40,6 +40,9 @@ pub enum Error {
     #[error("Invalid UTF-8 encoding in '{path}': {source}")]
     InvalidEncoding { path: PathBuf, source: std::string::FromUtf8Error },
 
+    #[error("editing non-text files is not supported: {path}")]
+    BinaryFile { path: PathBuf },
+
     #[error("Batch parse error on line {line_number}: '{line_content}'\n  Reason: {reason}")]
     InvalidBatchOp { line_number: usize, line_content: String, reason: String },
 

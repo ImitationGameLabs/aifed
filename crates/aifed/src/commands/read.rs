@@ -19,8 +19,7 @@ pub async fn execute(
         return Err(Error::FileNotFound { path: path.to_path_buf() });
     }
 
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })?;
+    let content = crate::file::read_text_file(path)?;
 
     // Record access with daemon (for history tracking)
     // Use canonical path to ensure consistency

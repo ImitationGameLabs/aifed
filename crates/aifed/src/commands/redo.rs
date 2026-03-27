@@ -23,8 +23,7 @@ pub async fn execute(
 
     if !dry_run && !response.diffs.is_empty() {
         // Read current file
-        let file_content = std::fs::read_to_string(file)
-            .map_err(|e| Error::InvalidIo { path: file.to_path_buf(), source: e })?;
+        let file_content = crate::file::read_text_file(file)?;
 
         // Verify hash if daemon provided one
         if !response.current_hash.is_empty() {

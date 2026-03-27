@@ -473,8 +473,7 @@ pub async fn execute_batch(
         return Ok(());
     }
 
-    let file_content = std::fs::read_to_string(path)
-        .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })?;
+    let file_content = crate::file::read_text_file(path)?;
 
     // Compute hash before edit
     let expected_hash = hash_file(file_content.as_bytes());

@@ -4,6 +4,20 @@ use std::path::Path;
 
 use crate::error::{Error, Result};
 
+/// Read a text file, rejecting binary files.
+pub fn read_text_file(path: &Path) -> Result<String> {
+    let bytes = std::fs::read(path)
+        .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })?;
+
+    if content_inspector::inspect(&bytes).is_binary() {
+        let abs_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        return Err(Error::BinaryFile { path: abs_path });
+    }
+
+    String::from_utf8(bytes)
+        .map_err(|e| Error::InvalidEncoding { path: path.to_path_buf(), source: e })
+}
+
 // =============================================================================
 // CRLF / Line Ending Handling
 // =============================================================================
@@ -96,4 +110,81 @@ pub fn write_file(path: &Path, lines: &[String]) -> Result<()> {
     std::fs::write(path, content)
         .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_read_text_file_plain_text() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.txt");
+        std::fs::write(&path, "hello\nworld\n").unwrap();
+
+        let content = read_text_file(&path).unwrap();
+        assert_eq!(content, "hello\nworld\n");
+    }
+
+    #[test]
+    fn test_read_text_file_binary_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("binary.bin");
+        // Write null bytes — content_inspector detects this as binary
+        std::fs::write(&path, b"\x00\x01\x02\x03").unwrap();
+
+        let result = read_text_file(&path);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("editing non-text files is not supported"));
+    }
+
+    #[test]
+    fn test_read_text_file_error_contains_absolute_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("binary.bin");
+        std::fs::write(&path, b"\x00\x00").unwrap();
+
+        let result = read_text_file(&path);
+        assert!(result.is_err());
+        if let Error::BinaryFile { path: abs_path } = result.unwrap_err() {
+            assert!(abs_path.is_absolute());
+        } else {
+            panic!("Expected BinaryFile error variant");
+        }
+    }
+
+    #[test]
+    fn test_read_text_file_empty_file_is_text() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("empty.txt");
+        std::fs::write(&path, "").unwrap();
+
+        let content = read_text_file(&path).unwrap();
+        assert_eq!(content, "");
+    }
+
+    #[test]
+    fn test_read_text_file_nonexistent() {
+        let path = Path::new("/tmp/this_file_absolutely_does_not_exist_aifed_test.txt");
+        let result = read_text_file(path);
+        assert!(result.is_err());
+        // Should be IO error, not BinaryFile
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("IO error"));
+    }
+
+    #[test]
+    fn test_read_text_file_invalid_utf8() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("invalid_utf8.txt");
+        // Write bytes that are valid text according to content_inspector but invalid UTF-8
+        // 0xC3 0x28 is an invalid UTF-8 sequence (lone high byte followed by '(')
+        std::fs::write(&path, b"hello \xc3\x28 world").unwrap();
+
+        let result = read_text_file(&path);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("Invalid UTF-8"));
+    }
 }
