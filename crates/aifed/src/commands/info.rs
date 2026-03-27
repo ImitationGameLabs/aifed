@@ -6,7 +6,10 @@ use crate::output::{FileInfo, OutputFormat, format_file_info};
 /// Execute the info command
 pub fn execute(path: &Path, format: OutputFormat) -> Result<()> {
     if !path.exists() {
-        return Err(Error::FileNotFound { path: path.to_path_buf() });
+        return Err(Error::FileNotFound {
+            path: crate::file::to_absolute(path),
+            cwd: std::env::current_dir().unwrap_or_default(),
+        });
     }
 
     let metadata = std::fs::metadata(path)

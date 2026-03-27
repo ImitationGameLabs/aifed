@@ -14,7 +14,10 @@ pub async fn execute(
     daemon_client: Option<&DaemonClient>,
 ) -> Result<()> {
     if !path.exists() {
-        return Err(Error::FileNotFound { path: path.to_path_buf() });
+        return Err(Error::FileNotFound {
+            path: crate::file::to_absolute(path),
+            cwd: std::env::current_dir().unwrap_or_default(),
+        });
     }
 
     // Read operations from stdin

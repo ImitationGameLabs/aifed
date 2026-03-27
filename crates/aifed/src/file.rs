@@ -1,6 +1,6 @@
 //! File I/O utilities for aifed.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::error::{Error, Result};
 
@@ -79,6 +79,17 @@ pub fn read_text_file(path: &Path) -> Result<String> {
 //
 // - Detect TTY output and escape control characters for terminal display
 // - Add `--escape` flag for explicit control character escaping
+
+/// Convert a path to absolute using the current working directory.
+///
+/// Unlike `canonicalize()`, this does not require the path to exist.
+pub fn to_absolute(path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir().unwrap_or_default().join(path)
+    }
+}
 
 /// Split content by `\n`, preserving `\r` at line endings and trailing empty string.
 ///

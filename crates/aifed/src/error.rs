@@ -5,8 +5,8 @@ use aifed_common::Position;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("File not found: {path}")]
-    FileNotFound { path: PathBuf },
+    #[error("File not found: {path}\n  Working directory: {cwd}")]
+    FileNotFound { path: PathBuf, cwd: PathBuf },
 
     #[error(
         "Hash mismatch\n\
