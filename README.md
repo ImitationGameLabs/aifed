@@ -24,6 +24,7 @@ Core features are implemented and available for experimental use in real scenari
 | `edit` - Edit file with hashline verification   | Ready  |
 | `lsp` - LSP integration (Rust first)            | Ready  |
 | `history/undo/redo` - Edit history and recovery | Ready  |
+| `copy/paste/clipboard` - Clipboard operations   | Ready  |
 
 **Current focus:** Optimizing the AI agent experience through real-world usage. Testing and refining the workflow in actual coding tasks.
 

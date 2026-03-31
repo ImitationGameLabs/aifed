@@ -4,16 +4,17 @@ This directory contains reference documentation for all **aifed** commands and c
 
 ## Quick Navigation
 
-| Category                | Description                           | Reference                            | Status      |
-| ----------------------- | ------------------------------------- | ------------------------------------ | ----------- |
-| **CLI Overview**        | Global options, workspace detection   | [cli-overview.md](cli-overview.md)   | Implemented |
-| **Locator**             | Positioning mechanism for safe edits  | [locator.md](locator.md)             | Implemented |
-| **Edit Commands**       | Unified edit with =, +, - operators   | [edit-commands.md](edit-commands.md) | Implemented |
-| **Read Commands**       | info, read                            | [read-commands.md](read-commands.md) | Implemented |
-| **LSP Integration**     | diag, symbols, rename, etc.           | [lsp.md](lsp.md)                     | Implemented |
-| **History & Recovery**  | history, undo, redo                   | [history.md](history.md)             | Implemented |
-| **Configuration**       | config command and file format        | [configuration.md](configuration.md) | Planned     |
-| **Utilities**           | diff, format                          | [utilities.md](utilities.md)         | Planned     |
+| Category               | Description                          | Reference                            | Status      |
+| ---------------------- | ------------------------------------ | ------------------------------------ | ----------- |
+| **CLI Overview**       | Global options, workspace detection  | [cli-overview.md](cli-overview.md)   | Implemented |
+| **Locator**            | Positioning mechanism for safe edits | [locator.md](locator.md)             | Implemented |
+| **Edit Commands**      | Unified edit with =, +, - operators  | [edit-commands.md](edit-commands.md) | Implemented |
+| **Read Commands**      | info, read                           | [read-commands.md](read-commands.md) | Implemented |
+| **LSP Integration**    | diag, symbols, rename, etc.          | [lsp.md](lsp.md)                     | Implemented |
+| **History & Recovery** | history, undo, redo                  | [history.md](history.md)             | Implemented |
+| **Clipboard**          | copy, paste, clipboard               | [clipboard.md](clipboard.md)         | Implemented |
+| **Configuration**      | config command and file format       | [configuration.md](configuration.md) | Planned     |
+| **Utilities**          | diff, format                         | [utilities.md](utilities.md)         | Planned     |
 
 ## Command Categories
 
@@ -37,6 +38,11 @@ This directory contains reference documentation for all **aifed** commands and c
 - [`history`](history.md#history) - View edit history
 - [`undo`](history.md#undo) - Undo recent edits
 - [`redo`](history.md#redo) - Redo undone edits
+
+### Clipboard *(Implemented)*
+- [`copy`](clipboard.md#copy) - Copy lines to clipboard
+- [`paste`](clipboard.md#paste) - Paste clipboard content to file
+- [`clipboard`](clipboard.md#clipboard) - Show clipboard content
 
 ### Configuration *(Planned)*
 - [`config`](configuration.md#config) - Manage configuration
