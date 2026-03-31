@@ -26,7 +26,7 @@ use std::fs::File;
 use std::io;
 use std::os::fd::AsRawFd;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use tokio::net::UnixListener;
 use tracing::Level;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
@@ -264,6 +264,7 @@ async fn main() -> anyhow::Result<()> {
         lsp_manager,
         history_manager,
         idle_monitor: idle_monitor.clone(),
+        clipboard: Arc::new(RwLock::new(None)),
         socket_path: socket.clone(),
         log_path: log_file.to_path_buf(),
     };

@@ -162,14 +162,13 @@ pub fn format_batch_result_with_diff(
         OutputFormat::Text => {
             let mut output = Vec::new();
 
-            // Message line
-            output.push(result.message.clone());
-
-            // Summary line
+            // Message line (with summary appended)
             if !result.changes.is_empty() {
                 let summary = compute_change_summary(&result.changes);
                 if summary != "no changes" {
-                    output.push(summary);
+                    output.push(format!("{}, {}", result.message, summary));
+                } else {
+                    output.push(result.message.clone());
                 }
 
                 // Diff view with context (using new file content for context)
@@ -178,6 +177,8 @@ pub fn format_batch_result_with_diff(
                 if diff_view != "  (no changes)" {
                     output.push(diff_view);
                 }
+            } else {
+                output.push(result.message.clone());
             }
 
             // Errors

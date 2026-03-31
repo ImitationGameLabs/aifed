@@ -212,6 +212,22 @@ impl DaemonClient {
         self.post_empty(&path).await
     }
 
+    // --- Clipboard Operations ---
+
+    /// Set clipboard content
+    pub async fn set_clipboard(
+        &self,
+        content: Option<String>,
+    ) -> Result<ClipboardResponse, ClientError> {
+        self.put("/api/v1/clipboard", &SetClipboardRequest { content }).await
+    }
+
+    /// Get clipboard content (None if clipboard is empty)
+    pub async fn get_clipboard(&self) -> Result<Option<String>, ClientError> {
+        let response: ClipboardResponse = self.get("/api/v1/clipboard").await?;
+        Ok(response.content)
+    }
+
     // --- HTTP Helpers ---
 
     /// URL-encode a path segment
@@ -272,6 +288,32 @@ impl DaemonClient {
             .uri(uri)
             .header("Content-Type", "application/json")
             .body(Full::new(Bytes::new()))
+            .map_err(|e| ClientError::RequestFailed { message: e.to_string() })?;
+
+        let resp = self
+            .client
+            .request(req)
+            .await
+            .map_err(|e| ClientError::ConnectionFailed { message: e.to_string() })?;
+
+        self.parse_response(resp).await
+    }
+
+    /// Make a PUT request
+    async fn put<T: DeserializeOwned, B: serde::Serialize>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T, ClientError> {
+        let uri = self.uri(path);
+        let json = serde_json::to_string(body)
+            .map_err(|e| ClientError::SerializationError { message: e.to_string() })?;
+
+        let req = Request::builder()
+            .method(Method::PUT)
+            .uri(uri)
+            .header("Content-Type", "application/json")
+            .body(Full::new(Bytes::from(json)))
             .map_err(|e| ClientError::RequestFailed { message: e.to_string() })?;
 
         let resp = self

@@ -37,7 +37,10 @@ fn daemon_requirement(cmd: &Commands) -> DaemonRequirement {
         Commands::Lsp { .. }
         | Commands::History { .. }
         | Commands::Undo { .. }
-        | Commands::Redo { .. } => DaemonRequirement::Required,
+        | Commands::Redo { .. }
+        | Commands::Copy { .. }
+        | Commands::Paste { .. }
+        | Commands::Clipboard => DaemonRequirement::Required,
     }
 }
 
@@ -122,6 +125,24 @@ async fn run(args: Args, format: OutputFormat) -> Result<()> {
             let client = daemon_client
                 .ok_or_else(|| Error::DaemonNotRunning { workspace: ws.root().to_path_buf() })?;
             commands::redo(&file, dry_run, &client, format).await
+        }
+        Commands::Copy { file, range } => {
+            let ws = workspace.ok_or(Error::LightweightMode)?;
+            let client = daemon_client
+                .ok_or_else(|| Error::DaemonNotRunning { workspace: ws.root().to_path_buf() })?;
+            commands::copy(&file, &range, &client, format).await
+        }
+        Commands::Paste { file, position } => {
+            let ws = workspace.ok_or(Error::LightweightMode)?;
+            let client = daemon_client
+                .ok_or_else(|| Error::DaemonNotRunning { workspace: ws.root().to_path_buf() })?;
+            commands::paste(&file, &position, &client, format).await
+        }
+        Commands::Clipboard => {
+            let ws = workspace.ok_or(Error::LightweightMode)?;
+            let client = daemon_client
+                .ok_or_else(|| Error::DaemonNotRunning { workspace: ws.root().to_path_buf() })?;
+            commands::clipboard(&client, format).await
         }
     }
 }

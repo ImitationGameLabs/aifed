@@ -372,3 +372,19 @@ pub struct UndoRedoResponse {
     /// The expected hash of the current file (for verification before applying)
     pub current_hash: String,
 }
+
+// --- Clipboard Types ---
+
+/// Request to set clipboard content
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetClipboardRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+}
+
+/// Clipboard response (used by both GET and SET)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClipboardResponse {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+}

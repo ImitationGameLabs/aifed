@@ -3,7 +3,7 @@
 use crate::server::handlers;
 use crate::server::state::DaemonState;
 use axum::Router;
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 
 /// Build the HTTP router for the daemon.
 pub fn build_router(state: DaemonState) -> Router {
@@ -34,5 +34,8 @@ pub fn build_router(state: DaemonState) -> Router {
         .route("/api/v1/history/{file}", get(handlers::get_history))
         .route("/api/v1/history/{file}/undo", post(handlers::undo))
         .route("/api/v1/history/{file}/redo", post(handlers::redo))
+        // Clipboard operations
+        .route("/api/v1/clipboard", put(handlers::set_clipboard))
+        .route("/api/v1/clipboard", get(handlers::get_clipboard))
         .with_state(state)
 }

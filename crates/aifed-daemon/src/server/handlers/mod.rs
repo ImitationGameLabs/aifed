@@ -1,10 +1,12 @@
 //! HTTP request handlers
 
+pub mod clipboard;
 pub mod daemon;
 pub mod history;
 pub mod management;
 pub mod operations;
 
+pub use clipboard::{get_clipboard, set_clipboard};
 pub use daemon::{health, heartbeat, list_servers, shutdown, status};
 pub use history::{get_history, record_access, record_edit, redo, undo};
 pub use management::{start_server, stop_server};

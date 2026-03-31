@@ -143,6 +143,27 @@ pub enum Commands {
         #[arg(long)]
         dry_run: bool,
     },
+
+    /// Copy lines from file to clipboard
+    Copy {
+        /// File to copy from
+        file: PathBuf,
+
+        /// Hashline range (e.g., "[1:AB,5:CD]")
+        range: String,
+    },
+
+    /// Paste clipboard content to file
+    Paste {
+        /// File to paste into
+        file: PathBuf,
+
+        /// Hashline position where to insert (e.g., "10:AB")
+        position: String,
+    },
+
+    /// Show clipboard content
+    Clipboard,
 }
 
 /// Daemon management commands
