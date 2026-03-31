@@ -8,7 +8,13 @@ This prevents AI agents from making edits based on stale file state.
 1. Read file to get current hashes: aifed read <FILE>
 2. Edit with hash verification via heredoc: aifed edit <FILE> <<'EOF' ... EOF
 3. Hash mismatch = file changed, re-read and retry
-   Tip: Use line range (e.g., "10-20") to re-read only nearby lines
+
+## READING STRATEGY
+
+- **First read**: Read the entire file to get full context. Do not guess line ranges on first access.
+- **Re-read after edit**: When re-reading specific lines (e.g., to verify or continue editing), expand the range by 3 lines above and below for surrounding context.
+  Example: To re-read line 15, use `aifed read file.rs [12,18]`
+- **Large files**: If the file is very large and full read is impractical, read relevant sections with extra context.
 
 ## OUTPUT FORMAT (aifed read)
 
@@ -141,12 +147,25 @@ Options:
   --stat      Show compact summary instead of detailed diffs
   --dry-run   Preview changes without applying
 
+## CLIPBOARD COMMANDS (requires running daemon)
+
+aifed copy <FILE> "[START:HASH,END:HASH]"   - Copy lines to clipboard (hashline range required)
+aifed paste <FILE> <LINE:HASH>             - Paste clipboard content after line
+aifed clipboard                            - Show clipboard content
+
+Notes:
+- Clipboard is stored in daemon memory (not persisted to disk)
+- Clipboard is workspace-scoped (same daemon isolation as history)
+- Single entry only, new copy overwrites previous content
+- Copy requires a hashline range or single hashline
+- Paste requires a hashline position (use 0:00 to insert at beginning)
+
 ## EXAMPLES
 
 ```bash
 # Read file
-aifed read main.rs              # Get hashes for all lines
-aifed read main.rs [10,20]      # Read lines 10-20
+aifed read main.rs              # First read: get full file with hashes
+aifed read main.rs [12,18]      # Re-read with context (targeting line 15)
 
 # Single edit - use heredoc with 'EOF' to prevent shell expansion
 aifed edit main.rs <<'EOF'
@@ -200,4 +219,10 @@ aifed history src/main.rs --stat      # View compact summary
 aifed undo src/main.rs                # Undo last edit
 aifed undo src/main.rs --dry-run      # Preview undo without applying
 aifed redo src/main.rs                # Redo last undone edit
+
+# Clipboard operations (requires running daemon)
+aifed copy src/main.rs "[10:AB,20:CD]"  # Copy lines 10-20 to clipboard
+aifed paste src/main.rs 20:CD          # Paste after line 20
+aifed paste src/main.rs 0:00           # Paste at file beginning
+aifed clipboard                         # Show clipboard content
 ```
