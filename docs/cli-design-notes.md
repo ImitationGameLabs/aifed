@@ -55,7 +55,7 @@ aifed provides two levels of documentation:
 
 ## Core Design Decisions
 
-### 1. Deterministic Positioning (Hashline)
+### Deterministic Positioning (Hashline)
 
 **Problem:** Line numbers drift when files change; concurrent edits cause unexpected modifications.
 
@@ -69,7 +69,7 @@ aifed provides two levels of documentation:
 
 See [locator.md](reference/locator.md) for usage details.
 
-### 2. Hash Algorithm
+### Hash Algorithm
 
 **Decision:** xxHash64 + base32hex (2 characters, 10 bits)
 
@@ -108,7 +108,7 @@ See [locator.md](reference/locator.md) for usage details.
 | Hash stability            | Same content -> same hash | Same content -> different hash (if lines above changed) |
 | Concurrent edit detection | Target line only          | Target line and all lines above                         |
 
-### 3. Command Structure: Unified Edit
+### Command Structure: Unified Edit
 
 **Decision:** Use a single `edit` command with operator prefixes (`=`/`+`/`-`) instead of separate `replace`/`insert`/`delete` commands.
 
@@ -155,7 +155,7 @@ Using symbolic operators (`=`/`+`/`-`) instead of subcommands (`replace`/`insert
 aifed edit main.rs + 0:00 "// Copyright 2026"
 ```
 
-### 4. Filepath and Locator Separation
+### Filepath and Locator Separation
 
 **Question:** Should filepath and locator be combined (`FILE:LOCATOR`) or separated (`FILE LOCATOR`)?
 
@@ -182,7 +182,7 @@ aifed edit main.rs + 0:00 "// Copyright 2026"
 - Windows paths (`C:\path:15`) create ambiguous `:` characters
 - Industry convention (vim/grep) is less relevant for AI users
 
-### 5. Column Positioning: Symbol Locator vs Numeric Column
+### Column Positioning: Symbol Locator vs Numeric Column
 
 **Problem:** LLMs cannot reliably count character positions. Numeric columns are error-prone.
 
@@ -234,6 +234,19 @@ Cons:
 - Less precise than semantic symbol matching
 
 **Decision:** Use Symbol Locator despite extra read requirement - precision and reliability outweigh the cost.
+
+### Workspace Detection: CWD Over Target File
+
+**Decision:** Workspace detection uses the command's working directory (cwd), not the target file path.
+
+**Rationale:**
+
+LSP operations like `def` can navigate to third-party libraries (`~/.cargo/registry/...`) and standard library source (`/nix/store/.../rust-lib-src/...`). If workspace detection searched upward from the target file path, these external files would either:
+
+- Miss the workspace entirely (no `aifed.toml` or `.git` in global paths)
+- Accidentally match an unrelated workspace marker in an ancestor directory
+
+The cwd is always within the user's project, making it the reliable anchor point for workspace resolution.
 
 See [locator.md](reference/locator.md) for Symbol Locator usage details.
 
@@ -326,7 +339,7 @@ Shell users have better alternatives: `sed`, `awk`, `ed` for scripting needs. ai
 
 **Implementation:** Simple binary exit: 0 for success, 1 for any error.
 
-### 4. Architecture: CLI + Daemon
+### Architecture: CLI + Daemon
 
 **Decision:** aifed uses CLI + daemon architecture.
 
