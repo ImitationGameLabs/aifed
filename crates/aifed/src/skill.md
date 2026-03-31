@@ -81,10 +81,11 @@ LINE:HASH                Standard hashline (e.g., "42:3K")
 Content in double quotes supports JSON escape sequences:
 - `\"` → `"` (double quote)
 - `\\` → `\` (backslash)
-- `\n` → newline
 - `\t` → tab
-- `\r` → carriage return
+- `\r` → carriage return (typically at end of line for CRLF files)
 - `\uXXXX` → Unicode character
+
+**`\n` is not allowed** in edit content. Each operation targets exactly one line — lines are the atomic unit of editing. To modify multiple lines, use multiple operations (one `=` per line to replace, or `+` to insert).
 
 Example: `"code: println!(\"hello\");"` becomes `code: println!("hello");`
 

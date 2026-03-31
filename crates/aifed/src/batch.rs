@@ -338,7 +338,17 @@ fn parse_single_operation(line_num: usize, line: &str) -> Result<EditOp> {
     // Extract content
     let content = if parts.len() > 2 {
         // Join remaining parts as content, handling quoted strings and escapes
-        Some(extract_content(&parts[2..])?)
+        let c = extract_content(&parts[2..])?;
+        // Validate: content must not contain \n (lines are split on \n)
+        if c.contains('\n') {
+            return Err(Error::InvalidBatchOp {
+                line_number: line_num,
+                line_content: line.to_string(),
+                reason: "Content must not contain newline (\\n). Each edit operation represents a single line."
+                    .to_string(),
+            });
+        }
+        Some(c)
     } else {
         None
     };
@@ -1056,11 +1066,13 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_content_newline_escape() {
-        // Newline escape sequence
+    fn test_parse_content_newline_escape_rejected() {
+        // Newline escape sequence should be rejected
         let input = r#"+ 10:AB "line1\nline2""#;
-        let ops = parse_batch_operations(input).unwrap();
-        assert_eq!(ops[0].content, Some("line1\nline2".to_string()));
+        let result = parse_batch_operations(input);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("newline"), "error should mention newline: {err}");
     }
 
     #[test]
@@ -1069,6 +1081,23 @@ mod tests {
         let input = r#"+ 10:AB "col1\tcol2""#;
         let ops = parse_batch_operations(input).unwrap();
         assert_eq!(ops[0].content, Some("col1\tcol2".to_string()));
+    }
+
+    #[test]
+    fn test_parse_content_cr_at_end_allowed() {
+        // \r at end of line is allowed (CRLF support)
+        let input = r#"+ 10:AB "line1\r""#;
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops[0].content, Some("line1\r".to_string()));
+    }
+
+    #[test]
+    fn test_parse_content_cr_in_middle_allowed() {
+        // \r in the middle of content is allowed (no restriction on \r placement)
+        // Only \n is rejected since lines are split on \n
+        let input = r#"+ 10:AB "line1\rline2""#;
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops[0].content, Some("line1\rline2".to_string()));
     }
 
     #[test]
