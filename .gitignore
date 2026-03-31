@@ -4,6 +4,9 @@ target/
 # CLI testing playground
 .playground
 
+# Git worktrees for isolated development
+.worktrees/
+
 # Environment files
 .env
 .env.local
