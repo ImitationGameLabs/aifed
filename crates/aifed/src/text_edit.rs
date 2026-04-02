@@ -34,7 +34,10 @@ fn position_to_byte_offset(content: &str, pos: &Position) -> usize {
 
 /// Convert character offset to byte offset within a line.
 fn char_offset_to_byte_offset(line: &str, char_offset: usize) -> usize {
-    line.char_indices().nth(char_offset).map(|(i, _)| i).unwrap_or(line.len())
+    line.char_indices()
+        .nth(char_offset)
+        .map(|(i, _)| i)
+        .unwrap_or(line.len())
 }
 
 /// Apply multiple TextEdits to file content.
@@ -91,7 +94,11 @@ fn extract_range_content(content: &str, range: &Range) -> Result<String> {
         return Err(Error::InvalidRange {
             start: range.start,
             end: range.end,
-            reason: format!("End position {} exceeds content length {}", end, content.len()),
+            reason: format!(
+                "End position {} exceeds content length {}",
+                end,
+                content.len()
+            ),
         });
     }
 
@@ -149,7 +156,10 @@ mod tests {
         // Content: "let args = Args::parse_args();"
         //          Position 0,4 to 0,8 is "args"
         let content = "let args = Args::parse_args();";
-        let edit = make_text_edit(make_range(make_position(0, 4), make_position(0, 8)), "cli_args");
+        let edit = make_text_edit(
+            make_range(make_position(0, 4), make_position(0, 8)),
+            "cli_args",
+        );
 
         let result = apply_edits(content, vec![edit]).unwrap();
         assert_eq!(result, "let cli_args = Args::parse_args();");

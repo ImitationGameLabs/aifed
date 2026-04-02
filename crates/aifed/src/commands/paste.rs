@@ -24,8 +24,11 @@ pub async fn execute(
     }
 
     // Get clipboard content
-    let clipboard_content =
-        daemon_client.get_clipboard().await.map_err(Error::ClientError)?.ok_or_else(|| {
+    let clipboard_content = daemon_client
+        .get_clipboard()
+        .await
+        .map_err(Error::ClientError)?
+        .ok_or_else(|| {
             Error::ClientError(aifed_common::ClientError::ApiError {
                 code: "CLIPBOARD_EMPTY".to_string(),
                 message: "Clipboard is empty".to_string(),
@@ -83,5 +86,9 @@ pub async fn execute(
 
 /// Escape content for batch operation string (JSON-style)
 fn escape_content(content: &str) -> String {
-    content.replace('\\', "\\\\").replace('\"', "\\\"").replace('\t', "\\t").replace('\r', "\\r")
+    content
+        .replace('\\', "\\\\")
+        .replace('\"', "\\\"")
+        .replace('\t', "\\t")
+        .replace('\r', "\\r")
 }

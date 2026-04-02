@@ -57,7 +57,10 @@ pub fn format_diffs_with_context(
 
         // Get content from original file (line_num is 1-based, so line 0 has no content)
         let content = if line_num >= 1 {
-            original_lines.get(line_num - 1).map(|s| s.as_str()).unwrap_or("")
+            original_lines
+                .get(line_num - 1)
+                .map(|s| s.as_str())
+                .unwrap_or("")
         } else {
             ""
         };

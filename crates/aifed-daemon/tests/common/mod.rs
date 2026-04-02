@@ -33,8 +33,11 @@ impl HttpClient {
 
     pub async fn get(&self, path: &str) -> Result<Response, Box<dyn std::error::Error>> {
         let uri = self.uri(path);
-        let req =
-            Request::builder().method(Method::GET).uri(uri).body(Full::new(Bytes::new())).unwrap();
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri(uri)
+            .body(Full::new(Bytes::new()))
+            .unwrap();
 
         let resp = self.client.request(req).await?;
         Ok(Response::from_hyper(resp).await)
@@ -121,7 +124,11 @@ impl DaemonFixture {
 "#;
         fs::write(workspace.path().join("src/main.rs"), main_rs_content).unwrap();
 
-        let main_rs_path = workspace.path().join("src/main.rs").to_string_lossy().to_string();
+        let main_rs_path = workspace
+            .path()
+            .join("src/main.rs")
+            .to_string_lossy()
+            .to_string();
 
         // Generate unique socket path
         static TEST_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -141,13 +148,18 @@ impl DaemonFixture {
         }
 
         // Build daemon binary
-        let status = Command::new("cargo").args(["build", "-p", "aifed-daemon"]).status().unwrap();
+        let status = Command::new("cargo")
+            .args(["build", "-p", "aifed-daemon"])
+            .status()
+            .unwrap();
         assert!(status.success(), "Failed to build aifed-daemon");
 
         // Spawn daemon process (use workspace root target directory)
         let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let workspace_dir =
-            manifest_dir.parent().and_then(|p| p.parent()).expect("Failed to find workspace root");
+        let workspace_dir = manifest_dir
+            .parent()
+            .and_then(|p| p.parent())
+            .expect("Failed to find workspace root");
         let daemon_path = workspace_dir.join("target/debug/aifed-daemon");
         let daemon = Command::new(&daemon_path)
             .arg("--workspace")

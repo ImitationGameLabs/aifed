@@ -35,7 +35,10 @@ async fn test_status_endpoint() {
     let json: ApiResponse<StatusResponse> = resp.json();
     assert!(json.success);
     let data = json.data.unwrap();
-    assert!(!data.workspace.is_empty(), "Workspace path should not be empty");
+    assert!(
+        !data.workspace.is_empty(),
+        "Workspace path should not be empty"
+    );
 }
 
 #[tokio::test]
@@ -68,7 +71,10 @@ async fn test_start_and_stop_server() {
     // Start it again
     let resp = fixture
         .client
-        .post("/api/v1/lsp/servers/start", &StartServerRequest { language: "rust".into() })
+        .post(
+            "/api/v1/lsp/servers/start",
+            &StartServerRequest { language: "rust".into() },
+        )
         .await
         .unwrap();
     assert!(resp.is_success());

@@ -6,7 +6,10 @@ use aifed_daemon_client::DaemonClient;
 
 /// Execute the clipboard command
 pub async fn execute(client: &DaemonClient, format: OutputFormat) -> Result<()> {
-    let content = client.get_clipboard().await.map_err(crate::error::Error::ClientError)?;
+    let content = client
+        .get_clipboard()
+        .await
+        .map_err(crate::error::Error::ClientError)?;
 
     match content {
         Some(content) => match format {

@@ -261,5 +261,8 @@ async fn wait_for_daemon(client: &DaemonClient, timeout: Duration) -> std::io::R
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
 
-    Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "daemon did not start within timeout"))
+    Err(std::io::Error::new(
+        std::io::ErrorKind::TimedOut,
+        "daemon did not start within timeout",
+    ))
 }

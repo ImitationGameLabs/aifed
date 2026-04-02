@@ -32,8 +32,9 @@ impl DaemonClient {
 
     /// Create a client using the default socket path
     pub fn default_socket() -> Result<Self, ClientError> {
-        let socket_path =
-            dirs::runtime_dir().unwrap_or_else(std::env::temp_dir).join("aifed-daemon.sock");
+        let socket_path = dirs::runtime_dir()
+            .unwrap_or_else(std::env::temp_dir)
+            .join("aifed-daemon.sock");
         Ok(Self::new(socket_path))
     }
 
@@ -156,7 +157,11 @@ impl DaemonClient {
 
     /// Record a file access (read operation)
     pub async fn record_access(&self, file: &str) -> Result<RecordAccessResponse, ClientError> {
-        self.post("/api/v1/history/access", &RecordAccessRequest { file: file.to_string() }).await
+        self.post(
+            "/api/v1/history/access",
+            &RecordAccessRequest { file: file.to_string() },
+        )
+        .await
     }
 
     /// Record an edit operation
@@ -186,7 +191,11 @@ impl DaemonClient {
         count: Option<usize>,
     ) -> Result<HistoryListResponse, ClientError> {
         let path = match count {
-            Some(n) => format!("/api/v1/history/{}?count={}", Self::urlencoding_encode(file), n),
+            Some(n) => format!(
+                "/api/v1/history/{}?count={}",
+                Self::urlencoding_encode(file),
+                n
+            ),
             None => format!("/api/v1/history/{}", Self::urlencoding_encode(file)),
         };
         self.get(&path).await
@@ -195,7 +204,10 @@ impl DaemonClient {
     /// Undo the last edit for a file
     pub async fn undo(&self, file: &str, dry_run: bool) -> Result<UndoRedoResponse, ClientError> {
         let path = if dry_run {
-            format!("/api/v1/history/{}/undo?dry_run=true", Self::urlencoding_encode(file))
+            format!(
+                "/api/v1/history/{}/undo?dry_run=true",
+                Self::urlencoding_encode(file)
+            )
         } else {
             format!("/api/v1/history/{}/undo", Self::urlencoding_encode(file))
         };
@@ -205,7 +217,10 @@ impl DaemonClient {
     /// Redo the last undone edit for a file
     pub async fn redo(&self, file: &str, dry_run: bool) -> Result<UndoRedoResponse, ClientError> {
         let path = if dry_run {
-            format!("/api/v1/history/{}/redo?dry_run=true", Self::urlencoding_encode(file))
+            format!(
+                "/api/v1/history/{}/redo?dry_run=true",
+                Self::urlencoding_encode(file)
+            )
         } else {
             format!("/api/v1/history/{}/redo", Self::urlencoding_encode(file))
         };
@@ -219,7 +234,8 @@ impl DaemonClient {
         &self,
         content: Option<String>,
     ) -> Result<ClipboardResponse, ClientError> {
-        self.put("/api/v1/clipboard", &SetClipboardRequest { content }).await
+        self.put("/api/v1/clipboard", &SetClipboardRequest { content })
+            .await
     }
 
     /// Get clipboard content (None if clipboard is empty)
@@ -233,7 +249,10 @@ impl DaemonClient {
     /// URL-encode a path segment
     fn urlencoding_encode(s: &str) -> String {
         // Simple URL encoding for file paths
-        s.replace('%', "%25").replace('/', "%2F").replace(' ', "%20").replace('+', "%2B")
+        s.replace('%', "%25")
+            .replace('/', "%2F")
+            .replace(' ', "%20")
+            .replace('+', "%2B")
     }
 
     /// Make a GET request
@@ -343,14 +362,18 @@ impl DaemonClient {
 
         if let Ok(api_response) = api_response {
             if api_response.success {
-                return api_response.data.ok_or_else(|| ClientError::SerializationError {
-                    message: "No data in response".to_string(),
-                });
+                return api_response
+                    .data
+                    .ok_or_else(|| ClientError::SerializationError {
+                        message: "No data in response".to_string(),
+                    });
             } else {
-                let error = api_response.error.unwrap_or_else(|| aifed_common::ApiError {
-                    code: "UNKNOWN".to_string(),
-                    message: "Unknown error".to_string(),
-                });
+                let error = api_response
+                    .error
+                    .unwrap_or_else(|| aifed_common::ApiError {
+                        code: "UNKNOWN".to_string(),
+                        message: "Unknown error".to_string(),
+                    });
                 return Err(ClientError::ApiError { code: error.code, message: error.message });
             }
         }

@@ -64,7 +64,10 @@ pub async fn record_access(
         Ok(h) => h,
         Err(e) => {
             tracing::error!("Failed to compute hash: {}", e);
-            return Err((StatusCode::BAD_REQUEST, Json(ApiResponse::error("FILE_ERROR", e))));
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse::error("FILE_ERROR", e)),
+            ));
         }
     };
 
@@ -108,7 +111,10 @@ pub async fn record_edit(
         })
         .collect();
 
-    match state.history_manager.record_edit(&path, &req.expected_hash, &req.new_hash, diffs) {
+    match state
+        .history_manager
+        .record_edit(&path, &req.expected_hash, &req.new_hash, diffs)
+    {
         Ok(()) => Ok(Json(ApiResponse::ok())),
         Err(HistoryError::HashMismatch { expected, actual }) => Err((
             StatusCode::CONFLICT,
@@ -170,7 +176,10 @@ pub async fn undo(
         Err(HistoryError::NoHistory) => {
             return Err((
                 StatusCode::NOT_FOUND,
-                Json(ApiResponse::error("NO_HISTORY", "No history available for this file")),
+                Json(ApiResponse::error(
+                    "NO_HISTORY",
+                    "No history available for this file",
+                )),
             ));
         }
         Err(e) => {
@@ -203,7 +212,10 @@ pub async fn redo(
         Err(HistoryError::NoRedo) => {
             return Err((
                 StatusCode::NOT_FOUND,
-                Json(ApiResponse::error("NO_REDO", "No redo available for this file")),
+                Json(ApiResponse::error(
+                    "NO_REDO",
+                    "No redo available for this file",
+                )),
             ));
         }
         Err(e) => {
@@ -228,7 +240,8 @@ fn compute_file_hash(path: &PathBuf) -> Result<String, String> {
 
     let mut file = std::fs::File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
     let mut content = Vec::new();
-    file.read_to_end(&mut content).map_err(|e| format!("Failed to read file: {}", e))?;
+    file.read_to_end(&mut content)
+        .map_err(|e| format!("Failed to read file: {}", e))?;
 
     // Use xxhash from the crate's dependencies
     let hash = xxhash_rust::xxh3::xxh3_64(&content);

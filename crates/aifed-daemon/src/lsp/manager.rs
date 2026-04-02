@@ -117,7 +117,11 @@ impl LanguageServerManager {
 
         // Spawn the server
         let mut command = config.spawn_command(&workspace_root);
-        tracing::debug!("Spawning LSP server: {} ({})", config.display_name(), language);
+        tracing::debug!(
+            "Spawning LSP server: {} ({})",
+            config.display_name(),
+            language
+        );
         let client = match StdioLspClient::spawn(&mut command, &workspace_root).await {
             Ok(c) => c,
             Err(e) => {

@@ -20,7 +20,10 @@ pub fn hash_line(content: &str) -> String {
 fn base32hex_encode(value: u16) -> String {
     let hi = (value >> 5) as usize;
     let lo = (value & 0x1F) as usize;
-    format!("{}{}", BASE32HEX_ALPHABET[hi] as char, BASE32HEX_ALPHABET[lo] as char)
+    format!(
+        "{}{}",
+        BASE32HEX_ALPHABET[hi] as char, BASE32HEX_ALPHABET[lo] as char
+    )
 }
 
 /// Check if the given hash is the virtual line hash.
@@ -75,7 +78,10 @@ mod tests {
     fn test_hash_line_base32hex_chars() {
         let hash = hash_line("test");
         // Should only contain base32hex characters
-        assert!(hash.chars().all(|c| c.is_ascii_digit() || ('A'..='V').contains(&c)));
+        assert!(
+            hash.chars()
+                .all(|c| c.is_ascii_digit() || ('A'..='V').contains(&c))
+        );
     }
 
     #[test]

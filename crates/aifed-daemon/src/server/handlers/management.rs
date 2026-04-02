@@ -11,7 +11,11 @@ pub async fn start_server(
     State(state): State<DaemonState>,
     Json(req): Json<StartServerRequest>,
 ) -> impl IntoResponse {
-    match state.lsp_manager.start(&req.language, state.workspace.clone()).await {
+    match state
+        .lsp_manager
+        .start(&req.language, state.workspace.clone())
+        .await
+    {
         Ok(()) => {
             // Get the actual server state from the manager
             let servers = state.lsp_manager.list_servers().await;
@@ -40,7 +44,11 @@ pub async fn stop_server(
     State(state): State<DaemonState>,
     Json(req): Json<StopServerRequest>,
 ) -> impl IntoResponse {
-    match state.lsp_manager.stop(&req.language, &state.workspace, req.force).await {
+    match state
+        .lsp_manager
+        .stop(&req.language, &state.workspace, req.force)
+        .await
+    {
         Ok(()) => {
             // Get the actual server state from the manager
             let servers = state.lsp_manager.list_servers().await;

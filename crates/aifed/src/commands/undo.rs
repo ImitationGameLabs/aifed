@@ -19,7 +19,10 @@ pub async fn execute(
         .map_err(|e| Error::InvalidIo { path: file.to_path_buf(), source: e })?;
     let file_str = canonical.to_string_lossy().to_string();
 
-    let response = client.undo(&file_str, dry_run).await.map_err(Error::ClientError)?;
+    let response = client
+        .undo(&file_str, dry_run)
+        .await
+        .map_err(Error::ClientError)?;
 
     if !dry_run && !response.diffs.is_empty() {
         let file_content = crate::file::read_text_file(file)?;

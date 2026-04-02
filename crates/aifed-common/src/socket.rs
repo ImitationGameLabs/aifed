@@ -29,7 +29,10 @@ pub enum SocketError {
 pub fn socket_path(workspace: &Path) -> Result<PathBuf, SocketError> {
     let base = base_name(workspace)?;
     let socket_name = format!("{}.sock", base);
-    Ok(dirs::cache_dir().ok_or(SocketError::NoCacheDir)?.join("aifed").join(socket_name))
+    Ok(dirs::cache_dir()
+        .ok_or(SocketError::NoCacheDir)?
+        .join("aifed")
+        .join(socket_name))
 }
 
 /// Generate a deterministic PID lock file path for a workspace.
@@ -40,7 +43,10 @@ pub fn socket_path(workspace: &Path) -> Result<PathBuf, SocketError> {
 pub fn lock_path(workspace: &Path) -> Result<PathBuf, SocketError> {
     let base = base_name(workspace)?;
     let lock_name = format!("{}.lock", base);
-    Ok(dirs::cache_dir().ok_or(SocketError::NoCacheDir)?.join("aifed").join(lock_name))
+    Ok(dirs::cache_dir()
+        .ok_or(SocketError::NoCacheDir)?
+        .join("aifed")
+        .join(lock_name))
 }
 
 /// Generate a deterministic log file path for a workspace.
@@ -49,12 +55,18 @@ pub fn lock_path(workspace: &Path) -> Result<PathBuf, SocketError> {
 pub fn log_path(workspace: &Path) -> Result<PathBuf, SocketError> {
     let base = base_name(workspace)?;
     let log_name = format!("{}.log", base);
-    Ok(dirs::state_dir().ok_or(SocketError::NoStateDir)?.join("aifed").join("logs").join(log_name))
+    Ok(dirs::state_dir()
+        .ok_or(SocketError::NoStateDir)?
+        .join("aifed")
+        .join("logs")
+        .join(log_name))
 }
 
 /// Generate base name for workspace: `<name>-<hash16>`
 fn base_name(workspace: &Path) -> Result<String, SocketError> {
-    let canonical = workspace.canonicalize().map_err(SocketError::CanonicalizeError)?;
+    let canonical = workspace
+        .canonicalize()
+        .map_err(SocketError::CanonicalizeError)?;
 
     // Extract and sanitize directory name
     let name: String = canonical

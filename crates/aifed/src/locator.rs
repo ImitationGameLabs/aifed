@@ -159,12 +159,12 @@ impl SymbolLocator {
         let input = input.trim();
 
         // Must start with 'S' or 's'
-        let rest =
-            input.strip_prefix('S').or_else(|| input.strip_prefix('s')).ok_or_else(|| {
-                Error::InvalidLocator {
-                    input: input.to_string(),
-                    reason: "Symbol locator must start with 'S'".to_string(),
-                }
+        let rest = input
+            .strip_prefix('S')
+            .or_else(|| input.strip_prefix('s'))
+            .ok_or_else(|| Error::InvalidLocator {
+                input: input.to_string(),
+                reason: "Symbol locator must start with 'S'".to_string(),
             })?;
 
         // Split on ':'
@@ -193,7 +193,10 @@ impl SymbolLocator {
         }
 
         // Validate name is a valid identifier
-        if !name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '!' || c == '?') {
+        if !name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '!' || c == '?')
+        {
             return Err(Error::InvalidLocator {
                 input: input.to_string(),
                 reason: "Symbol name must be a valid identifier".to_string(),

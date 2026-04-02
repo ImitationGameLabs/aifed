@@ -76,7 +76,9 @@ impl HistoryManager {
     pub fn record_access(&self, path: &Path, hash: &str) -> Result<(), HistoryError> {
         let mut files = self.files.write().unwrap();
 
-        let history = files.entry(path.to_path_buf()).or_insert_with(FileHistory::new);
+        let history = files
+            .entry(path.to_path_buf())
+            .or_insert_with(FileHistory::new);
 
         history.update_hash(hash);
         Ok(())
@@ -93,7 +95,9 @@ impl HistoryManager {
     ) -> Result<(), HistoryError> {
         let mut files = self.files.write().unwrap();
 
-        let history = files.entry(path.to_path_buf()).or_insert_with(FileHistory::new);
+        let history = files
+            .entry(path.to_path_buf())
+            .or_insert_with(FileHistory::new);
 
         // Verify hash matches (skip if first access - empty last_known_hash)
         if !history.last_known_hash.is_empty() && history.last_known_hash != expected_hash {
@@ -226,8 +230,13 @@ impl HistoryManager {
             return Vec::new();
         };
 
-        let entries: Vec<HistoryEntry> =
-            history.undo_stack.iter().rev().take(count.unwrap_or(usize::MAX)).cloned().collect();
+        let entries: Vec<HistoryEntry> = history
+            .undo_stack
+            .iter()
+            .rev()
+            .take(count.unwrap_or(usize::MAX))
+            .cloned()
+            .collect();
 
         entries
     }

@@ -25,7 +25,9 @@ pub async fn execute(
         return Err(Error::StdinNotAvailable);
     }
     let mut input = String::new();
-    io::stdin().read_to_string(&mut input).map_err(|_| Error::StdinNotAvailable)?;
+    io::stdin()
+        .read_to_string(&mut input)
+        .map_err(|_| Error::StdinNotAvailable)?;
     let operations = batch::parse_batch_operations(&input)?;
     batch::execute_batch(path, operations, dry_run, format, daemon_client).await
 }

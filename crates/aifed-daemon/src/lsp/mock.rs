@@ -22,7 +22,10 @@ impl MockLspClient {
 
     /// Configure a response for a specific method
     pub fn set_response(&mut self, method: &str, result: serde_json::Value) {
-        self.responses.lock().unwrap().insert(method.to_string(), result);
+        self.responses
+            .lock()
+            .unwrap()
+            .insert(method.to_string(), result);
     }
 
     /// Get response for a method, returns None if not configured
@@ -32,7 +35,10 @@ impl MockLspClient {
 
     /// Check if error is configured for a method
     fn has_error(&self, method: &str) -> bool {
-        self.responses.lock().unwrap().contains_key(&format!("{}_error", method))
+        self.responses
+            .lock()
+            .unwrap()
+            .contains_key(&format!("{}_error", method))
     }
 
     /// Get error message if configured
@@ -55,7 +61,9 @@ impl Default for MockLspClient {
 impl LspClient for MockLspClient {
     async fn initialize(&mut self, _params: InitializeParams) -> Result<InitializeResult> {
         if self.has_error("initialize") {
-            return Err(Error::Transport(self.get_error_message("initialize").unwrap_or_default()));
+            return Err(Error::Transport(
+                self.get_error_message("initialize").unwrap_or_default(),
+            ));
         }
         self.initialized = true;
 
@@ -80,7 +88,9 @@ impl LspClient for MockLspClient {
         _params: GotoDefinitionParams,
     ) -> Result<Option<GotoDefinitionResponse>> {
         if self.has_error("definition") {
-            return Err(Error::Transport(self.get_error_message("definition").unwrap_or_default()));
+            return Err(Error::Transport(
+                self.get_error_message("definition").unwrap_or_default(),
+            ));
         }
 
         let response = self.get_response("definition");
@@ -96,7 +106,9 @@ impl LspClient for MockLspClient {
 
     async fn references(&mut self, _params: ReferenceParams) -> Result<Option<Vec<Location>>> {
         if self.has_error("references") {
-            return Err(Error::Transport(self.get_error_message("references").unwrap_or_default()));
+            return Err(Error::Transport(
+                self.get_error_message("references").unwrap_or_default(),
+            ));
         }
 
         let response = self.get_response("references");
@@ -112,7 +124,9 @@ impl LspClient for MockLspClient {
 
     async fn hover(&mut self, _params: HoverParams) -> Result<Option<Hover>> {
         if self.has_error("hover") {
-            return Err(Error::Transport(self.get_error_message("hover").unwrap_or_default()));
+            return Err(Error::Transport(
+                self.get_error_message("hover").unwrap_or_default(),
+            ));
         }
 
         let response = self.get_response("hover");
@@ -130,7 +144,9 @@ impl LspClient for MockLspClient {
         _params: CompletionParams,
     ) -> Result<Option<CompletionResponse>> {
         if self.has_error("completion") {
-            return Err(Error::Transport(self.get_error_message("completion").unwrap_or_default()));
+            return Err(Error::Transport(
+                self.get_error_message("completion").unwrap_or_default(),
+            ));
         }
 
         let response = self.get_response("completion");
@@ -146,7 +162,9 @@ impl LspClient for MockLspClient {
 
     async fn rename(&mut self, _params: RenameParams) -> Result<Option<WorkspaceEdit>> {
         if self.has_error("rename") {
-            return Err(Error::Transport(self.get_error_message("rename").unwrap_or_default()));
+            return Err(Error::Transport(
+                self.get_error_message("rename").unwrap_or_default(),
+            ));
         }
 
         let response = self.get_response("rename");
@@ -165,19 +183,21 @@ impl LspClient for MockLspClient {
         _params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
         if self.has_error("diagnostic") {
-            return Err(Error::Transport(self.get_error_message("diagnostic").unwrap_or_default()));
+            return Err(Error::Transport(
+                self.get_error_message("diagnostic").unwrap_or_default(),
+            ));
         }
 
         // Return empty report by default
-        Ok(DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(
-            RelatedFullDocumentDiagnosticReport {
+        Ok(DocumentDiagnosticReportResult::Report(
+            DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
                 related_documents: None,
                 full_document_diagnostic_report: FullDocumentDiagnosticReport {
                     result_id: None,
                     items: vec![],
                 },
-            },
-        )))
+            }),
+        ))
     }
 
     async fn did_open(&mut self, _params: DidOpenTextDocumentParams) -> Result<()> {

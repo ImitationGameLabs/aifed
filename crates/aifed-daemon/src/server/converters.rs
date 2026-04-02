@@ -29,7 +29,12 @@ pub fn text_document_position(
 /// Convert LSP Location to API LocationResponse
 pub fn location_to_response(loc: lsp_types::Location) -> LocationResponse {
     LocationResponse {
-        file_path: loc.uri.to_file_path().unwrap_or_default().to_string_lossy().to_string(),
+        file_path: loc
+            .uri
+            .to_file_path()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string(),
         range: Range {
             start: Position { line: loc.range.start.line, character: loc.range.start.character },
             end: Position { line: loc.range.end.line, character: loc.range.end.character },
@@ -57,9 +62,11 @@ pub fn range_to_lsp_range(range: Range) -> lsp_types::Range {
 pub fn hover_contents_to_string(contents: HoverContents) -> String {
     match contents {
         HoverContents::Scalar(s) => marked_string_to_string(s),
-        HoverContents::Array(arr) => {
-            arr.into_iter().map(marked_string_to_string).collect::<Vec<_>>().join("\n")
-        }
+        HoverContents::Array(arr) => arr
+            .into_iter()
+            .map(marked_string_to_string)
+            .collect::<Vec<_>>()
+            .join("\n"),
         HoverContents::Markup(m) => m.value,
     }
 }
@@ -131,7 +138,11 @@ pub fn workspace_edit_to_file_edits(edit: lsp_types::WorkspaceEdit) -> Vec<FileE
 
     if let Some(changes) = edit.changes {
         for (uri, edits) in changes {
-            let file_path = uri.to_file_path().unwrap_or_default().to_string_lossy().to_string();
+            let file_path = uri
+                .to_file_path()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
             let text_edits: Vec<TextEdit> = edits
                 .into_iter()
                 .map(|e| TextEdit { range: lsp_range_to_range(e.range), new_text: e.new_text })

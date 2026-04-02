@@ -45,13 +45,21 @@ pub async fn execute(
     if start == 0 || start > lines.len() {
         return Err(Error::InvalidLocator {
             input: range_str.to_string(),
-            reason: format!("Range start {} out of bounds (file has {} lines)", start, lines.len()),
+            reason: format!(
+                "Range start {} out of bounds (file has {} lines)",
+                start,
+                lines.len()
+            ),
         });
     }
     if end == 0 || end > lines.len() {
         return Err(Error::InvalidLocator {
             input: range_str.to_string(),
-            reason: format!("Range end {} out of bounds (file has {} lines)", end, lines.len()),
+            reason: format!(
+                "Range end {} out of bounds (file has {} lines)",
+                end,
+                lines.len()
+            ),
         });
     }
 
@@ -81,7 +89,10 @@ pub async fn execute(
     let copied: String = lines[start - 1..end].join("\n");
 
     // Store in daemon clipboard
-    daemon_client.set_clipboard(Some(copied.clone())).await.map_err(Error::ClientError)?;
+    daemon_client
+        .set_clipboard(Some(copied.clone()))
+        .await
+        .map_err(Error::ClientError)?;
 
     let line_count = end - start + 1;
     match format {
@@ -96,7 +107,13 @@ pub async fn execute(
             println!("{}", serde_json::to_string_pretty(&output).unwrap());
         }
         OutputFormat::Text => {
-            println!("Copied {} line(s) ({}-{}) from {}", line_count, start, end, path.display());
+            println!(
+                "Copied {} line(s) ({}-{}) from {}",
+                line_count,
+                start,
+                end,
+                path.display()
+            );
             for (i, line) in copied.split('\n').enumerate() {
                 println!("{}|{}", start + i, line);
             }

@@ -144,7 +144,9 @@ fn test_manager_record_access() {
     // Verify by doing an edit with matching hash
     let diffs = vec![LineDiff::for_insertion(10, "new line")];
     // This should succeed since hash matches
-    manager.record_edit(&path, "ABC123", "DEF456", diffs).unwrap();
+    manager
+        .record_edit(&path, "ABC123", "DEF456", diffs)
+        .unwrap();
 }
 
 #[test]
@@ -157,7 +159,9 @@ fn test_manager_record_edit_new_file() {
 
     // Record edit (should succeed because hash matches)
     let diffs = vec![LineDiff::for_insertion(10, "new line")];
-    manager.record_edit(&path, "ABC123", "DEF456", diffs).unwrap();
+    manager
+        .record_edit(&path, "ABC123", "DEF456", diffs)
+        .unwrap();
 
     // Verify history was recorded by undoing
     let result = manager.undo(&path, false).unwrap();
@@ -194,7 +198,9 @@ fn test_manager_undo() {
     // Setup: record access and edit
     manager.record_access(&path, "ABC123").unwrap();
     let diffs = vec![LineDiff::for_insertion(10, "new line")];
-    manager.record_edit(&path, "ABC123", "DEF456", diffs).unwrap();
+    manager
+        .record_edit(&path, "ABC123", "DEF456", diffs)
+        .unwrap();
 
     // Undo
     let result = manager.undo(&path, false).unwrap();
@@ -217,7 +223,9 @@ fn test_manager_redo() {
     // Setup: record access, edit, then undo
     manager.record_access(&path, "ABC123").unwrap();
     let diffs = vec![LineDiff::for_insertion(10, "new line")];
-    manager.record_edit(&path, "ABC123", "DEF456", diffs).unwrap();
+    manager
+        .record_edit(&path, "ABC123", "DEF456", diffs)
+        .unwrap();
     manager.undo(&path, false).unwrap();
 
     // Redo
@@ -240,10 +248,14 @@ fn test_manager_new_edit_clears_redo_stack() {
     // Setup: two edits, then undo first
     manager.record_access(&path, "HASH1").unwrap();
     let diffs1 = vec![LineDiff::for_insertion(10, "line 1")];
-    manager.record_edit(&path, "HASH1", "HASH2", diffs1).unwrap();
+    manager
+        .record_edit(&path, "HASH1", "HASH2", diffs1)
+        .unwrap();
 
     let diffs2 = vec![LineDiff::for_insertion(11, "line 2")];
-    manager.record_edit(&path, "HASH2", "HASH3", diffs2).unwrap();
+    manager
+        .record_edit(&path, "HASH2", "HASH3", diffs2)
+        .unwrap();
 
     // Undo twice
     manager.undo(&path, false).unwrap();
@@ -252,7 +264,9 @@ fn test_manager_new_edit_clears_redo_stack() {
     // Make new edit - should clear redo stack
     manager.record_access(&path, "HASH1").unwrap();
     let diffs3 = vec![LineDiff::for_insertion(12, "line 3")];
-    manager.record_edit(&path, "HASH1", "HASH4", diffs3).unwrap();
+    manager
+        .record_edit(&path, "HASH1", "HASH4", diffs3)
+        .unwrap();
 
     // Verify redo is no longer available (redo stack was cleared)
     let result = manager.redo(&path, false);
@@ -297,10 +311,14 @@ fn test_manager_get_history() {
     // Add some history
     manager.record_access(&path, "HASH1").unwrap();
     let diffs1 = vec![LineDiff::for_insertion(10, "line 1")];
-    manager.record_edit(&path, "HASH1", "HASH2", diffs1).unwrap();
+    manager
+        .record_edit(&path, "HASH1", "HASH2", diffs1)
+        .unwrap();
 
     let diffs2 = vec![LineDiff::for_insertion(11, "line 2")];
-    manager.record_edit(&path, "HASH2", "HASH3", diffs2).unwrap();
+    manager
+        .record_edit(&path, "HASH2", "HASH3", diffs2)
+        .unwrap();
 
     // Get all history
     let entries = manager.get_history(&path, None);
@@ -322,7 +340,9 @@ fn test_manager_max_entries_overflow() {
         let old_hash = format!("HASH{}", i - 1);
         let new_hash = format!("HASH{}", i);
         let diffs = vec![LineDiff::for_insertion(i, &format!("line {}", i))];
-        manager.record_edit(&path, &old_hash, &new_hash, diffs).unwrap();
+        manager
+            .record_edit(&path, &old_hash, &new_hash, diffs)
+            .unwrap();
     }
 
     // Should be able to undo 50 times (max entries)

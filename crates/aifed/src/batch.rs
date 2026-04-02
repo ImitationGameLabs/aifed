@@ -176,14 +176,18 @@ impl EditPlan {
                 if self.deletions.contains(&validated.target_line) {
                     return Err(Error::ConflictDeleteAndReplace(validated.target_line));
                 }
-                self.replacements.insert(validated.target_line, validated.new_content.unwrap());
+                self.replacements
+                    .insert(validated.target_line, validated.new_content.unwrap());
             }
             Operation::Insert => {
                 let content = validated.new_content.unwrap();
                 if validated.target_line == 0 {
                     self.inserts_at_start.push(content);
                 } else {
-                    self.inserts.entry(validated.target_line).or_default().push(content);
+                    self.inserts
+                        .entry(validated.target_line)
+                        .or_default()
+                        .push(content);
                 }
             }
         }
@@ -482,7 +486,10 @@ pub async fn execute_batch(
         };
         // Empty batch has no original lines to show in diff
         let empty_lines: Vec<String> = Vec::new();
-        println!("{}", format_batch_result_with_diff(&result, format, &empty_lines));
+        println!(
+            "{}",
+            format_batch_result_with_diff(&result, format, &empty_lines)
+        );
         return Ok(());
     }
 
@@ -493,7 +500,16 @@ pub async fn execute_batch(
 
     let lines = crate::file::split_lines_owned(&file_content);
 
-    execute_atomic(path, &lines, operations, dry_run, format, daemon_client, &expected_hash).await
+    execute_atomic(
+        path,
+        &lines,
+        operations,
+        dry_run,
+        format,
+        daemon_client,
+        &expected_hash,
+    )
+    .await
 }
 
 /// Execute in atomic mode: validate all, build edit plan, then apply all
@@ -572,14 +588,23 @@ async fn execute_atomic(
             }
         } else {
             // Standard single-line operation
-            let content_str = op.content.as_ref().map(|c| format!("\"{}\"", c)).unwrap_or_default();
-            let validated =
-                validate_operation(lines, op.operation, &op.locator, op.content.as_deref(), path)
-                    .map_err(|e| Error::InvalidBatchOp {
-                    line_number: idx + 1,
-                    line_content: format!("{} {} {}", op.operation_str(), op.locator, content_str),
-                    reason: e.to_string(),
-                })?;
+            let content_str = op
+                .content
+                .as_ref()
+                .map(|c| format!("\"{}\"", c))
+                .unwrap_or_default();
+            let validated = validate_operation(
+                lines,
+                op.operation,
+                &op.locator,
+                op.content.as_deref(),
+                path,
+            )
+            .map_err(|e| Error::InvalidBatchOp {
+                line_number: idx + 1,
+                line_content: format!("{} {} {}", op.operation_str(), op.locator, content_str),
+                reason: e.to_string(),
+            })?;
 
             // Add to plan (checks for conflicts)
             plan.add(validated)?;
@@ -615,7 +640,9 @@ async fn execute_atomic(
                 .canonicalize()
                 .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })?;
             let file_str = canonical.to_string_lossy().to_string();
-            let _ = client.record_edit(&file_str, expected_hash, &new_hash, diffs).await;
+            let _ = client
+                .record_edit(&file_str, expected_hash, &new_hash, diffs)
+                .await;
         }
     }
 
@@ -625,16 +652,27 @@ async fn execute_atomic(
         successful: operations.len(),
         failed: 0,
         message: if dry_run {
-            format!("Would apply {} operations to {}", operations.len(), path.display())
+            format!(
+                "Would apply {} operations to {}",
+                operations.len(),
+                path.display()
+            )
         } else {
-            format!("Applied {} operations to {}", operations.len(), path.display())
+            format!(
+                "Applied {} operations to {}",
+                operations.len(),
+                path.display()
+            )
         },
         new_lines,
         changes,
         errors: Vec::new(),
     };
 
-    println!("{}", format_batch_result_with_diff(&result, format, &result.new_lines));
+    println!(
+        "{}",
+        format_batch_result_with_diff(&result, format, &result.new_lines)
+    );
     Ok(())
 }
 
@@ -747,17 +785,26 @@ mod tests {
         let path = dir.path().join("test.txt");
 
         // Test WITH trailing newline (trailing empty string indicates newline)
-        let lines: Vec<String> = ["line1", "line2", ""].into_iter().map(String::from).collect();
+        let lines: Vec<String> = ["line1", "line2", ""]
+            .into_iter()
+            .map(String::from)
+            .collect();
         write_file(&path, &lines).unwrap();
         let mut content = String::new();
-        std::fs::File::open(&path).unwrap().read_to_string(&mut content).unwrap();
+        std::fs::File::open(&path)
+            .unwrap()
+            .read_to_string(&mut content)
+            .unwrap();
         assert_eq!(content, "line1\nline2\n");
 
         // Test WITHOUT trailing newline (no trailing empty string)
         let lines: Vec<String> = ["line1", "line2"].into_iter().map(String::from).collect();
         write_file(&path, &lines).unwrap();
         let mut content = String::new();
-        std::fs::File::open(&path).unwrap().read_to_string(&mut content).unwrap();
+        std::fs::File::open(&path)
+            .unwrap()
+            .read_to_string(&mut content)
+            .unwrap();
         assert_eq!(content, "line1\nline2");
     }
 
@@ -770,11 +817,17 @@ mod tests {
 
         // Multiple trailing newlines are represented as empty strings in lines
         // ["line1", "line2", "", ""] -> "line1\nline2\n\n"
-        let lines: Vec<String> = ["line1", "line2", "", ""].into_iter().map(String::from).collect();
+        let lines: Vec<String> = ["line1", "line2", "", ""]
+            .into_iter()
+            .map(String::from)
+            .collect();
         write_file(&path, &lines).unwrap();
 
         let mut content = String::new();
-        std::fs::File::open(&path).unwrap().read_to_string(&mut content).unwrap();
+        std::fs::File::open(&path)
+            .unwrap()
+            .read_to_string(&mut content)
+            .unwrap();
         assert_eq!(content, "line1\nline2\n\n");
     }
 
@@ -787,8 +840,10 @@ mod tests {
         plan.add(ValidatedOp { operation: Operation::Delete, target_line: 4, new_content: None })
             .unwrap();
 
-        let original: Vec<String> =
-            ["1", "2", "3", "4", "5"].into_iter().map(String::from).collect();
+        let original: Vec<String> = ["1", "2", "3", "4", "5"]
+            .into_iter()
+            .map(String::from)
+            .collect();
         let (new_lines, _) = plan.apply(&original);
 
         assert_eq!(new_lines, vec!["1", "3", "5"]);
@@ -864,8 +919,10 @@ mod tests {
         })
         .unwrap();
 
-        let original: Vec<String> =
-            ["L1", "L2", "L3", "L4"].into_iter().map(String::from).collect();
+        let original: Vec<String> = ["L1", "L2", "L3", "L4"]
+            .into_iter()
+            .map(String::from)
+            .collect();
         let (new_lines, _) = plan.apply(&original);
 
         // L1, insert A after L1, skip L2 (deleted), replace L3 with NEW3, keep L4
@@ -922,7 +979,9 @@ mod tests {
         );
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
+        execute_batch(&path, ops, false, OutputFormat::Text, None)
+            .await
+            .unwrap();
 
         // Verify result: start, a, b, c (in that order) with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
@@ -936,8 +995,10 @@ mod tests {
         let path = dir.path().join("test.txt");
 
         // Create a 5-line file with trailing newline
-        let lines: Vec<String> =
-            ["1", "2", "3", "4", "5", ""].into_iter().map(String::from).collect();
+        let lines: Vec<String> = ["1", "2", "3", "4", "5", ""]
+            .into_iter()
+            .map(String::from)
+            .collect();
         write_file(&path, &lines).unwrap();
 
         // Read file content and get hashes
@@ -954,7 +1015,9 @@ mod tests {
         );
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
+        execute_batch(&path, ops, false, OutputFormat::Text, None)
+            .await
+            .unwrap();
 
         // Verify result: 1, 3, 5 with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
@@ -968,8 +1031,10 @@ mod tests {
         let path = dir.path().join("test.txt");
 
         // Create a file with trailing newline
-        let lines: Vec<String> =
-            ["L1", "L2", "L3", "L4", "L5", ""].into_iter().map(String::from).collect();
+        let lines: Vec<String> = ["L1", "L2", "L3", "L4", "L5", ""]
+            .into_iter()
+            .map(String::from)
+            .collect();
         write_file(&path, &lines).unwrap();
 
         // Read file content and get hashes
@@ -989,7 +1054,9 @@ mod tests {
         );
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
+        execute_batch(&path, ops, false, OutputFormat::Text, None)
+            .await
+            .unwrap();
 
         // Verify result: L1, A, NEW3, L4, L5 with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
@@ -1004,8 +1071,10 @@ mod tests {
         let path = dir.path().join("test.txt");
 
         // Create a 4-line file with trailing newline
-        let lines: Vec<String> =
-            ["L1", "L2", "L3", "L4", ""].into_iter().map(String::from).collect();
+        let lines: Vec<String> = ["L1", "L2", "L3", "L4", ""]
+            .into_iter()
+            .map(String::from)
+            .collect();
         write_file(&path, &lines).unwrap();
 
         // Read file content and get hashes
@@ -1022,7 +1091,9 @@ mod tests {
         );
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
+        execute_batch(&path, ops, false, OutputFormat::Text, None)
+            .await
+            .unwrap();
 
         // Verify result: L1, NEW3, L4 with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
@@ -1062,7 +1133,10 @@ mod tests {
         // Rust code containing raw string literal
         let input = r##"+ 10:AB "let s = r#\"hello\"#;""##;
         let ops = parse_batch_operations(input).unwrap();
-        assert_eq!(ops[0].content, Some(r###"let s = r#"hello"#;"###.to_string()));
+        assert_eq!(
+            ops[0].content,
+            Some(r###"let s = r#"hello"#;"###.to_string())
+        );
     }
 
     #[test]
@@ -1072,7 +1146,10 @@ mod tests {
         let result = parse_batch_operations(input);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
-        assert!(err.contains("newline"), "error should mention newline: {err}");
+        assert!(
+            err.contains("newline"),
+            "error should mention newline: {err}"
+        );
     }
 
     #[test]
@@ -1151,7 +1228,9 @@ mod tests {
         let input = format!("- [2:{hash2},9:{hash9}]");
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
+        execute_batch(&path, ops, false, OutputFormat::Text, None)
+            .await
+            .unwrap();
 
         // Verify result: L1, L10 with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
@@ -1175,7 +1254,9 @@ mod tests {
         let input = format!("- [3:{hash3},3:{hash3}]");
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text, None).await.unwrap();
+        execute_batch(&path, ops, false, OutputFormat::Text, None)
+            .await
+            .unwrap();
 
         // Verify result: L1, L2, L4, L5 with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
@@ -1201,6 +1282,10 @@ mod tests {
         // Should fail with hash mismatch error
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
-        assert!(err.contains("Hash mismatch") || err.contains("line"), "Error: {}", err);
+        assert!(
+            err.contains("Hash mismatch") || err.contains("line"),
+            "Error: {}",
+            err
+        );
     }
 }

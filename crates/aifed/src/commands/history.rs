@@ -89,7 +89,12 @@ fn print_diff_hunk(diff: &LineDiffDto) {
 /// Print compact stat output
 fn print_stat(entries: &[HistoryEntryDto]) {
     for entry in entries {
-        println!("#{} {} {}", entry.id, format_timestamp(&entry.timestamp), entry.summary);
+        println!(
+            "#{} {} {}",
+            entry.id,
+            format_timestamp(&entry.timestamp),
+            entry.summary
+        );
     }
 }
 

@@ -26,12 +26,19 @@ pub async fn definition(
         Err(e) => {
             return (
                 StatusCode::BAD_REQUEST,
-                Json(ApiResponse::<DefinitionResponse>::error(ErrorCode::InvalidPath, e)),
+                Json(ApiResponse::<DefinitionResponse>::error(
+                    ErrorCode::InvalidPath,
+                    e,
+                )),
             );
         }
     };
 
-    match state.lsp_manager.goto_definition(&req.language, &state.workspace, params).await {
+    match state
+        .lsp_manager
+        .goto_definition(&req.language, &state.workspace, params)
+        .await
+    {
         Ok(Some(response)) => {
             let locations = match response {
                 lsp_types::GotoDefinitionResponse::Scalar(loc) => vec![location_to_response(loc)],
@@ -51,14 +58,23 @@ pub async fn definition(
                     })
                     .collect(),
             };
-            (StatusCode::OK, Json(ApiResponse::success(DefinitionResponse { locations })))
+            (
+                StatusCode::OK,
+                Json(ApiResponse::success(DefinitionResponse { locations })),
+            )
         }
-        Ok(None) => {
-            (StatusCode::OK, Json(ApiResponse::success(DefinitionResponse { locations: vec![] })))
-        }
+        Ok(None) => (
+            StatusCode::OK,
+            Json(ApiResponse::success(DefinitionResponse {
+                locations: vec![],
+            })),
+        ),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<DefinitionResponse>::error(ErrorCode::LspError, e.to_string())),
+            Json(ApiResponse::<DefinitionResponse>::error(
+                ErrorCode::LspError,
+                e.to_string(),
+            )),
         ),
     }
 }
@@ -72,7 +88,10 @@ pub async fn references(
         Err(e) => {
             return (
                 StatusCode::BAD_REQUEST,
-                Json(ApiResponse::<ReferencesResponse>::error(ErrorCode::InvalidPath, e)),
+                Json(ApiResponse::<ReferencesResponse>::error(
+                    ErrorCode::InvalidPath,
+                    e,
+                )),
             );
         }
     };
@@ -84,17 +103,30 @@ pub async fn references(
         context: ReferenceContext { include_declaration: true },
     };
 
-    match state.lsp_manager.references(&req.language, &state.workspace, params).await {
+    match state
+        .lsp_manager
+        .references(&req.language, &state.workspace, params)
+        .await
+    {
         Ok(Some(locs)) => {
             let locations = locs.into_iter().map(location_to_response).collect();
-            (StatusCode::OK, Json(ApiResponse::success(ReferencesResponse { locations })))
+            (
+                StatusCode::OK,
+                Json(ApiResponse::success(ReferencesResponse { locations })),
+            )
         }
-        Ok(None) => {
-            (StatusCode::OK, Json(ApiResponse::success(ReferencesResponse { locations: vec![] })))
-        }
+        Ok(None) => (
+            StatusCode::OK,
+            Json(ApiResponse::success(ReferencesResponse {
+                locations: vec![],
+            })),
+        ),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<ReferencesResponse>::error(ErrorCode::LspError, e.to_string())),
+            Json(ApiResponse::<ReferencesResponse>::error(
+                ErrorCode::LspError,
+                e.to_string(),
+            )),
         ),
     }
 }
@@ -111,20 +143,36 @@ pub async fn hover(
         Err(e) => {
             return (
                 StatusCode::BAD_REQUEST,
-                Json(ApiResponse::<HoverResponse>::error(ErrorCode::InvalidPath, e)),
+                Json(ApiResponse::<HoverResponse>::error(
+                    ErrorCode::InvalidPath,
+                    e,
+                )),
             );
         }
     };
 
-    match state.lsp_manager.hover(&req.language, &state.workspace, params).await {
+    match state
+        .lsp_manager
+        .hover(&req.language, &state.workspace, params)
+        .await
+    {
         Ok(Some(hover)) => {
             let contents = Some(hover_contents_to_string(hover.contents));
-            (StatusCode::OK, Json(ApiResponse::success(HoverResponse { contents })))
+            (
+                StatusCode::OK,
+                Json(ApiResponse::success(HoverResponse { contents })),
+            )
         }
-        Ok(None) => (StatusCode::OK, Json(ApiResponse::success(HoverResponse { contents: None }))),
+        Ok(None) => (
+            StatusCode::OK,
+            Json(ApiResponse::success(HoverResponse { contents: None })),
+        ),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<HoverResponse>::error(ErrorCode::LspError, e.to_string())),
+            Json(ApiResponse::<HoverResponse>::error(
+                ErrorCode::LspError,
+                e.to_string(),
+            )),
         ),
     }
 }
@@ -138,7 +186,10 @@ pub async fn completions(
         Err(e) => {
             return (
                 StatusCode::BAD_REQUEST,
-                Json(ApiResponse::<CompletionsResponse>::error(ErrorCode::InvalidPath, e)),
+                Json(ApiResponse::<CompletionsResponse>::error(
+                    ErrorCode::InvalidPath,
+                    e,
+                )),
             );
         }
     };
@@ -150,7 +201,11 @@ pub async fn completions(
         context: None,
     };
 
-    match state.lsp_manager.completion(&req.language, &state.workspace, params).await {
+    match state
+        .lsp_manager
+        .completion(&req.language, &state.workspace, params)
+        .await
+    {
         Ok(Some(response)) => {
             let items = match response {
                 lsp_types::CompletionResponse::Array(arr) => arr,
@@ -167,14 +222,21 @@ pub async fn completions(
                     }),
                 })
                 .collect();
-            (StatusCode::OK, Json(ApiResponse::success(CompletionsResponse { items })))
+            (
+                StatusCode::OK,
+                Json(ApiResponse::success(CompletionsResponse { items })),
+            )
         }
-        Ok(None) => {
-            (StatusCode::OK, Json(ApiResponse::success(CompletionsResponse { items: vec![] })))
-        }
+        Ok(None) => (
+            StatusCode::OK,
+            Json(ApiResponse::success(CompletionsResponse { items: vec![] })),
+        ),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<CompletionsResponse>::error(ErrorCode::LspError, e.to_string())),
+            Json(ApiResponse::<CompletionsResponse>::error(
+                ErrorCode::LspError,
+                e.to_string(),
+            )),
         ),
     }
 }
@@ -188,7 +250,10 @@ pub async fn diagnostics(
         Err(e) => {
             return (
                 StatusCode::BAD_REQUEST,
-                Json(ApiResponse::<DiagnosticsResponse>::error(ErrorCode::InvalidPath, e)),
+                Json(ApiResponse::<DiagnosticsResponse>::error(
+                    ErrorCode::InvalidPath,
+                    e,
+                )),
             );
         }
     };
@@ -201,14 +266,24 @@ pub async fn diagnostics(
         previous_result_id: None,
     };
 
-    match state.lsp_manager.diagnostic(&req.language, &state.workspace, params).await {
+    match state
+        .lsp_manager
+        .diagnostic(&req.language, &state.workspace, params)
+        .await
+    {
         Ok(report) => {
             let diagnostics = extract_diagnostics(report);
-            (StatusCode::OK, Json(ApiResponse::success(DiagnosticsResponse { diagnostics })))
+            (
+                StatusCode::OK,
+                Json(ApiResponse::success(DiagnosticsResponse { diagnostics })),
+            )
         }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<DiagnosticsResponse>::error(ErrorCode::LspError, e.to_string())),
+            Json(ApiResponse::<DiagnosticsResponse>::error(
+                ErrorCode::LspError,
+                e.to_string(),
+            )),
         ),
     }
 }
@@ -222,7 +297,10 @@ pub async fn rename(
         Err(e) => {
             return (
                 StatusCode::BAD_REQUEST,
-                Json(ApiResponse::<RenameResponse>::error(ErrorCode::InvalidPath, e)),
+                Json(ApiResponse::<RenameResponse>::error(
+                    ErrorCode::InvalidPath,
+                    e,
+                )),
             );
         }
     };
@@ -233,17 +311,28 @@ pub async fn rename(
         new_name: req.new_name,
     };
 
-    match state.lsp_manager.rename(&req.language, &state.workspace, params).await {
+    match state
+        .lsp_manager
+        .rename(&req.language, &state.workspace, params)
+        .await
+    {
         Ok(Some(edit)) => {
             let changes = workspace_edit_to_file_edits(edit);
-            (StatusCode::OK, Json(ApiResponse::success(RenameResponse { changes })))
+            (
+                StatusCode::OK,
+                Json(ApiResponse::success(RenameResponse { changes })),
+            )
         }
-        Ok(None) => {
-            (StatusCode::OK, Json(ApiResponse::success(RenameResponse { changes: vec![] })))
-        }
+        Ok(None) => (
+            StatusCode::OK,
+            Json(ApiResponse::success(RenameResponse { changes: vec![] })),
+        ),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(ApiResponse::<RenameResponse>::error(ErrorCode::LspError, e.to_string())),
+            Json(ApiResponse::<RenameResponse>::error(
+                ErrorCode::LspError,
+                e.to_string(),
+            )),
         ),
     }
 }
@@ -271,7 +360,11 @@ pub async fn did_open(
         },
     };
 
-    match state.lsp_manager.did_open(&req.language, &state.workspace, params).await {
+    match state
+        .lsp_manager
+        .did_open(&req.language, &state.workspace, params)
+        .await
+    {
         Ok(()) => (StatusCode::OK, Json(ApiResponse::ok())),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -299,7 +392,11 @@ pub async fn did_change(
         content_changes: content_changes_to_lsp(req.content_changes),
     };
 
-    match state.lsp_manager.did_change(&req.language, &state.workspace, params).await {
+    match state
+        .lsp_manager
+        .did_change(&req.language, &state.workspace, params)
+        .await
+    {
         Ok(()) => (StatusCode::OK, Json(ApiResponse::ok())),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -324,7 +421,11 @@ pub async fn did_close(
 
     let params = DidCloseTextDocumentParams { text_document: TextDocumentIdentifier { uri } };
 
-    match state.lsp_manager.did_close(&req.language, &state.workspace, params).await {
+    match state
+        .lsp_manager
+        .did_close(&req.language, &state.workspace, params)
+        .await
+    {
         Ok(()) => (StatusCode::OK, Json(ApiResponse::ok())),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,

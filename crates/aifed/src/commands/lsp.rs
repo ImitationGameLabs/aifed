@@ -15,7 +15,8 @@ use std::path::{Path, PathBuf};
 /// Convert path to absolute path for LSP requests.
 /// LSP requires absolute paths for file:// URIs.
 fn canonicalize_path(path: &Path) -> Result<PathBuf> {
-    path.canonicalize().map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })
+    path.canonicalize()
+        .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })
 }
 
 /// Detect language from file extension
@@ -73,7 +74,11 @@ fn extract_symbols(line: &str) -> Vec<(u32, String, u32)> {
         // Skip non-identifier characters
         while pos < line.len() && !line[pos..].starts_with(|c: char| c.is_alphabetic() || c == '_')
         {
-            pos += line[pos..].char_indices().next().map(|(_, c)| c.len_utf8()).unwrap_or(1);
+            pos += line[pos..]
+                .char_indices()
+                .next()
+                .map(|(_, c)| c.len_utf8())
+                .unwrap_or(1);
         }
 
         if pos >= line.len() {
@@ -181,13 +186,15 @@ fn resolve_position(file: &Path, hashline: &str, symbol: &str) -> Result<(u32, u
     let sym_loc = SymbolLocator::parse(symbol)?;
 
     // Find character offset
-    let char_offset = sym_loc.find_offset(&line_content).ok_or_else(|| Error::InvalidLocator {
-        input: symbol.to_string(),
-        reason: format!(
-            "Symbol '{}' not found at index {} on line {}",
-            sym_loc.name, sym_loc.index, line_num
-        ),
-    })?;
+    let char_offset = sym_loc
+        .find_offset(&line_content)
+        .ok_or_else(|| Error::InvalidLocator {
+            input: symbol.to_string(),
+            reason: format!(
+                "Symbol '{}' not found at index {} on line {}",
+                sym_loc.name, sym_loc.index, line_num
+            ),
+        })?;
 
     Ok((line_num as u32, char_offset + 1)) // Convert to 1-based
 }

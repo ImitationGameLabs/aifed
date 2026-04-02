@@ -132,7 +132,10 @@ impl StdioLspClient {
         let writer: Box<dyn tokio::io::AsyncWrite + Unpin + Send> = Box::new(BufWriter::new(stdin));
 
         // Create shared state and progress tracker
-        let shared = Arc::new(Mutex::new(Shared { writer, pending_responses: HashMap::new() }));
+        let shared = Arc::new(Mutex::new(Shared {
+            writer,
+            pending_responses: HashMap::new(),
+        }));
         let progress = Arc::new(ProgressTracker::new());
 
         // Clone for background task
@@ -311,7 +314,8 @@ impl StdioLspClient {
 
         // Wait for response with timeout
         let response = timeout(self.default_timeout, async {
-            rx.await.map_err(|_| Error::Transport("Response channel closed".into()))?
+            rx.await
+                .map_err(|_| Error::Transport("Response channel closed".into()))?
         })
         .await
         .map_err(|_| Error::LspTimeout { timeout_ms: self.default_timeout.as_millis() as u64 })??;
@@ -352,18 +356,23 @@ impl Drop for StdioLspClient {
 #[async_trait]
 impl LspClient for StdioLspClient {
     async fn initialize(&mut self, params: InitializeParams) -> Result<InitializeResult> {
-        let result = self.send_request::<InitializeResult>("initialize", params).await?;
+        let result = self
+            .send_request::<InitializeResult>("initialize", params)
+            .await?;
         self.initialized.store(true, Ordering::SeqCst);
         Ok(result)
     }
 
     async fn initialized(&mut self) -> Result<()> {
-        self.send_notification("initialized", serde_json::json!({})).await
+        self.send_notification("initialized", serde_json::json!({}))
+            .await
     }
 
     async fn shutdown(&mut self, force: bool) -> Result<()> {
-        self.send_request::<serde_json::Value>("shutdown", serde_json::json!(null)).await?;
-        self.send_notification("exit", serde_json::json!({})).await?;
+        self.send_request::<serde_json::Value>("shutdown", serde_json::json!(null))
+            .await?;
+        self.send_notification("exit", serde_json::json!({}))
+            .await?;
         self.initialized.store(false, Ordering::SeqCst);
 
         // Stop the background message loop
@@ -430,11 +439,13 @@ impl LspClient for StdioLspClient {
     }
 
     async fn did_change(&mut self, params: DidChangeTextDocumentParams) -> Result<()> {
-        self.send_notification("textDocument/didChange", params).await
+        self.send_notification("textDocument/didChange", params)
+            .await
     }
 
     async fn did_close(&mut self, params: DidCloseTextDocumentParams) -> Result<()> {
-        self.send_notification("textDocument/didClose", params).await
+        self.send_notification("textDocument/didClose", params)
+            .await
     }
 
     async fn get_progress(&self) -> Vec<ProgressInfo> {

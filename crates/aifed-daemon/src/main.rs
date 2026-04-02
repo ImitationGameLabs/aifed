@@ -110,7 +110,9 @@ fn init_logging(
     use tracing_subscriber::fmt::time::OffsetTime;
 
     // Parse log level
-    let level: Level = level.parse().with_context(|| format!("Invalid log level: {}", level))?;
+    let level: Level = level
+        .parse()
+        .with_context(|| format!("Invalid log level: {}", level))?;
 
     // Build env filter
     let env_filter = EnvFilter::builder()
@@ -133,8 +135,13 @@ fn init_logging(
             .init();
     } else if let Some(log_path) = log_file {
         // File output with rotation
-        let parent = log_path.parent().context("Log file has no parent directory")?;
-        let filename = log_path.file_name().context("Log file has no filename")?.to_string_lossy();
+        let parent = log_path
+            .parent()
+            .context("Log file has no parent directory")?;
+        let filename = log_path
+            .file_name()
+            .context("Log file has no filename")?
+            .to_string_lossy();
         std::fs::create_dir_all(parent)
             .with_context(|| format!("Failed to create log directory: {}", parent.display()))?;
 
@@ -149,18 +156,22 @@ fn init_logging(
 
         tracing_subscriber::registry()
             .with(env_filter)
-            .with(tracing_subscriber::fmt::layer().with_timer(timer).with_writer(move || {
-                struct LogWriter(Arc<std::sync::Mutex<LogRoller>>);
-                impl io::Write for LogWriter {
-                    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-                        self.0.lock().unwrap().write(buf)
-                    }
-                    fn flush(&mut self) -> io::Result<()> {
-                        self.0.lock().unwrap().flush()
-                    }
-                }
-                Box::new(LogWriter(appender.clone()))
-            }))
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_timer(timer)
+                    .with_writer(move || {
+                        struct LogWriter(Arc<std::sync::Mutex<LogRoller>>);
+                        impl io::Write for LogWriter {
+                            fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+                                self.0.lock().unwrap().write(buf)
+                            }
+                            fn flush(&mut self) -> io::Result<()> {
+                                self.0.lock().unwrap().flush()
+                            }
+                        }
+                        Box::new(LogWriter(appender.clone()))
+                    }),
+            )
             .init();
     } else {
         // No log file configured, stderr only
@@ -226,7 +237,10 @@ async fn main() -> anyhow::Result<()> {
             .with_context(|| format!("Failed to create socket directory: {}", parent.display()))?;
     }
 
-    tracing::info!("Starting aifed-daemon for workspace: {}", workspace.display());
+    tracing::info!(
+        "Starting aifed-daemon for workspace: {}",
+        workspace.display()
+    );
     tracing::info!("Socket path: {}", socket.display());
     tracing::info!("Lock file: {}", lock.display());
     if !args.log_stderr {
@@ -291,7 +305,9 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Run server
-    axum::serve(listener, app).with_graceful_shutdown(shutdown_signal).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal)
+        .await?;
 
     // Cleanup
     tracing::info!("Shutting down daemon");

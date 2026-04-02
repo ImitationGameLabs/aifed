@@ -71,7 +71,11 @@ pub fn format_lines(lines: &[HashedLine], format: OutputFormat, no_hashes: bool)
     match format {
         OutputFormat::Text => {
             if no_hashes {
-                lines.iter().map(|l| l.content.clone()).collect::<Vec<_>>().join("\n")
+                lines
+                    .iter()
+                    .map(|l| l.content.clone())
+                    .collect::<Vec<_>>()
+                    .join("\n")
             } else {
                 lines
                     .iter()
@@ -105,7 +109,10 @@ pub fn format_file_info(info: &FileInfo, format: OutputFormat) -> String {
     match format {
         OutputFormat::Text => {
             let size_str = format_size(info.size);
-            format!("Path: {}\nLines: {}\nSize: {}", info.path, info.lines, size_str)
+            format!(
+                "Path: {}\nLines: {}\nSize: {}",
+                info.path, info.lines, size_str
+            )
         }
         OutputFormat::Json => serde_json::to_string_pretty(&info).unwrap_or_default(),
     }
@@ -130,10 +137,18 @@ pub fn compute_change_summary(changes: &[EditChange]) -> String {
 
     let mut parts = Vec::new();
     if insertions > 0 {
-        parts.push(format!("{} insertion{}(+)", insertions, if insertions > 1 { "s" } else { "" }));
+        parts.push(format!(
+            "{} insertion{}(+)",
+            insertions,
+            if insertions > 1 { "s" } else { "" }
+        ));
     }
     if deletions > 0 {
-        parts.push(format!("{} deletion{}(-)", deletions, if deletions > 1 { "s" } else { "" }));
+        parts.push(format!(
+            "{} deletion{}(-)",
+            deletions,
+            if deletions > 1 { "s" } else { "" }
+        ));
     }
 
     if parts.is_empty() { "no changes".to_string() } else { parts.join(", ") }
@@ -186,7 +201,10 @@ pub fn format_batch_result_with_diff(
                 output.push(String::new());
                 output.push("Errors:".to_string());
                 for err in &result.errors {
-                    output.push(format!("  Line {}: {} - {}", err.line, err.operation, err.error));
+                    output.push(format!(
+                        "  Line {}: {} - {}",
+                        err.line, err.operation, err.error
+                    ));
                 }
             }
 
@@ -230,7 +248,10 @@ fn format_size(bytes: u64) -> String {
 /// Format hover response
 pub fn format_hover_response(resp: &HoverResponse, format: OutputFormat) -> String {
     match format {
-        OutputFormat::Text => resp.contents.clone().unwrap_or_else(|| "No hover info".to_string()),
+        OutputFormat::Text => resp
+            .contents
+            .clone()
+            .unwrap_or_else(|| "No hover info".to_string()),
         OutputFormat::Json => serde_json::to_string_pretty(&resp).unwrap_or_default(),
     }
 }
@@ -371,7 +392,11 @@ pub fn format_rename_result(resp: &RenameResponse, format: OutputFormat) -> Stri
             }
 
             let total_edits: usize = resp.changes.iter().map(|f| f.edits.len()).sum();
-            format!("Renamed in {} file(s), {} edit(s)", resp.changes.len(), total_edits)
+            format!(
+                "Renamed in {} file(s), {} edit(s)",
+                resp.changes.len(),
+                total_edits
+            )
         }
         OutputFormat::Json => serde_json::to_string_pretty(&resp).unwrap_or_default(),
     }
