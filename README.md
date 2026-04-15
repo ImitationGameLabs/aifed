@@ -16,7 +16,7 @@ See the [Installation Guide](docs/installation-guide.md) for setup instructions.
 
 ## Current Status
 
-Core features are implemented and available for experimental use in real scenarios:
+### Features
 
 | Feature                                         | Status |
 | ----------------------------------------------- | ------ |
@@ -25,6 +25,24 @@ Core features are implemented and available for experimental use in real scenari
 | `lsp` - LSP integration (Rust first)            | Ready  |
 | `history/undo/redo` - Edit history and recovery | Ready  |
 | `copy/paste/clipboard` - Clipboard operations   | Ready  |
+
+### LSP *Support*
+
+| Language   | LSP Server    | Status  |
+| ---------- | ------------- | ------- |
+| Rust       | rust-analyzer | Ready   |
+| TypeScript | -             | Planned |
+| Go         | -             | Planned |
+| Nix        | -             | Planned |
+| Lean4      | -             | Planned |
+
+### Platform Support
+
+| Platform       | Supported | Tested |
+| -------------- | --------- | ------ |
+| linux          | Yes       | Yes    |
+| Windows        | No        | N/A    |
+| Darwin (macOS) | Unknown   | No     |
 
 **Current focus:** Optimizing the AI agent experience through real-world usage. Testing and refining the workflow in actual coding tasks.
 
