@@ -24,16 +24,17 @@ AI Agent working guide. This document provides code structure and decision rules
 - [Add workspace member](docs/agent-action-wizards/add-workspace-member.md)
 - [CLI test walkthrough](docs/agent-action-wizards/aifed-cli-test-walkthrough.md)
 
-## Testing aifed Commands
+## Testing aifed in `.playground/`
 
-When testing aifed commands, use the `.playground/` directory:
+Use `.playground/` as the general scratch workspace for testing aifed during development. This includes CLI flows, edit behavior, LSP-driven operations, and other manual verification tasks.
 
 ```bash
 cd .playground
+../target/debug/aifed --skill
 ../target/debug/aifed <command>
 ```
 
-The `.playground/` directory is in `.gitignore`. Refer to the `CLI test walkthrough` for test cases.
+The `.playground/` directory is in `.gitignore`. The [CLI test walkthrough](docs/agent-action-wizards/aifed-cli-test-walkthrough.md) provides example test cases, but `.playground/` is not limited to that guide.
 
 ## Dependency Management
 

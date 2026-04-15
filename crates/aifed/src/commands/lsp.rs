@@ -4,7 +4,7 @@ use crate::args::LspCommands;
 use crate::error::{Error, Result};
 use crate::hash::{hash_file, hash_line};
 use crate::locator::{Locator, SymbolLocator};
-use crate::output::{self, OutputFormat};
+use crate::output::{self, OutputFormat, RenameFileDiff};
 use aifed_common::{
     DiagnosticsRequest, HoverRequest, LineDiffDto, LspPositionRequest, Position, RenameRequest,
 };
@@ -106,11 +106,7 @@ fn extract_symbols(line: &str) -> Vec<(u32, String, u32)> {
 
 /// Compute line diffs for rename operations by comparing original and new content.
 /// For rename operations, we simply compare lines at the same positions.
-fn compute_rename_diffs(
-    original_lines: &[&str],
-    new_lines: &[&str],
-    _edits: &[aifed_common::TextEdit],
-) -> Vec<LineDiffDto> {
+fn compute_rename_diffs(original_lines: &[&str], new_lines: &[&str]) -> Vec<LineDiffDto> {
     let mut diffs = Vec::new();
     let max_lines = original_lines.len().max(new_lines.len());
 
@@ -154,6 +150,52 @@ fn compute_rename_diffs(
     }
 
     diffs
+}
+
+struct PreparedRenameFile {
+    path: PathBuf,
+    file_path: String,
+    edit_count: usize,
+    expected_hash: String,
+    new_hash: String,
+    new_content: String,
+    diffs: Vec<LineDiffDto>,
+    new_lines: Vec<String>,
+}
+
+impl PreparedRenameFile {
+    fn to_output_diff(&self) -> RenameFileDiff {
+        RenameFileDiff {
+            file_path: self.file_path.clone(),
+            edit_count: self.edit_count,
+            diffs: self.diffs.clone(),
+            new_lines: self.new_lines.clone(),
+        }
+    }
+}
+
+fn prepare_rename_file(file_edit: &aifed_common::FileEdit) -> Result<PreparedRenameFile> {
+    let path = PathBuf::from(&file_edit.file_path);
+    let content = crate::file::read_text_file(&path)?;
+    let expected_hash = hash_file(content.as_bytes());
+    let original_lines = crate::file::split_lines(&content);
+
+    let new_content = crate::text_edit::apply_edits(&content, file_edit.edits.clone())?;
+    let new_hash = hash_file(new_content.as_bytes());
+    let new_lines = crate::file::split_lines_owned(&new_content);
+    let updated_lines = crate::file::split_lines(&new_content);
+    let diffs = compute_rename_diffs(&original_lines, &updated_lines);
+
+    Ok(PreparedRenameFile {
+        path,
+        file_path: file_edit.file_path.clone(),
+        edit_count: file_edit.edits.len(),
+        expected_hash,
+        new_hash,
+        new_content,
+        diffs,
+        new_lines,
+    })
 }
 
 /// Resolve position from hashline and symbol locator
@@ -330,41 +372,30 @@ pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFor
             };
 
             let response = client.rename(request).await?;
+            let prepared_files: Vec<PreparedRenameFile> = response
+                .changes
+                .iter()
+                .map(prepare_rename_file)
+                .collect::<Result<_>>()?;
+            let rename_diffs: Vec<RenameFileDiff> = prepared_files
+                .iter()
+                .map(PreparedRenameFile::to_output_diff)
+                .collect();
 
             if *dry_run {
-                // Preview mode: show detailed edit information
-                println!("{}", output::format_rename_preview(&response, format));
+                println!(
+                    "{}",
+                    output::format_rename_preview(&response, &rename_diffs, format)
+                );
             } else {
-                // Apply mode: validate all ranges, then apply edits
-                for file_edit in &response.changes {
-                    let path = PathBuf::from(&file_edit.file_path);
-                    let content = crate::file::read_text_file(&path)?;
+                for prepared in &prepared_files {
+                    std::fs::write(&prepared.path, &prepared.new_content)
+                        .map_err(|e| Error::InvalidIo { path: prepared.path.clone(), source: e })?;
 
-                    // Compute hash before edit
-                    let expected_hash = hash_file(content.as_bytes());
-
-                    // Parse original lines for diff computation
-                    let original_lines = crate::file::split_lines(&content);
-
-                    // Validate and apply (validates all ranges first, then applies)
-                    let new_content =
-                        crate::text_edit::apply_edits(&content, file_edit.edits.clone())?;
-
-                    // Compute new hash
-                    let new_hash = hash_file(new_content.as_bytes());
-
-                    // Parse new lines for diff computation
-                    let new_lines = crate::file::split_lines(&new_content);
-
-                    // Convert TextEdits to LineDiffDto
-                    let diffs = compute_rename_diffs(&original_lines, &new_lines, &file_edit.edits);
-
-                    // Write the file
-                    std::fs::write(&path, &new_content)
-                        .map_err(|e| Error::InvalidIo { path: path.clone(), source: e })?;
-
-                    // Record edit with daemon (for history tracking)
-                    let file_str = path.to_string_lossy().to_string();
+                    let file_str = prepared.path.to_string_lossy().to_string();
+                    let expected_hash = prepared.expected_hash.clone();
+                    let new_hash = prepared.new_hash.clone();
+                    let diffs = prepared.diffs.clone();
                     let daemon_client = client.clone();
                     tokio::spawn(async move {
                         let _ = daemon_client
@@ -372,7 +403,10 @@ pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFor
                             .await;
                     });
                 }
-                println!("{}", output::format_rename_result(&response, format));
+                println!(
+                    "{}",
+                    output::format_rename_result(&response, &rename_diffs, format)
+                );
             }
             Ok(())
         }

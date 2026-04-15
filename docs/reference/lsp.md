@@ -264,7 +264,7 @@ Rename a symbol across all references using LSP.
 ### Usage
 
 ```
-aifed lsp rename <FILE> <HASHLINE> <SYMBOL> <NEW_NAME>
+aifed lsp rename <FILE> <HASHLINE> <SYMBOL> <NEW_NAME> [--dry-run]
 ```
 
 ### Arguments
@@ -280,11 +280,22 @@ The hashline ensures the line content hasn't drifted. Symbol locator index is pe
 
 Get both values with: `aifed lsp symbols <FILE> <LINE>`
 
+### Output
+
+- Text output shows a summary followed by one diff section per changed file.
+- Each file section uses a single file header plus contextual `-old/+new` hunk lines.
+- Paths are shown relative to the workspace root when possible, with absolute fallback.
+- `--dry-run` previews the rename without writing files.
+- `--json` keeps the raw structured response from the daemon.
+
 ### Examples
 
 ```bash
 # Rename symbol (hashline from symbols output)
 aifed lsp rename main.rs 15:3K S1:config settings
+
+# Preview the rename diff without applying it
+aifed lsp rename main.rs 15:3K S1:config settings --dry-run
 
 # JSON output
 aifed lsp rename main.rs 15:3K S1:config settings --json

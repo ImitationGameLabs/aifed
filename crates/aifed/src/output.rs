@@ -1,8 +1,11 @@
 use serde::Serialize;
+use std::path::Path;
+
+use aifed_common::workspace::detect_workspace;
 
 // Re-export LSP response types for formatting
 pub use aifed_common::{
-    CompletionsResponse, DefinitionResponse, DiagnosticsResponse, HoverResponse,
+    CompletionsResponse, DefinitionResponse, DiagnosticsResponse, HoverResponse, LineDiffDto,
     ReferencesResponse, RenameResponse,
 };
 
@@ -64,6 +67,14 @@ pub struct BatchResult {
     pub changes: Vec<EditChange>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub errors: Vec<BatchOpError>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RenameFileDiff {
+    pub file_path: String,
+    pub edit_count: usize,
+    pub diffs: Vec<LineDiffDto>,
+    pub new_lines: Vec<String>,
 }
 
 /// Format hashed lines for output
@@ -356,48 +367,196 @@ pub fn format_diagnostics_response(resp: &DiagnosticsResponse, format: OutputFor
 }
 
 /// Format rename preview for dry-run mode.
-pub fn format_rename_preview(resp: &RenameResponse, format: OutputFormat) -> String {
+pub fn format_rename_preview(
+    resp: &RenameResponse,
+    file_diffs: &[RenameFileDiff],
+    format: OutputFormat,
+) -> String {
     match format {
         OutputFormat::Text => {
             if resp.changes.is_empty() {
                 return "No changes".to_string();
             }
-
-            let mut output = Vec::new();
-            for file_edit in &resp.changes {
-                output.push(format!("File: {}", file_edit.file_path));
-                for edit in &file_edit.edits {
-                    output.push(format!(
-                        "  Line {}:{} - {}:{}",
-                        edit.range.start.line + 1,
-                        edit.range.start.character + 1,
-                        edit.range.end.line + 1,
-                        edit.range.end.character + 1
-                    ));
-                    output.push(format!("    -> {}", edit.new_text));
-                }
-            }
-            output.join("\n")
+            format_rename_text("Rename preview", file_diffs)
         }
         OutputFormat::Json => serde_json::to_string_pretty(&resp).unwrap_or_default(),
     }
 }
 
 /// Format rename result summary for normal mode.
-pub fn format_rename_result(resp: &RenameResponse, format: OutputFormat) -> String {
+pub fn format_rename_result(
+    resp: &RenameResponse,
+    file_diffs: &[RenameFileDiff],
+    format: OutputFormat,
+) -> String {
     match format {
         OutputFormat::Text => {
             if resp.changes.is_empty() {
                 return "No changes".to_string();
             }
-
-            let total_edits: usize = resp.changes.iter().map(|f| f.edits.len()).sum();
-            format!(
-                "Renamed in {} file(s), {} edit(s)",
-                resp.changes.len(),
-                total_edits
-            )
+            format_rename_text("Renamed", file_diffs)
         }
         OutputFormat::Json => serde_json::to_string_pretty(&resp).unwrap_or_default(),
+    }
+}
+
+fn format_rename_text(verb: &str, file_diffs: &[RenameFileDiff]) -> String {
+    let mut file_diffs = file_diffs.to_vec();
+    file_diffs.sort_by(|a, b| a.file_path.cmp(&b.file_path));
+
+    let total_edits: usize = file_diffs.iter().map(|f| f.edit_count).sum();
+    let mut output = vec![format!(
+        "{} in {} file(s), {} edit(s)",
+        verb,
+        file_diffs.len(),
+        total_edits
+    )];
+
+    for file_diff in file_diffs {
+        output.push(String::new());
+
+        let display_path = display_rename_path(&file_diff.file_path);
+        output.push(format!("File: {display_path}"));
+
+        let diff_view =
+            crate::diff::format_diffs_with_context(&file_diff.diffs, &file_diff.new_lines, 3);
+        if diff_view != "  (no changes)" {
+            output.push(diff_view);
+        }
+    }
+
+    output.join("\n")
+}
+
+fn display_rename_path(file_path: &str) -> String {
+    let path = Path::new(file_path);
+
+    if let Some(workspace_root) = path
+        .parent()
+        .and_then(detect_workspace)
+        .map(|workspace| workspace.root().to_path_buf())
+        && let Ok(relative) = path.strip_prefix(&workspace_root)
+    {
+        return relative.to_string_lossy().to_string();
+    }
+
+    file_path.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aifed_common::{FileEdit, Position, Range, TextEdit};
+
+    fn make_text_edit(
+        start_line: u32,
+        start_character: u32,
+        end_line: u32,
+        end_character: u32,
+        new_text: &str,
+    ) -> TextEdit {
+        TextEdit {
+            range: Range {
+                start: Position { line: start_line, character: start_character },
+                end: Position { line: end_line, character: end_character },
+            },
+            new_text: new_text.to_string(),
+        }
+    }
+
+    fn make_line_diff(line_num: usize, old: Option<&str>, new: Option<&str>) -> LineDiffDto {
+        LineDiffDto {
+            line_num,
+            old_hash: None,
+            old_content: old.map(str::to_string),
+            new_content: new.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn format_rename_preview_shows_single_file_header() {
+        let response = RenameResponse {
+            changes: vec![FileEdit {
+                file_path: "/workspace/src/main.rs".to_string(),
+                edits: vec![make_text_edit(1, 4, 1, 8, "new_name")],
+            }],
+        };
+        let file_diffs = vec![RenameFileDiff {
+            file_path: "/workspace/src/main.rs".to_string(),
+            edit_count: 1,
+            diffs: vec![make_line_diff(2, Some("let old_name = 1;"), Some("let new_name = 1;"))],
+            new_lines: vec![
+                "fn main() {".to_string(),
+                "let new_name = 1;".to_string(),
+                "}".to_string(),
+            ],
+        }];
+
+        let output = format_rename_preview(&response, &file_diffs, OutputFormat::Text);
+
+        assert!(output.contains("Rename preview in 1 file(s), 1 edit(s)"));
+        assert!(output.contains("File: /workspace/src/main.rs"));
+        assert!(output.contains("-2|let old_name = 1;"));
+        assert!(output.contains("+2|let new_name = 1;"));
+    }
+
+    #[test]
+    fn format_rename_result_sorts_files_for_stable_output() {
+        let response = RenameResponse {
+            changes: vec![
+                FileEdit {
+                    file_path: "/workspace/src/z.rs".to_string(),
+                    edits: vec![make_text_edit(0, 0, 0, 1, "renamed_z")],
+                },
+                FileEdit {
+                    file_path: "/workspace/src/a.rs".to_string(),
+                    edits: vec![make_text_edit(0, 0, 0, 1, "renamed_a")],
+                },
+            ],
+        };
+        let file_diffs = vec![
+            RenameFileDiff {
+                file_path: "/workspace/src/z.rs".to_string(),
+                edit_count: 1,
+                diffs: vec![make_line_diff(1, Some("z"), Some("renamed_z"))],
+                new_lines: vec!["renamed_z".to_string()],
+            },
+            RenameFileDiff {
+                file_path: "/workspace/src/a.rs".to_string(),
+                edit_count: 1,
+                diffs: vec![make_line_diff(1, Some("a"), Some("renamed_a"))],
+                new_lines: vec!["renamed_a".to_string()],
+            },
+        ];
+
+        let output = format_rename_result(&response, &file_diffs, OutputFormat::Text);
+        let a_pos = output.find("File: /workspace/src/a.rs").unwrap();
+        let z_pos = output.find("File: /workspace/src/z.rs").unwrap();
+
+        assert!(output.starts_with("Renamed in 2 file(s), 2 edit(s)"));
+        assert!(a_pos < z_pos);
+    }
+
+    #[test]
+    fn format_rename_result_avoids_git_specific_headers() {
+        let response = RenameResponse {
+            changes: vec![FileEdit {
+                file_path: "/workspace/src/main.rs".to_string(),
+                edits: vec![make_text_edit(0, 0, 0, 1, "renamed")],
+            }],
+        };
+        let file_diffs = vec![RenameFileDiff {
+            file_path: "/workspace/src/main.rs".to_string(),
+            edit_count: 1,
+            diffs: vec![make_line_diff(1, Some("a"), Some("renamed"))],
+            new_lines: vec!["renamed".to_string()],
+        }];
+
+        let output = format_rename_result(&response, &file_diffs, OutputFormat::Text);
+
+        assert!(output.contains("File: /workspace/src/main.rs"));
+        assert!(!output.contains("diff --git"));
+        assert!(!output.contains("\n--- "));
+        assert!(!output.contains("\n+++ "));
     }
 }
