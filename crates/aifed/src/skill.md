@@ -44,13 +44,16 @@ If you see `\r` at line endings in JSON output, the file uses CRLF:
 {"line": 1, "content": "line1\r"}  ← CRLF file
 ```
 
-**Key rule**: Replace with identical ending to preserve, or change to control:
+**Key rule**: Delete then insert with the identical ending to preserve, or change the inserted ending to control:
 
 ```
 Original:  1:XX "line1\r"     (CRLF)
 
-= 1:XX "modified\r"            → keeps CRLF  (recommended for CRLF files)
-= 1:XX "modified"              → converts to LF
+- 1:XX
++ 1:XX "modified\r"            → keeps CRLF  (recommended for CRLF files)
+
+- 1:XX
++ 1:XX "modified"              → converts to LF
 ```
 
 ### Trailing Newline Control
@@ -66,9 +69,15 @@ To change trailing newline status:
 
 ## EDIT OPERATORS
 
-=   Replace line at locator
-+   Insert new line after locator
++   Insert one or more new lines after locator
 -   Delete line at locator (supports range: `- [START:HASH,END:HASH]`)
+
+Replacement is expressed as delete plus insert. For range replacement, the documented canonical form is:
+
+```text
+- [START:HASH,END:HASH]
++ END:HASH "new line 1" "new line 2"
+```
 
 ## LINE LOCATORS
 
@@ -85,7 +94,7 @@ Content in double quotes supports JSON escape sequences:
 - `\r` → carriage return (typically at end of line for CRLF files)
 - `\uXXXX` → Unicode character
 
-**`\n` is not allowed** in edit content. Each operation targets exactly one line — lines are the atomic unit of editing. To modify multiple lines, use multiple operations (one `=` per line to replace, or `+` to insert).
+**`\n` is not allowed** in edit content. Each inserted content payload is exactly one line. To insert multiple lines at one anchor, provide multiple quoted payloads after a single `+`.
 
 Example: `"code: println!(\"hello\");"` becomes `code: println!("hello");`
 
@@ -170,12 +179,13 @@ aifed read main.rs [12,18]      # Re-read with context (targeting line 15)
 
 # Single edit - use heredoc with 'EOF' to prevent shell expansion
 aifed edit main.rs <<'EOF'
-= 42:3K "new content"
+- 42:3K
++ 42:3K "new content"
 EOF
 
 # Insert after line 10
 aifed edit main.rs <<'EOF'
-+ 10:AB "inserted line"
++ 10:AB "inserted line" "another inserted line"
 EOF
 
 # Delete line 15
@@ -190,7 +200,8 @@ EOF
 
 # Batch edit - multiple operations in one heredoc
 aifed edit main.rs <<'EOF'
-= 1:AB "modified"
+- [1:AB,1:AB]
++ 1:AB "modified"
 + 10:3K "inserted"
 - 15:7M
 EOF
@@ -202,7 +213,8 @@ EOF
 
 # Content with JSON escaping
 aifed edit main.rs <<'EOF'
-= 1:AB "println!(\"result: {}\", value);"
+- 1:AB
++ 1:AB "println!(\"result: {}\", value);"
 + 5:CD "{\"key\": \"value\"}"
 EOF
 

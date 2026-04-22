@@ -82,16 +82,15 @@ pub enum Commands {
     /// Operations are read from stdin:
     ///   ```bash
     ///   aifed edit main.rs <<'EOF'
-    ///   = 42:AB "new content"
-    ///   + 10:3K "inserted line"
+    ///   + 42:AB "new content"
+    ///   + 10:3K "inserted line" "another inserted line"
     ///   - 15:7M
     ///   - [20:XX,30:YY]
     ///   EOF
     ///   ```
     ///
     /// Operations:
-    ///   =  Replace line at locator
-    ///   +  Insert new line after locator
+    ///   +  Insert one or more new lines after locator
     ///   -  Delete line at locator (or range with [start:end])
     Edit {
         /// File to edit

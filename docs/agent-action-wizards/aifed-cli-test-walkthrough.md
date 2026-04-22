@@ -96,16 +96,17 @@ aifed read test.txt [1,2]
 
 ---
 
-## Replace Line with Hashline Verification
+## Replace Line with Delete Plus Insert
 
-**Goal:** Verify `=` (replace) operation modifies a line when hash matches.
+**Goal:** Verify replacement via `-` plus `+` modifies a line when hash matches.
 
 **Steps:**
 ```bash
 aifed read test.txt
 # Capture hash for line 2 (e.g., 3K)
 aifed edit test.txt <<'EOF'
-= 2:3K "modified line2"
+- 2:3K
++ 2:3K "modified line2"
 EOF
 aifed read test.txt
 ```
@@ -122,15 +123,16 @@ aifed read test.txt
 
 ---
 
-## Replace with Hash Mismatch
+## Replacement with Hash Mismatch
 
-**Goal:** Verify edit is rejected when hash does not match current content.
+**Goal:** Verify replacement is rejected when the stale hash does not match current content.
 
 **Steps:**
 ```bash
 # Using stale hash (from original line content)
 aifed edit test.txt <<'EOF'
-= 2:3K "should fail"
+- 2:3K
++ 2:3K "should fail"
 EOF
 ```
 
@@ -236,7 +238,8 @@ aifed read test.txt
 ```bash
 aifed read test.txt
 aifed edit test.txt --dry-run <<'EOF'
-= 1:C8 "new content"
+- 1:C8
++ 1:C8 "new content"
 EOF
 aifed read test.txt
 ```
@@ -246,7 +249,7 @@ aifed read test.txt
 - File content is unchanged
 
 ```
-Would apply = to test.txt
+Would apply 2 operations to test.txt
 ```
 
 ---
@@ -263,7 +266,8 @@ echo -e "line1\nline2\nline3\nline4" > batch.txt
 aifed read batch.txt
 # Capture hashes for lines, then apply batch edit
 aifed edit batch.txt <<EOF
-= 1:XX "modified line1"
+- 1:XX
++ 1:XX "modified line1"
 + 2:XX "inserted after line2"
 - 4:XX
 EOF
@@ -286,10 +290,11 @@ aifed read batch.txt
 ```bash
 echo -e "line1\nline2\nline3" > atomic.txt
 aifed read atomic.txt
-# Use invalid hash for second operation
+# Use wrong but syntactically valid hash for second operation
 aifed edit atomic.txt <<EOF
-= 1:XX "this should work"
-+ 2:INVALID "but this hash is wrong"
+- 1:XX
++ 1:XX "this should work"
++ 2:VV "but this hash is wrong"
 EOF
 aifed read atomic.txt
 ```
@@ -299,11 +304,11 @@ aifed read atomic.txt
 - File is unchanged (line 1 still has original content)
 
 ```
-Batch parse error on line 2: '+ 2:INVALID "but this hash is wrong"'
+Batch parse error on line 3: '+ 2:VV "but this hash is wrong"'
   Reason: Hash mismatch
   File: atomic.txt
   Line: 2
-  Expected hash: INVALID
+  Expected hash: VV
   Actual hash: TD
   Actual content: line2
   Hint: Run 'aifed read atomic.txt' to get current hashes
@@ -321,7 +326,8 @@ echo -e "line1\nline2\nline3" > comments.txt
 aifed read comments.txt
 aifed edit comments.txt <<EOF
 # This is a comment
-= 1:XX "modified"
+- 1:XX
++ 1:XX "modified"
 
 + 2:XX "inserted"
 # Another comment

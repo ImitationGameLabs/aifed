@@ -218,7 +218,7 @@ The output provides everything needed for LSP operations: `15:3K` (hashline) and
 
 | Locator Type   | Format        | Use Case                                               |
 | -------------- | ------------- | ------------------------------------------------------ |
-| Line Locator   | `LINE:HASH`   | Edit operations (`~`, `+`, `-`)                        |
+| Line Locator   | `LINE:HASH`   | Edit operations (`+`, `-`)                             |
 | Symbol Locator | `SINDEX:NAME` | Symbol identification (used with Line Locator for LSP) |
 
 For LSP operations, both locators are required: `LINE:HASH` identifies the line, `SINDEX:NAME` identifies the symbol on that line.
@@ -240,9 +240,10 @@ aifed lsp refs main.rs 15:3K S1:config
 Locators are used with the `edit` command:
 
 ```bash
-# Replace with LINE:HASH format
+# Replace a line via delete + insert at the same anchor
 aifed edit main.rs <<'EOF'
-= 42:AB "new content"
+- 42:AB
++ 42:AB "new content"
 EOF
 
 # Insert after a line
@@ -262,7 +263,8 @@ EOF
 
 # Batch operations
 aifed edit main.rs <<'EOF'
-= 42:AB "new content"
+- [42:AB,42:AB]
++ 42:AB "new content"
 + 10:3K "another line"
 - 15:7M
 EOF

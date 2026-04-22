@@ -156,7 +156,8 @@ aifed lsp diag .
 
 ```bash
 aifed edit main.rs <<'EOF'
-= 42:AB "new code"
+- 42:AB
++ 42:AB "new code"
 EOF
 
 # Check for errors

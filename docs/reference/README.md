@@ -8,7 +8,7 @@ This directory contains reference documentation for all **aifed** commands and c
 | ---------------------- | ------------------------------------ | ------------------------------------ | ----------- |
 | **CLI Overview**       | Global options, workspace detection  | [cli-overview.md](cli-overview.md)   | Implemented |
 | **Locator**            | Positioning mechanism for safe edits | [locator.md](locator.md)             | Implemented |
-| **Edit Commands**      | Unified edit with =, +, - operators  | [edit-commands.md](edit-commands.md) | Implemented |
+| **Edit Commands**      | Unified edit with + and - operators   | [edit-commands.md](edit-commands.md) | Implemented |
 | **Read Commands**      | info, read                           | [read-commands.md](read-commands.md) | Implemented |
 | **LSP Integration**    | diag, symbols, rename, etc.          | [lsp.md](lsp.md)                     | Implemented |
 | **History & Recovery** | history, undo, redo                  | [history.md](history.md)             | Implemented |
@@ -19,7 +19,7 @@ This directory contains reference documentation for all **aifed** commands and c
 ## Command Categories
 
 ### Core Editing
-- [`edit`](edit-commands.md#edit) - Edit file content (replace, insert, delete)
+- [`edit`](edit-commands.md#edit) - Edit file content (delete and insert; replacement via `-` + `+`)
 
 ### File Information
 - [`read`](read-commands.md#read) - Read file content

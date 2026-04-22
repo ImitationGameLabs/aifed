@@ -4,7 +4,7 @@ Commands for modifying file content.
 
 ## `edit` - Edit File Content
 
-The unified command for all file edits: replace, insert, and delete.
+The unified command for all file edits: delete and insert. Replacement is expressed as delete plus insert.
 
 ### Usage
 
@@ -16,16 +16,37 @@ All edit operations are provided via stdin using heredoc syntax.
 
 ### Operations
 
-| Operator | Syntax                  | Description                                       |
-| -------- | ----------------------- | ------------------------------------------------- |
-| `=`      | `= <LOCATOR> <CONTENT>` | Replace content at locator                        |
-| `+`      | `+ <LOCATOR> <CONTENT>` | Insert content after locator                      |
-| `-`      | `- <LOCATOR>`           | Delete content at locator (supports range delete) |
+| Operator | Syntax                    | Description                                               |
+| -------- | ------------------------- | --------------------------------------------------------- |
+| `+`      | `+ <LOCATOR> <CONTENT...>` | Insert one or more lines after locator                    |
+| `-`      | `- <LOCATOR>`             | Delete content at locator (supports range delete)         |
 
 **Mnemonic:**
-- `=` - Equals suggests "assignment" (replace X with Y)
 - `+` - Plus suggests "add" or "insert"
 - `-` - Minus suggests "remove" or "delete"
+
+### Replacement Pattern
+
+Replacement is written as delete plus insert:
+
+```bash
+# Replace one line
+aifed edit main.rs <<'EOF'
+- 42:AB
++ 42:AB "fn main() {"
+EOF
+```
+
+For range replacement, the documented canonical form is to reuse the deleted range end hashline:
+
+```bash
+aifed edit main.rs <<'EOF'
+- [10:AB,14:CD]
++ 14:CD "new line 1" "new line 2"
+EOF
+```
+
+Because edits are resolved atomically against the original file state, insertion after the line before the range or after a deleted line inside the range may also work. Documentation and examples intentionally standardize on `+ END:HASH ...` to keep the mental model simple for LLMs.
 
 ### Locator Format
 
@@ -60,19 +81,22 @@ Content in double quotes supports JSON escape sequences:
 | `\r`     | carriage return    |
 | `\uXXXX` | Unicode character  |
 
+**Rules:**
+- `\n` is rejected. Each content payload is exactly one line.
+- A single `+` can carry multiple quoted payloads, inserted in order.
+
 **Example:**
 ```bash
 # Double quotes inside content
 aifed edit main.rs <<'EOF'
-= 42:AB "println!(\"hello\");"
++ 42:AB "println!(\"hello\");"
 EOF
 # Result: println!("hello");
 
-# JSON string as content
-aifed edit config.rs <<'EOF'
-+ 10:CD "{\"key\": \"value\"}"
+# Insert multiple lines with one locator
+aifed edit main.rs <<'EOF'
++ 10:CD "{\"key\": \"value\"}" "{\"key\": \"value2\"}"
 EOF
-# Result: {"key": "value"}
 ```
 
 ### Options
@@ -88,12 +112,18 @@ EOF
 ```bash
 # Replace line 42 with hash verification
 aifed edit main.rs <<'EOF'
-= 42:AB "fn main() {"
+- 42:AB
++ 42:AB "fn main() {"
 EOF
 
 # Insert after line 10
 aifed edit main.rs <<'EOF'
 + 10:AB "    println!(\"hello\");"
+EOF
+
+# Insert multiple lines after line 10
+aifed edit main.rs <<'EOF'
++ 10:AB "    println!(\"hello\");" "    println!(\"world\");"
 EOF
 
 # Delete line 42
@@ -112,13 +142,14 @@ EOF
 ```bash
 # Multiple operations in one heredoc
 aifed edit main.rs <<'EOF'
-= 42:AB "fn main() {"
-+ 10:3K "    println!(\"hello\");"
+- [42:AB,42:AB]
++ 42:AB "fn main() {"
++ 10:3K "    println!(\"hello\");" "    println!(\"world\");"
 - 15:7M
 EOF
 ```
 
-#### Range Delete
+#### Range Delete and Range Replacement
 
 ```bash
 # Delete lines 10-50 (inclusive), with boundary hash verification
@@ -126,10 +157,10 @@ aifed edit main.rs <<'EOF'
 - [10:AB,50:CD]
 EOF
 
-# Range delete combined with other operations
+# Range replacement using the canonical end-anchor form
 aifed edit main.rs <<'EOF'
 - [2:AA,89:BB]
-+ 1:HH "new header"
++ 89:BB "new header" "second header line"
 EOF
 ```
 
@@ -138,7 +169,8 @@ EOF
 ```bash
 # Content with embedded quotes
 aifed edit main.rs <<'EOF'
-= 42:AB "code: println!(\"result: {}\", value);"
+- 42:AB
++ 42:AB "code: println!(\"result: {}\", value);"
 EOF
 
 # JSON content
@@ -152,7 +184,8 @@ EOF
 ```bash
 # Preview changes
 aifed edit main.rs --dry-run <<'EOF'
-= 42:AB "fn main() {"
+- 42:AB
++ 42:AB "fn main() {"
 EOF
 ```
 
@@ -167,9 +200,10 @@ Original:
   L3: c
 
 Edit operations:
-  = AB "aa"    # Hash-based, valid
-  - 3K         # Hash-based, valid
-  = 7M "cc"    # Hash-based, valid
+  - 1:AB
+  + 1:AB "aa"
+  - 3:7M
+  + 3:7M "cc"
 ```
 
 Hashes are content-based, so they remain valid regardless of other edits.
