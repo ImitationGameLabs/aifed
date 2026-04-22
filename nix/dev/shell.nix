@@ -22,5 +22,7 @@ craneLib.devShell {
 
     # TOML toolkit (linter, formatter)
     taplo
+
+    bashInteractive
   ];
 }
