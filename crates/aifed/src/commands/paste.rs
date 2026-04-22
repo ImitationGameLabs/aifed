@@ -69,16 +69,12 @@ pub async fn execute(
         }
     }
 
-    // Build insert operations (one per line)
-    let mut ops_input = String::new();
+    // Build one insert operation carrying all clipboard lines in order.
+    let mut ops_input = format!("+ {}:{}", anchor_line, anchor_hash);
     for line in clipboard_content.split('\n') {
-        ops_input.push_str(&format!(
-            "+ {}:{} \"{}\"\n",
-            anchor_line,
-            anchor_hash,
-            escape_content(line)
-        ));
+        ops_input.push_str(&format!(" \"{}\"", escape_content(line)));
     }
+    ops_input.push('\n');
 
     let operations = batch::parse_batch_operations(&ops_input)?;
     batch::execute_batch(path, operations, false, format, Some(daemon_client)).await

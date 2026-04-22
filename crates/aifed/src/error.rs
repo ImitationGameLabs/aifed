@@ -31,7 +31,7 @@ pub enum Error {
     #[error("Invalid locator '{input}': {reason}")]
     InvalidLocator { input: String, reason: String },
 
-    #[error("Invalid operation '{input}'. Expected one of: = (replace), + (insert), - (delete)")]
+    #[error("Invalid operation '{input}'. Expected one of: + (insert), - (delete)")]
     InvalidOperation { input: String },
 
     #[error("IO error for '{path}': {source}")]
@@ -70,9 +70,6 @@ pub enum Error {
 
     #[error("Invalid range {start:?}-{end:?}: {reason}")]
     InvalidRange { start: Position, end: Position, reason: String },
-
-    #[error("Conflict: line {0} cannot be both deleted and replaced")]
-    ConflictDeleteAndReplace(usize),
 
     #[error("Invalid escape sequence in '{sequence}': {reason}")]
     InvalidEscape { sequence: String, reason: String },
