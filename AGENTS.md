@@ -61,6 +61,6 @@ After modifying Nix files:
 - `statix check .` - Static analysis (run from project root)
 
 After modifying Rust code:
-- `cargo clippy` - Lint check
+- `cargo clippy --workspace --all-targets` - Lint check
 - `cargo fmt` - Format check
 - `cargo test` - Run tests
