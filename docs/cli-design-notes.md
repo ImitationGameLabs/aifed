@@ -115,6 +115,7 @@ See [locator.md](reference/locator.md) for usage details.
 ```
 + <LOCATOR> <CONTENT...>   # insert one or more lines after locator
 - <LOCATOR>                # delete
+= <LOCATOR> <CONTENT...>   # replace (delete + insert in one step)
 ```
 
 **Rationale:**
@@ -129,7 +130,7 @@ See [locator.md](reference/locator.md) for usage details.
 
 **Why operators over subcommands:**
 
-Using symbolic operators (`+`/`-`) instead of subcommands (`replace`/`insert`/`delete`):
+Using symbolic operators (`+`/`-`/`=`) instead of subcommands (`replace`/`insert`/`delete`):
 - **Consistency:** Same syntax for single and batch operations
 - **Token efficiency:** Shorter, especially in batch mode
 - **Visual clarity:** Operators visually distinguish operation types
@@ -137,7 +138,31 @@ Using symbolic operators (`+`/`-`) instead of subcommands (`replace`/`insert`/`d
 
 **Replacement model:**
 
-Replacement is not a first-class operator. Instead:
+The `=` operator provides first-class replacement support. It is syntactic sugar
+for delete plus insert at the same locator:
+
+```text
+= 42:AB "new content"
+```
+
+This is equivalent to:
+
+```text
+- 42:AB
++ 42:AB "new content"
+```
+
+**Engine behavior:** Internally, `=` expands to a deletion + insertion at the
+same anchor line. Because all operations are anchored to the original file state,
+no index-shift issues arise.
+
+**Why syntactic sugar over a separate HashMap:** `=` resolves by inserting into
+the existing `deletions` and `inserts` structures. No separate `replacements`
+HashMap or `ConflictDeleteAndReplace` error variant is retained. This keeps the
+code lean while making `=` understandable in terms of the existing
+`EditPlan::apply()` logic.
+
+For range replacement, the documented canonical form is:
 
 ```text
 - [START:HASH,END:HASH]

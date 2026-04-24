@@ -71,10 +71,15 @@ To change trailing newline status:
 
 +   Insert one or more new lines after locator
 -   Delete line at locator (supports range: `- [START:HASH,END:HASH]`)
+=   Replace line at locator (syntactic sugar for `-` + `+` at same locator)
 
-Replacement is expressed as delete plus insert. For range replacement, the documented canonical form is:
+Replacement is written as a single `=` operator for single lines, or as delete plus insert for ranges:
 
 ```text
+= 42:AB "new content"
+= 42:AB "line 1" "line 2"     # Replace with multiple lines
+
+# Range replacement (canonical form)
 - [START:HASH,END:HASH]
 + END:HASH "new line 1" "new line 2"
 ```
@@ -179,8 +184,7 @@ aifed read main.rs [12,18]      # Re-read with context (targeting line 15)
 
 # Single edit - use heredoc with 'EOF' to prevent shell expansion
 aifed edit main.rs <<'EOF'
-- 42:3K
-+ 42:3K "new content"
+= 42:3K "new content"
 EOF
 
 # Insert after line 10
@@ -200,8 +204,7 @@ EOF
 
 # Batch edit - multiple operations in one heredoc
 aifed edit main.rs <<'EOF'
-- [1:AB,1:AB]
-+ 1:AB "modified"
+= 1:AB "modified"
 + 10:3K "inserted"
 - 15:7M
 EOF

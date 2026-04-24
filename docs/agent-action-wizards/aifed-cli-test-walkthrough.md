@@ -96,6 +96,32 @@ aifed read test.txt [1,2]
 
 ---
 
+## Replace Line with `=` Operator
+
+**Goal:** Verify `=` operator replaces a line in one step.
+
+**Steps:**
+```bash
+aifed read test.txt
+# Capture hash for line 2 (e.g., 3K)
+aifed edit test.txt <<'EOF'
+= 2:3K "modified line2 with ="
+EOF
+aifed read test.txt
+```
+
+**Expected:**
+- Line 2 content is changed
+- Same result as `-` + `+` but in a single operation
+
+```
+1:AB|line1
+2:P2|modified line2 with =
+3:7M|line3
+```
+
+---
+
 ## Replace Line with Delete Plus Insert
 
 **Goal:** Verify replacement via `-` plus `+` modifies a line when hash matches.

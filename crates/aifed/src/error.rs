@@ -31,7 +31,7 @@ pub enum Error {
     #[error("Invalid locator '{input}': {reason}")]
     InvalidLocator { input: String, reason: String },
 
-    #[error("Invalid operation '{input}'. Expected one of: + (insert), - (delete)")]
+    #[error("Invalid operation '{input}'. Expected one of: + (insert), - (delete), = (replace)")]
     InvalidOperation { input: String },
 
     #[error("IO error for '{path}': {source}")]

@@ -4,7 +4,7 @@ Commands for modifying file content.
 
 ## `edit` - Edit File Content
 
-The unified command for all file edits: delete and insert. Replacement is expressed as delete plus insert.
+The unified command for all file edits: delete, insert, and replace.
 
 ### Usage
 
@@ -16,21 +16,36 @@ All edit operations are provided via stdin using heredoc syntax.
 
 ### Operations
 
-| Operator | Syntax                    | Description                                               |
-| -------- | ------------------------- | --------------------------------------------------------- |
-| `+`      | `+ <LOCATOR> <CONTENT...>` | Insert one or more lines after locator                    |
-| `-`      | `- <LOCATOR>`             | Delete content at locator (supports range delete)         |
+| Operator | Syntax                     | Description                                             |
+| -------- | -------------------------- | ------------------------------------------------------- |
+| `+`      | `+ <LOCATOR> <CONTENT...>` | Insert one or more lines after locator                  |
+| `-`      | `- <LOCATOR>`              | Delete content at locator (supports range delete)       |
+| `=`      | `= <LOCATOR> <CONTENT...>` | Replace line at locator (syntactic sugar for `-` + `+`) |
 
 **Mnemonic:**
 - `+` - Plus suggests "add" or "insert"
 - `-` - Minus suggests "remove" or "delete"
+- `=` - Equals suggests "assign" or "replace"
 
 ### Replacement Pattern
 
-Replacement is written as delete plus insert:
+Replacement can be written as a single `=` operator:
 
 ```bash
 # Replace one line
+aifed edit main.rs <<'EOF'
+= 42:AB "fn main() {"
+EOF
+
+# Replace one line with multiple lines
+aifed edit main.rs <<'EOF'
+= 42:AB "line 1" "line 2"
+EOF
+```
+
+This is equivalent to the two-line form using delete plus insert:
+
+```bash
 aifed edit main.rs <<'EOF'
 - 42:AB
 + 42:AB "fn main() {"
@@ -112,8 +127,7 @@ EOF
 ```bash
 # Replace line 42 with hash verification
 aifed edit main.rs <<'EOF'
-- 42:AB
-+ 42:AB "fn main() {"
+= 42:AB "fn main() {"
 EOF
 
 # Insert after line 10
@@ -142,8 +156,7 @@ EOF
 ```bash
 # Multiple operations in one heredoc
 aifed edit main.rs <<'EOF'
-- [42:AB,42:AB]
-+ 42:AB "fn main() {"
+= 42:AB "fn main() {"
 + 10:3K "    println!(\"hello\");" "    println!(\"world\");"
 - 15:7M
 EOF

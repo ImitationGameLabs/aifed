@@ -20,6 +20,7 @@ use aifed_daemon_client::DaemonClient;
 pub enum Operation {
     Insert,
     Delete,
+    Replace,
 }
 
 impl Operation {
@@ -27,6 +28,7 @@ impl Operation {
         match s {
             "+" => Ok(Operation::Insert),
             "-" => Ok(Operation::Delete),
+            "=" => Ok(Operation::Replace),
             _ => Err(Error::InvalidOperation { input: s.to_string() }),
         }
     }
@@ -50,11 +52,11 @@ pub fn validate_operation(
 ) -> Result<ValidatedOp> {
     // Validate content requirement
     match operation {
-        Operation::Insert => {
+        Operation::Insert | Operation::Replace => {
             if contents.is_empty() {
                 return Err(Error::InvalidLocator {
                     input: "".to_string(),
-                    reason: "Content is required for insert operations".to_string(),
+                    reason: "Content is required for insert and replace operations".to_string(),
                 });
             }
         }
@@ -152,6 +154,13 @@ impl EditPlan {
             Operation::Delete => {
                 self.deletions.insert(validated.target_line);
             }
+            Operation::Replace => {
+                self.deletions.insert(validated.target_line);
+                self.inserts
+                    .entry(validated.target_line)
+                    .or_default()
+                    .extend(validated.new_contents);
+            }
             Operation::Insert => {
                 if validated.target_line == 0 {
                     self.inserts_at_start.extend(validated.new_contents);
@@ -225,7 +234,7 @@ impl EditPlan {
 /// ```text
 /// <OP> <LOCATOR> [<CONTENT>]
 ///
-/// OP:       + | -
+/// OP:       + | - | =
 /// LOCATOR:  LINE:HASH (e.g., "42:AB") or "0:00"
 /// CONTENT:  One or more quoted strings (supports escapes) or unquoted text
 ///
@@ -310,12 +319,13 @@ fn parse_single_operation(line_num: usize, line: &str) -> Result<EditOp> {
 
     // Validate content requirement
     match operation {
-        Operation::Insert => {
+        Operation::Insert | Operation::Replace => {
             if contents.is_empty() {
                 return Err(Error::InvalidBatchOp {
                     line_number: line_num,
                     line_content: line.to_string(),
-                    reason: "Content is required for insert (+) operations".to_string(),
+                    reason: "Content is required for insert (+) and replace (=) operations"
+                        .to_string(),
                 });
             }
         }
@@ -650,6 +660,7 @@ impl EditOp {
         match self.operation {
             Operation::Insert => "+".to_string(),
             Operation::Delete => "-".to_string(),
+            Operation::Replace => "=".to_string(),
         }
     }
 }
@@ -679,14 +690,17 @@ mod tests {
     #[test]
     fn test_parse_simple_operations() {
         let input = r#"
-+ 42:AB "new content" "second line"
++ 42:AB "new content"
 - 15:7M
+= 10:3K "replacement"
 "#;
         let ops = parse_batch_operations(input).unwrap();
-        assert_eq!(ops.len(), 2);
+        assert_eq!(ops.len(), 3);
         assert_eq!(ops[0].operation, Operation::Insert);
-        assert_eq!(ops[0].contents, vec!["new content", "second line"]);
+        assert_eq!(ops[0].contents, vec!["new content"]);
         assert_eq!(ops[1].operation, Operation::Delete);
+        assert_eq!(ops[2].operation, Operation::Replace);
+        assert_eq!(ops[2].contents, vec!["replacement"]);
     }
 
     #[test]
@@ -937,6 +951,36 @@ mod tests {
     }
 
     #[test]
+    fn test_edit_plan_replace_single_line() {
+        let mut plan = EditPlan::new();
+        plan.add(ValidatedOp {
+            operation: Operation::Replace,
+            target_line: 3,
+            new_contents: vec!["new".to_string()],
+        });
+
+        let original: Vec<String> = ["1", "2", "3", "4"].into_iter().map(String::from).collect();
+        let (new_lines, _) = plan.apply(&original);
+
+        assert_eq!(new_lines, vec!["1", "2", "new", "4"]);
+    }
+
+    #[test]
+    fn test_edit_plan_replace_multi_line() {
+        let mut plan = EditPlan::new();
+        plan.add(ValidatedOp {
+            operation: Operation::Replace,
+            target_line: 2,
+            new_contents: vec!["a".to_string(), "b".to_string()],
+        });
+
+        let original: Vec<String> = ["1", "2", "3"].into_iter().map(String::from).collect();
+        let (new_lines, _) = plan.apply(&original);
+
+        assert_eq!(new_lines, vec!["1", "a", "b", "3"]);
+    }
+
+    #[test]
     fn test_edit_plan_insert_at_start() {
         // Insert at the beginning (virtual line 0)
         let mut plan = EditPlan::new();
@@ -1098,6 +1142,58 @@ mod tests {
         assert_eq!(result, "L1\nNEW3\nL4\n");
     }
 
+    #[tokio::test]
+    async fn test_batch_replace_single_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.txt");
+
+        let lines: Vec<String> = ["L1", "L2", "L3", ""]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        write_file(&path, &lines).unwrap();
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        let file_lines = crate::file::split_lines_owned(&content);
+        let hash2 = crate::hash::hash_line(&file_lines[1]);
+
+        let input = format!(r#"= 2:{hash2} "REPLACED""#);
+        let ops = parse_batch_operations(&input).unwrap();
+
+        execute_batch(&path, ops, false, OutputFormat::Text, None)
+            .await
+            .unwrap();
+
+        let result = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(result, "L1\nREPLACED\nL3\n");
+    }
+
+    #[tokio::test]
+    async fn test_batch_replace_multi_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.txt");
+
+        let lines: Vec<String> = ["L1", "L2", "L3", ""]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        write_file(&path, &lines).unwrap();
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        let file_lines = crate::file::split_lines_owned(&content);
+        let hash2 = crate::hash::hash_line(&file_lines[1]);
+
+        let input = format!(r#"= 2:{hash2} "A" "B""#);
+        let ops = parse_batch_operations(&input).unwrap();
+
+        execute_batch(&path, ops, false, OutputFormat::Text, None)
+            .await
+            .unwrap();
+
+        let result = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(result, "L1\nA\nB\nL3\n");
+    }
+
     // ============================================================
     // Quote escaping tests - currently failing (documenting issues)
     // ============================================================
@@ -1196,6 +1292,35 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("Unterminated string"));
+    }
+
+    // ============================================================
+    // Replace (=) operator tests
+    // ============================================================
+
+    #[test]
+    fn test_parse_replace_operation() {
+        let input = r#"= 42:AB "new content""#;
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops.len(), 1);
+        assert_eq!(ops[0].operation, Operation::Replace);
+        assert_eq!(ops[0].contents, vec!["new content"]);
+    }
+
+    #[test]
+    fn test_parse_replace_multi_line() {
+        let input = r#"= 42:AB "line1" "line2""#;
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops.len(), 1);
+        assert_eq!(ops[0].operation, Operation::Replace);
+        assert_eq!(ops[0].contents, vec!["line1", "line2"]);
+    }
+
+    #[test]
+    fn test_parse_replace_missing_content() {
+        let input = "= 42:AB";
+        let result = parse_batch_operations(input);
+        assert!(result.is_err());
     }
 
     #[tokio::test]
