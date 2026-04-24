@@ -291,7 +291,7 @@ Note: The `LINE:HASH` format matches the locator syntax for easy copy-paste into
 
 - [Edit Commands](edit-commands.md) - Using locators in edits
 - [Read Commands](read-commands.md) - Getting hashes with info/read
-- [CLI Design Notes](../cli-design-notes.md) - Design rationale
+- [Design Notes](../design-notes/README.md) - Design rationale
 
 ## References
 

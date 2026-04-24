@@ -75,4 +75,4 @@ aifed is designed specifically for AI agents, prioritizing:
 ## See Also
 
 - [Command Reference](README.md) - All commands
-- [CLI Design Notes](../cli-design-notes.md) - Design rationale
+- [Design Notes](../design-notes/README.md) - Design rationale

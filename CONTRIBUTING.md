@@ -15,7 +15,7 @@ Don't be shy! Whether you found a bug, have a question, or want to request a fea
 
 We value feedback on our design decisions. The `docs/` directory contains design documentation that explains the rationale behind various choices:
 
-- [CLI Design Notes](docs/cli-design-notes.md) - Design rationale and trade-offs
+- [Design Notes](docs/design-notes/README.md) - Design rationale and trade-offs
 - [CLI Reference](docs/reference/README.md) - Command documentation
 
 Feel free to open an issue to discuss any design ideas or suggestions you have.

@@ -312,4 +312,4 @@ If the new name conflicts with an existing symbol, the command fails with an err
 - [Configuration](configuration.md) - Configuring LSP servers
 - [Read Commands](read-commands.md) - Getting Symbol Locators
 - [Locator Format](locator.md) - Understanding hashlines and symbol locators
-- [CLI Design Notes](../cli-design-notes.md) - LSP design rationale
+- [Design Notes](../design-notes/README.md) - LSP design rationale

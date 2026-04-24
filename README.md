@@ -135,7 +135,7 @@ aifed redo main.rs
 ## Documentation
 
 - [CLI Reference](docs/reference/README.md) - Command documentation
-- [CLI Design Notes](docs/cli-design-notes.md) - Design rationale and trade-offs
+- [Design Notes](docs/design-notes/README.md) - Design rationale and trade-offs
 
 ## Credits
 

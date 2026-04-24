@@ -8,7 +8,7 @@ This directory contains reference documentation for all **aifed** commands and c
 | ---------------------- | ------------------------------------ | ------------------------------------ | ----------- |
 | **CLI Overview**       | Global options, workspace detection  | [cli-overview.md](cli-overview.md)   | Implemented |
 | **Locator**            | Positioning mechanism for safe edits | [locator.md](locator.md)             | Implemented |
-| **Edit Commands**      | Unified edit with + and - operators   | [edit-commands.md](edit-commands.md) | Implemented |
+| **Edit Commands**      | Unified edit with +, -, and = operators | [edit-commands.md](edit-commands.md) | Implemented |
 | **Read Commands**      | info, read                           | [read-commands.md](read-commands.md) | Implemented |
 | **LSP Integration**    | diag, symbols, rename, etc.          | [lsp.md](lsp.md)                     | Implemented |
 | **History & Recovery** | history, undo, redo                  | [history.md](history.md)             | Implemented |
@@ -19,7 +19,7 @@ This directory contains reference documentation for all **aifed** commands and c
 ## Command Categories
 
 ### Core Editing
-- [`edit`](edit-commands.md#edit) - Edit file content (delete and insert; replacement via `-` + `+`)
+- [`edit`](edit-commands.md#edit) - Edit file content (delete, insert, replace via `=`, `+`, `-`)
 
 ### File Information
 - [`read`](read-commands.md#read) - Read file content
@@ -80,7 +80,7 @@ All examples use **2-character base32hex hashes** (e.g., `AB`, `3K`):
 main.rs 42:AB
 ```
 
-The hash encodes 10 bits of the xxHash64 output using base32hex character set (`0-9`, `A-V`). See [CLI Design Notes](../cli-design-notes.md#2-hash-algorithm) for the algorithm details.
+The hash encodes 10 bits of the xxHash64 output using base32hex character set (`0-9`, `A-V`). See [Locator Design Notes](../design-notes/locator.md#hash-algorithm) for the algorithm details.
 
 ### Example Language
 
@@ -102,5 +102,5 @@ The tool itself supports any programming language with appropriate LSP servers c
 
 ## See Also
 
-- [CLI Design Notes](../cli-design-notes.md) - Design rationale and trade-offs
+- [Design Notes](../design-notes/README.md) - Design rationale and trade-offs
 - [Project README](../../README.md) - Project overview
