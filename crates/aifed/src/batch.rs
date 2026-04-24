@@ -294,6 +294,18 @@ pub fn parse_batch_operations(input: &str) -> Result<Vec<EditOp>> {
                     "Content is required for insert (+) and replace (=) operations",
                 ));
             }
+            Operation::Replace if contents.len() > 1 => {
+                return Err(invalid_op(
+                    scanner.line(),
+                    String::new(),
+                    "Replace (=) accepts only one content line. \
+                     For multi-line replacement, use - then +:\n  \
+                     - 42:AB\n  \
+                     + 42:AB\n    \
+                     \"line 1\"\n    \
+                     \"line 2\"",
+                ));
+            }
             _ => {}
         }
 
@@ -1201,7 +1213,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_batch_replace_multi_line() {
+    async fn test_batch_replace_multi_line_via_delete_insert() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.txt");
 
@@ -1215,7 +1227,10 @@ mod tests {
         let file_lines = crate::file::split_lines_owned(&content);
         let hash2 = crate::hash::hash_line(&file_lines[1]);
 
-        let input = format!(r#"= 2:{hash2} "A" "B""#);
+        let input = format!(
+            r#"- 2:{hash2}
++ 2:{hash2} "A" "B""#
+        );
         let ops = parse_batch_operations(&input).unwrap();
 
         execute_batch(&path, ops, false, OutputFormat::Text, None)
@@ -1340,12 +1355,15 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_replace_multi_line() {
+    fn test_parse_replace_rejects_multi_content() {
         let input = r#"= 42:AB "line1" "line2""#;
-        let ops = parse_batch_operations(input).unwrap();
-        assert_eq!(ops.len(), 1);
-        assert_eq!(ops[0].operation, Operation::Replace);
-        assert_eq!(ops[0].contents, vec!["line1", "line2"]);
+        let result = parse_batch_operations(input);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("-") && err.contains("+"),
+            "error should hint at - + syntax: {err}"
+        );
     }
 
     #[test]

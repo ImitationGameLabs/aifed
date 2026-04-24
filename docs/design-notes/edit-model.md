@@ -7,7 +7,7 @@
 ```
 + <LOCATOR> <CONTENT...>   # insert one or more lines after locator
 - <LOCATOR>                # delete
-= <LOCATOR> <CONTENT...>   # replace (delete + insert in one step)
+= <LOCATOR> <CONTENT>      # replace line content (delete + insert in one step)
 ```
 
 **Rationale:**

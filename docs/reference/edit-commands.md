@@ -20,7 +20,7 @@ All edit operations are provided via stdin using heredoc syntax.
 | -------- | -------------------------- | ------------------------------------------------------- |
 | `+`      | `+ <LOCATOR> <CONTENT...>` | Insert one or more lines after locator                  |
 | `-`      | `- <LOCATOR>`              | Delete content at locator (supports range delete)       |
-| `=`      | `= <LOCATOR> <CONTENT...>` | Replace line at locator (syntactic sugar for `-` + `+`) |
+| `=`      | `= <LOCATOR> <CONTENT>`    | Replace line at locator (syntactic sugar for `-` + `+`) |
 
 **Mnemonic:**
 - `+` - Plus suggests "add" or "insert"
@@ -53,19 +53,14 @@ Replacement can be written as a single `=` operator:
 aifed edit main.rs <<'EOF'
 = 42:AB "fn main() {"
 EOF
-
-# Replace one line with multiple lines
-aifed edit main.rs <<'EOF'
-= 42:AB "line 1" "line 2"
-EOF
 ```
 
-This is equivalent to the two-line form using delete plus insert:
+To replace one line with multiple lines, use delete plus insert:
 
 ```bash
 aifed edit main.rs <<'EOF'
 - 42:AB
-+ 42:AB "fn main() {"
++ 42:AB "line 1" "line 2"
 EOF
 ```
 
@@ -154,7 +149,9 @@ EOF
 
 # Insert multiple lines after line 10
 aifed edit main.rs <<'EOF'
-+ 10:AB "    println!(\"hello\");" "    println!(\"world\");"
++ 10:AB
+  "    println!(\"hello\");"
+  "    println!(\"world\");"
 EOF
 
 # Delete line 42
@@ -174,7 +171,9 @@ EOF
 # Multiple operations in one heredoc
 aifed edit main.rs <<'EOF'
 = 42:AB "fn main() {"
-+ 10:3K "    println!(\"hello\");" "    println!(\"world\");"
++ 10:3K
+  "    println!(\"hello\");"
+  "    println!(\"world\");"
 - 15:7M
 EOF
 ```

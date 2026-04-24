@@ -73,11 +73,10 @@ To change trailing newline status:
 -   Delete line at locator (supports range: `- [START:HASH,END:HASH]`)
 =   Replace line at locator (syntactic sugar for `-` + `+` at same locator)
 
-Replacement is written as a single `=` operator for single lines, or as delete plus insert for ranges:
+Replacement is written as a single `=` operator, or as delete plus insert for ranges:
 
 ```text
 = 42:AB "new content"
-= 42:AB "line 1" "line 2"     # Replace with multiple lines
 
 # Range replacement (canonical form)
 - [START:HASH,END:HASH]
