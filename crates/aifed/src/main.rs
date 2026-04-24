@@ -7,6 +7,7 @@ mod file;
 mod hash;
 mod locator;
 mod output;
+mod scanner;
 mod text_edit;
 
 use crate::args::{Args, Commands, DaemonCommands};

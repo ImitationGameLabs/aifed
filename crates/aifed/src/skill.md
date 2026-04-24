@@ -189,7 +189,10 @@ EOF
 
 # Insert after line 10
 aifed edit main.rs <<'EOF'
-+ 10:AB "inserted line" "another inserted line"
++ 10:AB
+  "inserted line"
+  "another inserted line"
+  "one more line"
 EOF
 
 # Delete line 15

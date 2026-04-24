@@ -27,6 +27,23 @@ All edit operations are provided via stdin using heredoc syntax.
 - `-` - Minus suggests "remove" or "delete"
 - `=` - Equals suggests "assign" or "replace"
 
+### Multi-line Content (Insert Only)
+
+When inserting many lines at once with `+`, content payloads can wrap to separate lines:
+
+```bash
+aifed edit main.rs <<'EOF'
++ 42:AB
+  "fn main() {"
+  "    println!(\"hello\");"
+  "    println!(\"world\");"
+  "}"
+EOF
+```
+
+This is equivalent to the single-line form `+ 42:AB "fn main() {" "    println!(\"hello\");" "    println!(\"world\");" "}"`.
+Only the `+` operator supports content on separate lines — `=` and `-` use single-line format only.
+
 ### Replacement Pattern
 
 Replacement can be written as a single `=` operator:

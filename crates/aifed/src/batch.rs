@@ -12,6 +12,7 @@ use crate::error::{Error, Result};
 use crate::hash::{hash_file, hash_line, is_virtual_hash};
 use crate::locator::Locator;
 use crate::output::{BatchResult, EditChange, OutputFormat, format_batch_result_with_diff};
+use crate::scanner::{PeekResult, Scanner, Token};
 use aifed_common::LineDiffDto;
 use aifed_daemon_client::DaemonClient;
 
@@ -21,17 +22,6 @@ pub enum Operation {
     Insert,
     Delete,
     Replace,
-}
-
-impl Operation {
-    pub fn parse(s: &str) -> Result<Self> {
-        match s {
-            "+" => Ok(Operation::Insert),
-            "-" => Ok(Operation::Delete),
-            "=" => Ok(Operation::Replace),
-            _ => Err(Error::InvalidOperation { input: s.to_string() }),
-        }
-    }
 }
 
 /// Validated operation ready to apply
@@ -228,7 +218,10 @@ impl EditPlan {
     }
 }
 
-/// Parse operations from string (heredoc/file content)
+/// Parse operations from string (heredoc/file content).
+///
+/// Uses a character-level [`Scanner`] so that newlines between tokens (e.g. OP
+/// on one line, LOCATOR on the next) are treated as ordinary whitespace.
 ///
 /// Format:
 /// ```text
@@ -241,183 +234,222 @@ impl EditPlan {
 /// # Comments and blank lines are ignored
 /// ```
 pub fn parse_batch_operations(input: &str) -> Result<Vec<EditOp>> {
+    let mut scanner = Scanner::new(input);
     let mut operations = Vec::new();
 
-    for (line_idx, line) in input.lines().enumerate() {
-        let line_num = line_idx + 1; // 1-based line numbering
-        let trimmed = line.trim();
+    loop {
+        let op = match scanner.peek_token() {
+            None => break,
+            Some(PeekResult::Token(Token::Plus)) => {
+                scanner.next_token();
+                Operation::Insert
+            }
+            Some(PeekResult::Token(Token::Minus)) => {
+                scanner.next_token();
+                Operation::Delete
+            }
+            Some(PeekResult::Token(Token::Equals)) => {
+                scanner.next_token();
+                Operation::Replace
+            }
+            Some(PeekResult::Token(other)) => {
+                return Err(invalid_op(
+                    scanner.line(),
+                    format!("{:?}", other),
+                    "Expected operation: +, -, or =",
+                ));
+            }
+            Some(PeekResult::Err(msg)) => {
+                return Err(invalid_op(scanner.line(), String::new(), &msg));
+            }
+        };
 
-        // Skip empty lines and comments
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            continue;
+        let locator = match op {
+            Operation::Delete => parse_delete_locator(&mut scanner)?,
+            Operation::Insert | Operation::Replace => {
+                let raw = expect_locator_str(&mut scanner, "locator")?;
+                Locator::parse(raw)
+                    .map_err(|e| invalid_op(scanner.line(), raw.to_string(), &e.to_string()))?
+            }
+        };
+
+        // Edit operations require hash verification.
+        if let Locator::Line(_) | Locator::LineRange { .. } = &locator {
+            return Err(invalid_op(
+                scanner.line(),
+                locator.to_string(),
+                "Locator must include hash (e.g. \"42:AB\" or \"[2:AA,5:BB]\")",
+            ));
         }
 
-        let op = parse_single_operation(line_num, trimmed)?;
-        operations.push(op);
+        // Parse content tokens.
+        let contents = collect_content_tokens(&mut scanner)?;
+
+        // Validate content requirement.
+        match op {
+            Operation::Insert | Operation::Replace if contents.is_empty() => {
+                return Err(invalid_op(
+                    scanner.line(),
+                    String::new(),
+                    "Content is required for insert (+) and replace (=) operations",
+                ));
+            }
+            _ => {}
+        }
+
+        operations.push(EditOp { operation: op, locator, contents });
     }
 
     Ok(operations)
 }
 
-/// Parse a single operation line.
-fn parse_single_operation(line_num: usize, line: &str) -> Result<EditOp> {
-    // Split into parts: OP LOCATOR [CONTENT]
-    let parts = split_operation_line(line).map_err(|e| Error::InvalidBatchOp {
-        line_number: line_num,
-        line_content: line.to_string(),
-        reason: e.to_string(),
-    })?;
+// ── parser helpers ──────────────────────────────────────────────────
 
-    if parts.is_empty() {
-        return Err(Error::InvalidBatchOp {
-            line_number: line_num,
-            line_content: line.to_string(),
-            reason: "Empty operation".to_string(),
-        });
-    }
-
-    if parts.len() < 2 {
-        return Err(Error::InvalidBatchOp {
-            line_number: line_num,
-            line_content: line.to_string(),
-            reason: "Missing locator. Format: OP LOCATOR [CONTENT]".to_string(),
-        });
-    }
-
-    let operation_str = parts[0].raw;
-    let locator_str = parts[1].raw;
-
-    // Parse operation
-    let operation = Operation::parse(operation_str).map_err(|e| Error::InvalidBatchOp {
-        line_number: line_num,
-        line_content: line.to_string(),
-        reason: e.to_string(),
-    })?;
-
-    // Parse locator
-    let locator = Locator::parse(locator_str).map_err(|e| Error::InvalidBatchOp {
-        line_number: line_num,
-        line_content: line.to_string(),
-        reason: e.to_string(),
-    })?;
-
-    // Validate: edit operations require hash verification
-    if let Locator::Line(_) | Locator::LineRange { .. } = &locator {
-        return Err(Error::InvalidBatchOp {
-            line_number: line_num,
-            line_content: line.to_string(),
-            reason: "Locator must include hash (e.g., \"42:AB\" or \"[2:AA,5:BB]\")".to_string(),
-        });
-    }
-
-    // Extract content
-    let contents = parse_contents(&parts[2..]).map_err(|e| Error::InvalidBatchOp {
-        line_number: line_num,
-        line_content: line.to_string(),
-        reason: e.to_string(),
-    })?;
-
-    // Validate content requirement
-    match operation {
-        Operation::Insert | Operation::Replace => {
-            if contents.is_empty() {
-                return Err(Error::InvalidBatchOp {
-                    line_number: line_num,
-                    line_content: line.to_string(),
-                    reason: "Content is required for insert (+) and replace (=) operations"
-                        .to_string(),
-                });
-            }
+/// Parse the locator for a delete operation (single-line or range).
+fn parse_delete_locator(scanner: &mut Scanner<'_>) -> Result<Locator> {
+    match scanner.peek_token() {
+        Some(PeekResult::Token(Token::RangeStart)) => {
+            scanner.next_token(); // consume '['
+            let start = expect_locator_str(scanner, "start of range")?;
+            expect_comma(scanner)?;
+            let end = expect_locator_str(scanner, "end of range")?;
+            expect_range_end(scanner)?;
+            let loc = format!("[{},{}]", start, end);
+            Locator::parse(&loc).map_err(|e| invalid_op(scanner.line(), loc, &e.to_string()))
         }
-        Operation::Delete => {}
-    }
-
-    Ok(EditOp { operation, locator, contents })
-}
-
-#[derive(Clone, Copy)]
-struct ParsedToken<'a> {
-    raw: &'a str,
-    quoted: bool,
-}
-
-/// Split operation line into parts, respecting quoted strings with escape support.
-fn split_operation_line(line: &str) -> Result<Vec<ParsedToken<'_>>> {
-    let mut parts = Vec::new();
-    let mut current_start = None;
-    let mut in_quotes = false;
-    let mut idx = 0;
-
-    while idx < line.len() {
-        let ch = line[idx..].chars().next().unwrap();
-
-        if in_quotes {
-            if ch == '\\' {
-                // Skip next character (escape sequence)
-                idx += ch.len_utf8();
-                if idx < line.len() {
-                    idx += line[idx..].chars().next().unwrap().len_utf8();
-                }
-                continue;
-            } else if ch == '"' {
-                // End of quoted string - extract content without quotes
-                if let Some(start) = current_start {
-                    parts.push(ParsedToken { raw: &line[start + 1..idx], quoted: true });
-                }
-                in_quotes = false;
-                current_start = None;
-                idx += ch.len_utf8();
-                continue;
-            }
-        } else if ch == '"' {
-            // Start of quoted string
-            in_quotes = true;
-            current_start = Some(idx);
-            idx += ch.len_utf8();
-            continue;
-        } else if ch.is_whitespace() {
-            if let Some(start) = current_start {
-                parts.push(ParsedToken { raw: &line[start..idx], quoted: false });
-                current_start = None;
-            }
-            idx += ch.len_utf8();
-            continue;
-        } else if current_start.is_none() {
-            current_start = Some(idx);
+        _ => {
+            let raw = expect_locator_str(scanner, "locator")?;
+            Locator::parse(raw)
+                .map_err(|e| invalid_op(scanner.line(), raw.to_string(), &e.to_string()))
         }
-
-        idx += ch.len_utf8();
     }
-
-    // Check for unterminated string
-    if in_quotes {
-        return Err(Error::UnterminatedString);
-    }
-
-    // Handle remaining unquoted part
-    if let Some(start) = current_start {
-        parts.push(ParsedToken { raw: &line[start..], quoted: false });
-    }
-
-    Ok(parts)
 }
 
-fn parse_contents(parts: &[ParsedToken<'_>]) -> Result<Vec<String>> {
-    if parts.is_empty() {
+/// Expect the next token to be a locator-like token (Unquoted or Quoted)
+/// and return its raw text.
+fn expect_locator_str<'a>(scanner: &mut Scanner<'a>, context: &str) -> Result<&'a str> {
+    match scanner.next_token() {
+        Some(Ok(Token::Unquoted(s))) | Some(Ok(Token::Quoted(s))) => Ok(s),
+        Some(Ok(other)) => Err(invalid_op(
+            scanner.line(),
+            format!("{:?}", other),
+            &format!("Expected locator ({})", context),
+        )),
+        Some(Err(e)) => Err(convert_scanner_error(scanner.line(), &e)),
+        None => Err(invalid_op(
+            scanner.line(),
+            String::new(),
+            &format!("Expected locator ({})", context),
+        )),
+    }
+}
+
+fn expect_comma(scanner: &mut Scanner<'_>) -> Result<()> {
+    match scanner.next_token() {
+        Some(Ok(Token::Comma)) => Ok(()),
+        Some(Ok(other)) => Err(invalid_op(
+            scanner.line(),
+            format!("{:?}", other),
+            "Expected comma (,) in range",
+        )),
+        Some(Err(e)) => Err(convert_scanner_error(scanner.line(), &e)),
+        None => Err(invalid_op(
+            scanner.line(),
+            String::new(),
+            "Unexpected end of input in range",
+        )),
+    }
+}
+
+fn expect_range_end(scanner: &mut Scanner<'_>) -> Result<()> {
+    match scanner.next_token() {
+        Some(Ok(Token::RangeEnd)) => Ok(()),
+        Some(Ok(other)) => Err(invalid_op(
+            scanner.line(),
+            format!("{:?}", other),
+            "Expected closing bracket (])",
+        )),
+        Some(Err(e)) => Err(convert_scanner_error(scanner.line(), &e)),
+        None => Err(invalid_op(
+            scanner.line(),
+            String::new(),
+            "Unexpected end of input in range",
+        )),
+    }
+}
+
+/// Collect content tokens (Quoted / Unquoted) that follow the locator.
+fn collect_content_tokens(scanner: &mut Scanner<'_>) -> Result<Vec<String>> {
+    let mut tokens: Vec<Token<'_>> = Vec::new();
+    loop {
+        match scanner.peek_token() {
+            Some(PeekResult::Token(Token::Quoted(_)))
+            | Some(PeekResult::Token(Token::Unquoted(_))) => {
+                tokens.push(scanner.next_token().unwrap().unwrap());
+            }
+            Some(PeekResult::Err(msg)) => {
+                return Err(invalid_op(scanner.line(), String::new(), &msg));
+            }
+            _ => break,
+        }
+    }
+
+    if tokens.is_empty() {
+        return Ok(Vec::new());
+    }
+    parse_contents(&tokens)
+}
+
+fn invalid_op(line: usize, content: String, reason: &str) -> Error {
+    Error::InvalidBatchOp { line_number: line, line_content: content, reason: reason.to_string() }
+}
+
+fn convert_scanner_error(line: usize, err: &Error) -> Error {
+    match err {
+        Error::Syntax { reason, .. } => Error::InvalidBatchOp {
+            line_number: line,
+            line_content: String::new(),
+            reason: reason.clone(),
+        },
+        _ => Error::InvalidBatchOp {
+            line_number: line,
+            line_content: String::new(),
+            reason: err.to_string(),
+        },
+    }
+}
+
+// ── content processing ──────────────────────────────────────────────
+
+fn parse_contents(tokens: &[Token<'_>]) -> Result<Vec<String>> {
+    if tokens.is_empty() {
         return Ok(Vec::new());
     }
 
-    if parts.len() > 1 && parts.iter().all(|part| part.quoted) {
-        return parts.iter().map(|part| decode_content(part.raw)).collect();
+    // Multiple Quoted tokens → each is a separate content line.
+    if tokens.len() > 1 && tokens.iter().all(|t| matches!(t, Token::Quoted(_))) {
+        return tokens
+            .iter()
+            .map(|t| decode_content(token_raw(t)))
+            .collect();
     }
 
-    let decoded = parts
+    // Single token (Quoted or not), or mixed — decode and join with space.
+    let decoded: Result<Vec<_>> = tokens
         .iter()
-        .map(|part| decode_content(part.raw))
-        .collect::<Result<Vec<_>>>()?;
+        .map(|t| decode_content(token_raw(t)))
+        .collect();
+    let decoded = decoded?;
     let joined = decoded.join(" ");
     validate_content(&joined)?;
     Ok(vec![joined])
+}
+
+fn token_raw<'a>(t: &Token<'a>) -> &'a str {
+    match t {
+        Token::Quoted(s) | Token::Unquoted(s) => s,
+        _ => unreachable!("unexpected token in content"),
+    }
 }
 
 fn decode_content(raw: &str) -> Result<String> {
@@ -1321,6 +1353,78 @@ mod tests {
         let input = "= 42:AB";
         let result = parse_batch_operations(input);
         assert!(result.is_err());
+    }
+
+    // ============================================================
+    // Multi-line operation tests (newlines between tokens)
+    // ============================================================
+
+    #[test]
+    fn test_parse_multiline_op() {
+        let input = "+\n42:AB\n\"content\"";
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops.len(), 1);
+        assert_eq!(ops[0].operation, Operation::Insert);
+        assert_eq!(ops[0].locator.to_string(), "42:AB");
+        assert_eq!(ops[0].contents, vec!["content"]);
+    }
+
+    #[test]
+    fn test_parse_multiline_replace() {
+        let input = "=\n42:AB\n\"new\"";
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops.len(), 1);
+        assert_eq!(ops[0].operation, Operation::Replace);
+        assert_eq!(ops[0].contents, vec!["new"]);
+    }
+
+    #[test]
+    fn test_parse_multiline_virtual_line() {
+        let input = "+\n0:00\n\"first\"";
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops.len(), 1);
+        assert_eq!(ops[0].operation, Operation::Insert);
+        assert_eq!(ops[0].locator.to_string(), "0:00");
+        assert_eq!(ops[0].contents, vec!["first"]);
+    }
+
+    #[test]
+    fn test_parse_multiline_delete() {
+        let input = "-\n42:AB";
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops.len(), 1);
+        assert_eq!(ops[0].operation, Operation::Delete);
+        assert_eq!(ops[0].locator.to_string(), "42:AB");
+    }
+
+    #[test]
+    fn test_parse_multiline_range() {
+        let input = "-\n[2:AA\n,\n5:BB]";
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops.len(), 1);
+        assert_eq!(ops[0].operation, Operation::Delete);
+        assert!(matches!(ops[0].locator, Locator::HashlineRange { .. }));
+    }
+
+    #[test]
+    fn test_parse_multiline_mixed() {
+        // Mix single-line and multi-line ops
+        let input = "+ 1:AA \"x\"\n=\n2:BB\n\"y\"";
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops.len(), 2);
+        assert_eq!(ops[0].operation, Operation::Insert);
+        assert_eq!(ops[0].contents, vec!["x"]);
+        assert_eq!(ops[1].operation, Operation::Replace);
+        assert_eq!(ops[1].contents, vec!["y"]);
+    }
+
+    #[test]
+    fn test_parse_multiline_with_comments() {
+        let input = "+\n# note: line 42\n42:AB\n\"content\"";
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops.len(), 1);
+        assert_eq!(ops[0].operation, Operation::Insert);
+        assert_eq!(ops[0].contents, vec!["content"]);
     }
 
     #[tokio::test]

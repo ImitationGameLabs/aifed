@@ -31,9 +31,6 @@ pub enum Error {
     #[error("Invalid locator '{input}': {reason}")]
     InvalidLocator { input: String, reason: String },
 
-    #[error("Invalid operation '{input}'. Expected one of: + (insert), - (delete), = (replace)")]
-    InvalidOperation { input: String },
-
     #[error("IO error for '{path}': {source}")]
     InvalidIo { path: PathBuf, source: std::io::Error },
 
@@ -74,9 +71,6 @@ pub enum Error {
     #[error("Invalid escape sequence in '{sequence}': {reason}")]
     InvalidEscape { sequence: String, reason: String },
 
-    #[error("Unterminated string literal")]
-    UnterminatedString,
-
     #[error(
         "File hash mismatch during undo/redo\n\
          \n\
@@ -88,6 +82,9 @@ pub enum Error {
          Hint: Run 'aifed read {path}' to get current state"
     )]
     FileHashMismatch { path: PathBuf, expected: String, actual: String },
+
+    #[error("Parse error at line {line}:{column}: {reason}")]
+    Syntax { line: usize, column: usize, reason: String },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

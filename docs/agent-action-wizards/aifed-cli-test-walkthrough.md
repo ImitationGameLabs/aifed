@@ -122,6 +122,30 @@ aifed read test.txt
 
 ---
 
+## Multi-line Content Insert
+
+**Goal:** Verify `+` content payloads can span multiple lines.
+
+**Steps:**
+```bash
+echo -e "line1\nline2\nline3" > multi.txt
+aifed read multi.txt
+# Capture hash for line 2, then insert multiple lines
+aifed edit multi.txt <<'EOF'
++ 2:XX
+  "inserted a"
+  "inserted b"
+  "inserted c"
+EOF
+aifed read multi.txt
+```
+
+**Expected:**
+- Lines inserted after line 2 with content from separate lines
+- Each quoted payload becomes its own line
+
+---
+
 ## Replace Line with Delete Plus Insert
 
 **Goal:** Verify replacement via `-` plus `+` modifies a line when hash matches.
