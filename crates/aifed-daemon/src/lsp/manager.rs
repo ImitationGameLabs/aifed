@@ -250,6 +250,7 @@ impl LanguageServerManager {
         workspace: &Path,
         params: GotoDefinitionParams,
     ) -> Result<Option<GotoDefinitionResponse>> {
+        self.ensure_running(language, workspace).await?;
         let mut servers = self.servers.write().await;
         let entry = self.get_entry_mut(&mut servers, language, workspace)?;
         entry.client.as_mut().unwrap().goto_definition(params).await
@@ -262,6 +263,7 @@ impl LanguageServerManager {
         workspace: &Path,
         params: ReferenceParams,
     ) -> Result<Option<Vec<Location>>> {
+        self.ensure_running(language, workspace).await?;
         let mut servers = self.servers.write().await;
         let entry = self.get_entry_mut(&mut servers, language, workspace)?;
         entry.client.as_mut().unwrap().references(params).await
@@ -274,6 +276,7 @@ impl LanguageServerManager {
         workspace: &Path,
         params: HoverParams,
     ) -> Result<Option<Hover>> {
+        self.ensure_running(language, workspace).await?;
         let mut servers = self.servers.write().await;
         let entry = self.get_entry_mut(&mut servers, language, workspace)?;
         entry.client.as_mut().unwrap().hover(params).await
@@ -286,6 +289,7 @@ impl LanguageServerManager {
         workspace: &Path,
         params: CompletionParams,
     ) -> Result<Option<CompletionResponse>> {
+        self.ensure_running(language, workspace).await?;
         let mut servers = self.servers.write().await;
         let entry = self.get_entry_mut(&mut servers, language, workspace)?;
         entry.client.as_mut().unwrap().completion(params).await
@@ -298,6 +302,7 @@ impl LanguageServerManager {
         workspace: &Path,
         params: RenameParams,
     ) -> Result<Option<WorkspaceEdit>> {
+        self.ensure_running(language, workspace).await?;
         let mut servers = self.servers.write().await;
         let entry = self.get_entry_mut(&mut servers, language, workspace)?;
         entry.client.as_mut().unwrap().rename(params).await
@@ -310,6 +315,7 @@ impl LanguageServerManager {
         workspace: &Path,
         params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
+        self.ensure_running(language, workspace).await?;
         let mut servers = self.servers.write().await;
         let entry = self.get_entry_mut(&mut servers, language, workspace)?;
         entry.client.as_mut().unwrap().diagnostic(params).await
@@ -322,6 +328,7 @@ impl LanguageServerManager {
         workspace: &Path,
         params: DidOpenTextDocumentParams,
     ) -> Result<()> {
+        self.ensure_running(language, workspace).await?;
         let mut servers = self.servers.write().await;
         let entry = self.get_entry_mut(&mut servers, language, workspace)?;
         entry.client.as_mut().unwrap().did_open(params).await
@@ -334,6 +341,7 @@ impl LanguageServerManager {
         workspace: &Path,
         params: DidChangeTextDocumentParams,
     ) -> Result<()> {
+        self.ensure_running(language, workspace).await?;
         let mut servers = self.servers.write().await;
         let entry = self.get_entry_mut(&mut servers, language, workspace)?;
         entry.client.as_mut().unwrap().did_change(params).await
@@ -346,9 +354,25 @@ impl LanguageServerManager {
         workspace: &Path,
         params: DidCloseTextDocumentParams,
     ) -> Result<()> {
+        self.ensure_running(language, workspace).await?;
         let mut servers = self.servers.write().await;
         let entry = self.get_entry_mut(&mut servers, language, workspace)?;
         entry.client.as_mut().unwrap().did_close(params).await
+    }
+
+    async fn ensure_running(&self, language: &str, workspace: &Path) -> Result<()> {
+        let key = ServerKey { language: language.to_string(), workspace: workspace.to_path_buf() };
+        {
+            let servers = self.servers.read().await;
+            if let Some(entry) = servers.get(&key)
+                && matches!(entry.status.state, ServerState::Running { .. })
+                && entry.client.is_some()
+            {
+                return Ok(());
+            }
+        }
+
+        self.start(language, workspace.to_path_buf()).await
     }
 
     /// Helper to get a mutable entry for a running server

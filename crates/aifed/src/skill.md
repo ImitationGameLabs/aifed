@@ -135,6 +135,20 @@ aifed lsp refs <FILE> <LINE:HASH> <SINDEX:NAME>    - Find references
 aifed lsp complete <FILE> <LINE:HASH> <SINDEX:NAME> - Get completions
 aifed lsp rename <FILE> <LINE:HASH> <SINDEX:NAME> <NAME> - Rename symbol
 
+## LSP CONFIGURATION
+
+- Built-in default: Rust via `rust-analyzer`
+- Global config file: `~/.config/aifed/config.toml`
+- Project config file: `aifed.toml`
+- Merge order: built-in defaults < global config < project config
+- Each configured language server uses one `[[lsp]]` object with:
+  - `language`
+  - `file_extensions`
+  - `root_markers`
+  - `command`
+  - optional `args`, `display_name`, `initialization_options`
+- If an LSP request targets a configured language whose server is not running yet, the daemon will try to start it on demand
+
 ## DAEMON COMMANDS
 
 aifed daemon status   - Check daemon status

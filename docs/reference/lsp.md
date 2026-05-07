@@ -18,13 +18,17 @@ All LSP commands are under the `lsp` subcommand and require a running daemon.
 
 ### Supported Languages
 
-LSP servers are configured per-language in `aifed.toml`:
+Rust is available as the built-in default.
+
+Additional languages, server commands, startup args, file extensions, and root markers are configured with `[[lsp]]` entries in `aifed.toml` or `~/.config/aifed/config.toml`:
 
 ```toml
-[lsp]
-go = "gopls"
-rust = "rust-analyzer"
-typescript = "typescript-language-server --stdio"
+[[lsp]]
+language = "rust"
+file_extensions = ["rs"]
+root_markers = ["Cargo.toml"]
+command = "rust-analyzer"
+args = []
 ```
 
 ---

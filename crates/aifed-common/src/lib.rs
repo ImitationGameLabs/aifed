@@ -5,11 +5,16 @@
 //! - `aifed-daemon-client`: The client library
 //! - `aifed`: The CLI (via client)
 
+pub mod config;
 mod error;
 mod socket;
 mod types;
 pub mod workspace;
 
+pub use config::{
+    ConfigError, LspRegistry, LspServerConfig, global_config_path, load_lsp_registry_for_path,
+    load_lsp_registry_for_workspace,
+};
 pub use error::*;
 pub use socket::*;
 pub use types::*;

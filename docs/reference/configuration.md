@@ -1,240 +1,163 @@
 # Configuration
 
-> **Status: Planned** - This document describes features that are not yet implemented.
+File-based runtime configuration for LSP language detection and server startup.
 
-Configuration commands and file format for aifed.
+## Current Scope
 
-## `config` - Manage Configuration
+The current implementation supports:
 
-View or modify aifed configuration.
+- built-in LSP defaults
+- user config: `~/.config/aifed/config.toml`
+- project config: `aifed.toml`
+- runtime merging for LSP language definitions
 
-### Usage
+The current implementation does **not** yet support:
 
-```
-aifed config list
-aifed config get <KEY>
-aifed config set <KEY> <VALUE>
-aifed config init
-```
+- `aifed config ...` management commands
+- `aifed init`
+- formatter/history/edit configuration
+- environment-variable or CLI overrides for config values
 
-### Subcommands
-
-| Subcommand          | Description                        |
-| ------------------- | ---------------------------------- |
-| `list`              | List all configuration values      |
-| `get <KEY>`         | Get a specific configuration value |
-| `set <KEY> <VALUE>` | Set a configuration value          |
-| `init`              | Initialize configuration file      |
-
-### Examples
-
-```bash
-# Initialize config file
-aifed config init
-
-# View current config
-aifed config list
-
-# Get specific value
-aifed config get edit.auto_format
-
-# Set auto-format
-aifed config set edit.auto_format true
-
-# JSON output
-aifed config list --json
-```
-
----
-
-## `init` - Initialize Project
-
-Initialize aifed for the current project.
-
-### Usage
-
-```
-aifed init [PATH]
-```
-
-### Options
-
-| Option    | Description                      |
-| --------- | -------------------------------- |
-| `--force` | Overwrite existing configuration |
-
-### Examples
-
-```bash
-# Initialize in current directory
-aifed init
-
-# Initialize in specific directory
-aifed init ./myproject
-
-# Overwrite existing config
-aifed init --force
-```
-
----
-
-## Configuration File
-
-Default location: `aifed.toml` in project root, or `~/.config/aifed/config.toml` globally.
-
-### Full Configuration Example
-
-```toml
-[edit]
-auto_format = true
-hash_enabled = true
-
-[format]
-# Per-language formatters
-rust = "rustfmt"
-go = "gofmt"
-javascript = "prettier --stdin-filepath"
-
-[lsp]
-# Per-language LSP servers
-rust = "rust-analyzer"
-go = "gopls"
-typescript = "typescript-language-server --stdio"
-
-[history]
-enabled = true
-max_entries = 100
-```
-
-### Configuration Sections
-
-#### `[edit]`
-
-| Key            | Type | Default | Description              |
-| -------------- | ---- | ------- | ------------------------ |
-| `auto_format`  | bool | `false` | Auto-format after edits  |
-| `hash_enabled` | bool | `true`  | Enable hash verification |
-
-#### `[format]`
-
-Per-language formatter configuration.
-
-```toml
-[format]
-rust = "rustfmt"
-go = "gofmt"
-javascript = "prettier --stdin-filepath"
-python = "black -"
-```
-
-#### `[lsp]`
-
-Per-language LSP server configuration.
-
-```toml
-[lsp]
-rust = "rust-analyzer"
-go = "gopls"
-typescript = "typescript-language-server --stdio"
-python = "pylsp"
-```
-
-#### `[history]`
-
-| Key           | Type   | Default | Description                      |
-| ------------- | ------ | ------- | -------------------------------- |
-| `enabled`     | bool   | `true`  | Enable edit history              |
-| `max_entries` | number | `100`   | Maximum history entries per file |
+For now, edit the TOML files directly.
 
 ---
 
 ## Configuration Layers
 
-Configuration is loaded in layers, with later layers overriding earlier ones:
+Configuration is loaded in this order, with later layers replacing earlier entries that use the same `language` value:
 
-| Priority    | Layer                 | Location                      |
-| ----------- | --------------------- | ----------------------------- |
-| 1 (lowest)  | Built-in defaults     | -                             |
-| 2           | Global config         | `~/.config/aifed/config.toml` |
-| 3           | Project config        | `aifed.toml`                  |
-| 4           | Environment variables | `AIFED_*`                     |
-| 5 (highest) | CLI flags             | `--option`                    |
+| Priority    | Layer             | Location                      |
+| ----------- | ----------------- | ----------------------------- |
+| 1 (lowest)  | Built-in defaults | -                             |
+| 2           | Global config     | `~/.config/aifed/config.toml` |
+| 3 (highest) | Project config    | `aifed.toml`                  |
 
-### Example Resolution
-
-```bash
-# Built-in default
-edit.auto_format = false
-
-# Global config (~/.config/aifed/config.toml)
-edit.auto_format = true
-
-# Project config (aifed.toml)
-# (not set)
-
-# Environment variable
-AIFED_AUTO_FORMAT=false
-
-# CLI flag
---auto-format
-```
-
-Result: `--auto-format` wins (highest priority)
+Today, the built-in default is Rust + `rust-analyzer`.
 
 ---
 
-## Environment Variables
+## File Format
 
-| Variable            | Equivalent   |
-| ------------------- | ------------ |
-| `AIFED_CONFIG`      | `--config`   |
-| `AIFED_NO_COLOR`    | `--no-color` |
-| `AIFED_JSON`        | `--json`     |
-| `AIFED_QUIET`       | `--quiet`    |
-| `AIFED_AUTO_FORMAT` | `--auto-fmt` |
+Use one `[[lsp]]` object per language server definition.
+
+```toml
+[[lsp]]
+language = "rust"
+file_extensions = ["rs"]
+root_markers = ["Cargo.toml"]
+command = "rust-analyzer"
+args = []
+display_name = "rust-analyzer"
+initialization_options = { checkOnSave = { command = "clippy" }, cargo = { allFeatures = true } }
+```
+
+### Fields
+
+| Field                    | Type           | Required | Description |
+| ------------------------ | -------------- | -------- | ----------- |
+| `language`               | string         | yes      | Language id used by aifed and LSP requests |
+| `file_extensions`        | string array   | yes      | Extensions used by CLI LSP commands to map files to a language |
+| `root_markers`           | string array   | no       | Workspace-root files that trigger daemon auto-start for the language |
+| `command`                | string         | yes      | Executable used to launch the language server |
+| `args`                   | string array   | no       | Extra arguments passed to the server process |
+| `display_name`           | string         | no       | Human-readable server name for logs and status output |
+| `initialization_options` | inline table / TOML value | no | JSON-like initialization options passed during LSP initialize |
+
+### Validation Rules
+
+- `language` must be unique within a single file.
+- `command` must not be empty.
+- Unknown fields are rejected.
+- Later config layers replace earlier entries for the same `language`.
 
 ---
 
-## Per-Language Settings
+## Common Examples
 
-### Formatter Configuration
+### Override the built-in Rust server
 
-Specify the formatter command for each language:
-
-```toml
-[format]
-# Simple command
-rust = "rustfmt"
-
-# Command with flags
-go = "gofmt -s"
-
-# Using stdin
-javascript = "prettier --stdin-filepath $FILE"
-```
-
-### LSP Configuration
-
-Specify the LSP server for each language:
+Use this when you want to change command, args, root markers, or extension mapping for Rust.
 
 ```toml
-[lsp]
-rust = "rust-analyzer"
-go = "gopls"
-typescript = "typescript-language-server --stdio"
-python = "pylsp"
+[[lsp]]
+language = "rust"
+file_extensions = ["rs"]
+root_markers = ["Cargo.toml", "rust-project.json"]
+command = "rust-analyzer"
+args = ["--stdio"]
+display_name = "rust-analyzer"
+initialization_options = { checkOnSave = { command = "check" } }
 ```
 
-### Language Detection
+### Add a custom language server
 
-aifed detects language using a cascading approach:
+This is the main workaround path for languages not supported by built-in defaults.
 
-1. File extension (fastest)
-2. shebang for scripts
-3. LSP detection (fallback)
+```toml
+[[lsp]]
+language = "nix"
+file_extensions = ["nix"]
+root_markers = ["flake.nix", "default.nix", "shell.nix"]
+command = "nil"
+args = []
+display_name = "nil"
+```
+
+### Global defaults + project override
+
+Global config:
+
+```toml
+# ~/.config/aifed/config.toml
+[[lsp]]
+language = "rust"
+file_extensions = ["rs"]
+root_markers = ["Cargo.toml"]
+command = "rust-analyzer"
+```
+
+Project config:
+
+```toml
+# ./aifed.toml
+[[lsp]]
+language = "rust"
+file_extensions = ["rs"]
+root_markers = ["Cargo.toml", "rust-project.json"]
+command = "rust-analyzer"
+args = ["--stdio"]
+```
+
+Result: the project definition replaces the global Rust definition for that workspace.
+
+---
+
+## Detection and Startup Behavior
+
+### CLI language detection
+
+When you run `aifed lsp ...`, the CLI maps the target file to a language using the merged `file_extensions` list.
+
+### Daemon auto-start
+
+When a daemon starts for a workspace, it checks merged `root_markers` to decide which language servers to start eagerly.
+
+### On-demand start
+
+If an LSP request targets a configured language whose server is not already running, the daemon will try to start it on demand before executing the request.
+
+This makes custom language entries useful even when you only configure file extensions and command details.
+
+---
+
+## Suggested Locations
+
+- Use `~/.config/aifed/config.toml` for machine-wide or user-wide defaults.
+- Use `aifed.toml` for project-specific overrides and workarounds that should stay with the repository.
+
+`aifed.toml` also continues to act as a workspace-root marker.
 
 ## See Also
 
-- [CLI Overview](cli-overview.md) - Environment variables
-- [LSP Integration](lsp.md) - LSP server configuration
-- [Utilities](utilities.md) - Formatter usage
+- [LSP Integration](lsp.md) - LSP commands and behavior
+- [CLI Overview](cli-overview.md) - Workspace detection

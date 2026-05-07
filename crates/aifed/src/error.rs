@@ -65,6 +65,9 @@ pub enum Error {
     #[error("Client error: {0}")]
     ClientError(#[from] aifed_common::ClientError),
 
+    #[error("Configuration error: {0}")]
+    ConfigError(#[from] aifed_common::ConfigError),
+
     #[error("Invalid range {start:?}-{end:?}: {reason}")]
     InvalidRange { start: Position, end: Position, reason: String },
 

@@ -4,7 +4,6 @@
 //! Each daemon instance is bound to exactly one workspace.
 
 mod args;
-mod detection;
 mod error;
 mod history;
 mod idle;
@@ -12,14 +11,13 @@ mod languages;
 mod lsp;
 mod server;
 
-use aifed_common::{lock_path, log_path, socket_path};
+use aifed_common::{load_lsp_registry_for_workspace, lock_path, log_path, socket_path};
 use anyhow::Context;
 use args::Args;
 use clap::Parser;
-use detection::detect;
 use history::HistoryManager;
 use idle::IdleMonitor;
-use languages::RustAnalyzerConfig;
+use languages::ConfiguredLanguageServerConfig;
 use lsp::LanguageServerManager;
 use server::{DaemonState, build_router};
 use std::fs::File;
@@ -247,21 +245,39 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("Log file: {}", log_file.display());
     }
 
+    let registry = load_lsp_registry_for_workspace(Some(&workspace)).with_context(|| {
+        format!(
+            "Failed to load LSP config for workspace: {}",
+            workspace.display()
+        )
+    })?;
+
     // Initialize LSP manager
     let lsp_manager = Arc::new(LanguageServerManager::new());
 
     // Register language server configs
-    lsp_manager.register_config(RustAnalyzerConfig).await;
-    tracing::debug!("Registered language server configs: rust (rust-analyzer)");
+    for config in registry.entries().iter().cloned() {
+        lsp_manager
+            .register_config(ConfiguredLanguageServerConfig::new(config))
+            .await;
+    }
+    tracing::debug!(
+        "Registered language server configs: {:?}",
+        registry
+            .entries()
+            .iter()
+            .map(|entry| format!("{} ({})", entry.language, entry.display_name()))
+            .collect::<Vec<_>>()
+    );
 
     // Auto-detect languages and start LSP servers
-    let detected = detect(&workspace);
+    let detected = registry.detect_languages_for_workspace(&workspace);
     tracing::info!("Detected languages: {:?}", detected);
 
-    for lang in &detected {
-        match lsp_manager.start(lang, workspace.clone()).await {
-            Ok(()) => tracing::info!("Started LSP server for: {}", lang),
-            Err(e) => tracing::error!("Failed to start LSP server for {}: {}", lang, e),
+    for entry in &detected {
+        match lsp_manager.start(&entry.language, workspace.clone()).await {
+            Ok(()) => tracing::info!("Started LSP server for: {}", entry.language),
+            Err(e) => tracing::error!("Failed to start LSP server for {}: {}", entry.language, e),
         }
     }
 

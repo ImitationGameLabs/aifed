@@ -5,6 +5,7 @@ use crate::error::{Error, Result};
 use crate::hash::{hash_file, hash_line};
 use crate::locator::{Locator, SymbolLocator};
 use crate::output::{self, OutputFormat, RenameFileDiff};
+use aifed_common::load_lsp_registry_for_path;
 use aifed_common::{
     DiagnosticsRequest, HoverRequest, LineDiffDto, LspPositionRequest, Position, RenameRequest,
 };
@@ -21,31 +22,13 @@ fn canonicalize_path(path: &Path) -> Result<PathBuf> {
 
 /// Detect language from file extension
 fn detect_language(file: &Path) -> Result<String> {
-    let ext = file.extension().and_then(|e| e.to_str()).unwrap_or("");
-
-    let lang = match ext {
-        "rs" => "rust",
-        "py" => "python",
-        "ts" => "typescript",
-        "tsx" => "typescriptreact",
-        "js" => "javascript",
-        "jsx" => "javascriptreact",
-        "go" => "go",
-        "java" => "java",
-        "c" => "c",
-        "cpp" | "cc" | "cxx" => "cpp",
-        "h" => "c",
-        "hpp" => "cpp",
-        "rb" => "ruby",
-        "php" => "php",
-        "swift" => "swift",
-        "kt" => "kotlin",
-        "scala" => "scala",
-        "lua" => "lua",
-        _ => return Err(Error::Lsp { message: format!("Unknown file extension: {}", ext) }),
-    };
-
-    Ok(lang.to_string())
+    let registry = load_lsp_registry_for_path(file)?;
+    registry
+        .detect_language_for_file(file)
+        .map(|entry| entry.language.clone())
+        .ok_or_else(|| Error::Lsp {
+            message: format!("No configured LSP matches file: {}", file.display()),
+        })
 }
 
 /// Read a specific line from a file (1-based line number)

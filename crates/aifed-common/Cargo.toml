@@ -5,6 +5,8 @@ version.workspace = true
 
 [dependencies]
 serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
 time = { workspace = true }
 xxhash-rust = { workspace = true }
 dirs = { workspace = true }

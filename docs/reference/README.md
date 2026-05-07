@@ -13,7 +13,7 @@ This directory contains reference documentation for all **aifed** commands and c
 | **LSP Integration**    | diag, symbols, rename, etc.          | [lsp.md](lsp.md)                     | Implemented |
 | **History & Recovery** | history, undo, redo                  | [history.md](history.md)             | Implemented |
 | **Clipboard**          | copy, paste, clipboard               | [clipboard.md](clipboard.md)         | Implemented |
-| **Configuration**      | config command and file format       | [configuration.md](configuration.md) | Planned     |
+| **Configuration**      | file-based LSP config and layering   | [configuration.md](configuration.md) | Partial     |
 | **Utilities**          | diff, format                         | [utilities.md](utilities.md)         | Planned     |
 
 ## Command Categories
@@ -44,9 +44,8 @@ This directory contains reference documentation for all **aifed** commands and c
 - [`paste`](clipboard.md#paste) - Paste clipboard content to file
 - [`clipboard`](clipboard.md#clipboard) - Show clipboard content
 
-### Configuration *(Planned)*
-- [`config`](configuration.md#config) - Manage configuration
-- [`init`](configuration.md#init) - Initialize project
+### Configuration *(Partial)*
+- [Configuration file](configuration.md) - Global/project `[[lsp]]` configuration and layering
 
 ### Utilities *(Planned)*
 - [`diff`](utilities.md#diff) - Show file differences

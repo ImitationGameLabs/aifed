@@ -31,10 +31,7 @@ See the [Installation Guide](docs/installation-guide.md) for setup instructions.
 | Language   | LSP Server    | Status  |
 | ---------- | ------------- | ------- |
 | Rust       | rust-analyzer | Ready   |
-| TypeScript | -             | Planned |
-| Go         | -             | Planned |
-| Nix        | -             | Planned |
-| Lean4      | -             | Planned |
+| Custom via `[[lsp]]` config | User-defined | Supported |
 
 ### Platform Support
 
