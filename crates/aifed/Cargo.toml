@@ -2,6 +2,10 @@
 name = "aifed"
 edition = "2024"
 version.workspace = true
+description = "AI-first CLI text editor with safe edits and LSP-powered code operations"
+license = "MIT"
+repository = "https://github.com/ImitationGameLabs/aifed"
+homepage = "https://github.com/ImitationGameLabs/aifed"
 
 [dependencies]
 clap = { workspace = true }

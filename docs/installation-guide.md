@@ -6,25 +6,52 @@ This guide covers how to install aifed on your system.
 
 aifed can be installed on various operating systems. Choose the installation method that matches your system:
 
-- [Standard Installation (Non-NixOS)](#standard-installation-non-nixos) — For Linux, macOS, and other Unix-like systems
+- [Install with Cargo (Git)](#install-with-cargo-git) — Recommended for Linux, macOS, and other Unix-like systems
+- [Build from Source](#build-from-source) — For local development or manual installation
 - [Installing on NixOS](#installing-on-nixos) — For NixOS users
 
 ---
 
-## Standard Installation (Non-NixOS)
+## Install with Cargo (Git)
 
-This section covers installation on Linux, macOS, and other Unix-like systems.
+This is the recommended installation method for Linux, macOS, and other Unix-like systems.
+
+### Prerequisite
+
+Install the Rust toolchain first if you do not already have it.
+
+### Install
+
+```bash
+cargo install --git https://github.com/ImitationGameLabs/aifed aifed --locked
+```
+
+This installs the `aifed` binary into Cargo's bin directory (typically `~/.cargo/bin`).
+
+### Verify the installation
+
+```bash
+aifed --version
+```
+
+### Next step
+
+Then proceed to [Post-Installation](#post-installation-configure-your-ai-agent).
+
+---
+
+## Build from Source
+
+This section covers local builds when you want to work from a checkout directly.
 
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/aifed.git
+git clone https://github.com/ImitationGameLabs/aifed.git
 cd aifed
 ```
 
-### Step 2: Build from Source
-
-Make sure you have Rust installed, then build the release binary:
+### Step 2: Build the Binary
 
 ```bash
 cargo build --release
@@ -41,13 +68,13 @@ Copy the binary to your system's binary directory:
 sudo cp target/release/aifed /usr/local/bin/
 ```
 
-Verify the installation:
+### Step 4: Verify the installation
 
 ```bash
 aifed --version
 ```
 
-### Step 4: Configure Your AI Agent
+### Step 5: Configure Your AI Agent
 
 Then proceed to [Post-Installation](#post-installation-configure-your-ai-agent).
 
@@ -76,7 +103,7 @@ Add aifed to your flake inputs. This can be done in either your NixOS configurat
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     aifed = {
-      url = "https://github.com/ImitationGameLabss/aifed";
+      url = "https://github.com/ImitationGameLabs/aifed";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
