@@ -4,6 +4,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
+const DEFAULT_CONFIG_TOML: &str = include_str!("default-config.toml");
+
 #[derive(Debug, Error)]
 pub enum ConfigError {
     #[error("Failed to read config file '{path}': {source}")]
@@ -25,6 +27,13 @@ pub enum ConfigError {
 
     #[error("Invalid LSP config for language '{language}' in '{path}': {reason}")]
     InvalidEntry { path: PathBuf, language: String, reason: String },
+
+    #[error("Failed to write default config to '{path}': {source}")]
+    Write {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -118,7 +127,30 @@ impl LspRegistry {
 }
 
 pub fn global_config_path() -> Option<PathBuf> {
+    if let Ok(dir) = std::env::var("AIFED_CONFIG_DIR")
+        && !dir.is_empty()
+    {
+        return Some(PathBuf::from(dir).join("config.toml"));
+    }
     dirs::config_dir().map(|dir| dir.join("aifed").join("config.toml"))
+}
+
+/// Write the default config to the global path if it does not exist yet.
+///
+/// NixOS users with home-manager will already have the file via xdg.configFile,
+/// so this is a no-op. Non-Nix users get the default config on first run.
+pub fn ensure_default_config() -> Result<(), ConfigError> {
+    if let Some(path) = global_config_path()
+        && !path.exists()
+    {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|source| ConfigError::Write { path: parent.to_path_buf(), source })?;
+        }
+        fs::write(&path, DEFAULT_CONFIG_TOML)
+            .map_err(|source| ConfigError::Write { path: path.clone(), source })?;
+    }
+    Ok(())
 }
 
 pub fn load_lsp_registry_for_workspace(
@@ -141,7 +173,7 @@ fn load_lsp_registry_from_paths(
     global_path: Option<&Path>,
     project_path: Option<&Path>,
 ) -> Result<LspRegistry, ConfigError> {
-    let mut entries = built_in_lsp_configs();
+    let mut entries = Vec::new();
 
     if let Some(path) = global_path
         && let Some(config) = load_config_file(path)?
@@ -214,25 +246,6 @@ fn merge_entries(entries: &mut Vec<LspServerConfig>, overrides: Vec<LspServerCon
     }
 }
 
-fn built_in_lsp_configs() -> Vec<LspServerConfig> {
-    vec![LspServerConfig {
-        language: "rust".into(),
-        file_extensions: vec!["rs".into()],
-        root_markers: vec!["Cargo.toml".into()],
-        command: "rust-analyzer".into(),
-        args: vec![],
-        display_name: Some("rust-analyzer".into()),
-        initialization_options: Some(serde_json::json!({
-            "checkOnSave": {
-                "command": "clippy"
-            },
-            "cargo": {
-                "allFeatures": true
-            }
-        })),
-    }]
-}
-
 fn normalize_language(language: &str) -> String {
     language.trim().to_ascii_lowercase()
 }
@@ -272,7 +285,7 @@ mod tests {
     }
 
     #[test]
-    fn built_in_registry_detects_rust() {
+    fn global_config_provides_language_detection() {
         let dir = tempfile::tempdir().unwrap();
         write_file(
             &dir.path().join("Cargo.toml"),
@@ -280,7 +293,19 @@ mod tests {
         );
         write_file(&dir.path().join("src/main.rs"), "fn main() {}\n");
 
-        let registry = load_lsp_registry_from_paths(None, None).unwrap();
+        let global_config = dir.path().join("config.toml");
+        write_file(
+            &global_config,
+            r#"
+[[lsp]]
+language = "rust"
+file_extensions = ["rs"]
+root_markers = ["Cargo.toml"]
+command = "rust-analyzer"
+"#,
+        );
+
+        let registry = load_lsp_registry_from_paths(Some(&global_config), None).unwrap();
         let file_language = registry
             .detect_language_for_file(&dir.path().join("src/main.rs"))
             .unwrap();
@@ -292,7 +317,13 @@ mod tests {
     }
 
     #[test]
-    fn project_config_replaces_builtin_entry() {
+    fn empty_registry_when_no_config() {
+        let registry = load_lsp_registry_from_paths(None, None).unwrap();
+        assert!(registry.entries().is_empty());
+    }
+
+    #[test]
+    fn project_config_loads_without_global() {
         let dir = tempfile::tempdir().unwrap();
         let project_config = dir.path().join("aifed.toml");
         write_file(

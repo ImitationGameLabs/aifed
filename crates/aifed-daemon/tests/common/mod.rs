@@ -115,6 +115,17 @@ impl DaemonFixture {
             "[package]\nname = \"test\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
         )
         .unwrap();
+        fs::write(
+            workspace.path().join("aifed.toml"),
+            r#"[[lsp]]
+language = "rust"
+file_extensions = ["rs"]
+root_markers = ["Cargo.toml"]
+command = "rust-analyzer"
+display_name = "rust-analyzer"
+"#,
+        )
+        .unwrap();
         fs::create_dir_all(workspace.path().join("src")).unwrap();
 
         let main_rs_content = r#"fn main() {

@@ -137,16 +137,11 @@ aifed lsp rename <FILE> <LINE:HASH> <SINDEX:NAME> <NAME> - Rename symbol
 
 ## LSP CONFIGURATION
 
-- Built-in default: Rust via `rust-analyzer`
-- Global config file: `~/.config/aifed/config.toml`
-- Project config file: `aifed.toml`
-- Merge order: built-in defaults < global config < project config
-- Each configured language server uses one `[[lsp]]` object with:
-  - `language`
-  - `file_extensions`
-  - `root_markers`
-  - `command`
-  - optional `args`, `display_name`, `initialization_options`
+- Global config: `~/.config/aifed/config.toml` (or `$AIFED_CONFIG_DIR/config.toml`)
+- Project config: `aifed.toml` in workspace root
+- Merge order: global config < project config
+- First run auto-creates a default global config with Rust/rust-analyzer; edit or replace as needed
+- Each `[[lsp]]` object has: `language`, `file_extensions`, `root_markers`, `command`, optional `args`, `display_name`, `initialization_options`
 - If an LSP request targets a configured language whose server is not running yet, the daemon will try to start it on demand
 
 ## DAEMON COMMANDS

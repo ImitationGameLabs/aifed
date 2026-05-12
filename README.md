@@ -30,8 +30,7 @@ See the [Installation Guide](docs/installation-guide.md) for setup instructions.
 
 | Language   | LSP Server    | Status  |
 | ---------- | ------------- | ------- |
-| Rust       | rust-analyzer | Ready   |
-| Custom via `[[lsp]]` config | User-defined | Supported |
+| Any via `[[lsp]]` config | User-defined | Supported |
 
 ### Platform Support
 

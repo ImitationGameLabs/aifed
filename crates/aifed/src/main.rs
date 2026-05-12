@@ -13,6 +13,7 @@ mod text_edit;
 use crate::args::{Args, Commands, DaemonCommands};
 use crate::error::{Error, Result};
 use crate::output::{OutputFormat, format_error};
+use aifed_common::ensure_default_config;
 use aifed_common::workspace::{Workspace, detect_workspace};
 use aifed_daemon_client::DaemonClient;
 use std::path::{Path, PathBuf};
@@ -56,6 +57,12 @@ async fn main() {
 
     let args = Args::parse_args();
     let format = if args.json { OutputFormat::Json } else { OutputFormat::Text };
+
+    // Non-fatal: CLI can still perform file operations (read/edit) without a config file.
+    // The daemon treats this as fatal because it needs LSP config to function.
+    if let Err(e) = ensure_default_config() {
+        eprintln!("Warning: {}", e);
+    }
 
     let result = run(args, format).await;
 

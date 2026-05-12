@@ -11,7 +11,7 @@ mod languages;
 mod lsp;
 mod server;
 
-use aifed_common::{load_lsp_registry_for_workspace, lock_path, log_path, socket_path};
+use aifed_common::{ensure_default_config, load_lsp_registry_for_workspace, lock_path, log_path, socket_path};
 use anyhow::Context;
 use args::Args;
 use clap::Parser;
@@ -186,6 +186,10 @@ fn init_logging(
 async fn main() -> anyhow::Result<()> {
     // Parse CLI arguments
     let args = Args::parse();
+
+    // Fatal: daemon cannot function without a config file (no LSP servers to serve).
+    // The CLI treats this as non-fatal because basic file ops (read/edit) still work.
+    ensure_default_config().context("Failed to initialize default config")?;
 
     // Canonicalize workspace path
     let workspace = args.workspace.canonicalize().map_err(|e| {

@@ -26,6 +26,7 @@ let
     fileset = lib.fileset.unions [
       (lib.fileset.fromSource (craneLib.cleanCargoSource root))
       (root + /crates/aifed/src/skill.md)
+      (root + /crates/aifed-common/src/default-config.toml)
     ];
   };
 
