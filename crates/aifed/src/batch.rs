@@ -465,7 +465,8 @@ fn token_raw<'a>(t: &Token<'a>) -> &'a str {
 }
 
 fn decode_content(raw: &str) -> Result<String> {
-    match json_escape::unescape(&raw).decode_utf8() {
+    let normalized = crate::escape::normalize_hex_escapes(raw);
+    match json_escape::unescape(normalized.as_ref()).decode_utf8() {
         Ok(cow) => {
             let content = cow.into_owned();
             validate_content(&content)?;
@@ -1317,10 +1318,27 @@ mod tests {
 
     #[test]
     fn test_parse_content_invalid_escape() {
-        // Invalid escape sequence should return error
+        // \x followed by a non-hex character (space) is not a valid \xNN escape
+        // and should still produce an error.
         let input = r#"+ 10:AB "unknown \x escape""#;
         let result = parse_batch_operations(input);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_content_hex_escape_x1b() {
+        // \x1b (ANSI escape byte) should be accepted and decoded
+        let input = r#"+ 10:AB "\x1b[0m""#;
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops[0].contents, vec!["\x1b[0m"]);
+    }
+
+    #[test]
+    fn test_parse_content_hex_escape_ascii() {
+        // \x41 == 'A'
+        let input = r#"+ 10:AB "\x41""#;
+        let ops = parse_batch_operations(input).unwrap();
+        assert_eq!(ops[0].contents, vec!["A"]);
     }
 
     #[test]

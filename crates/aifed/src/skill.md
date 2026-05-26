@@ -89,13 +89,14 @@ LINE:HASH                Standard hashline (e.g., "42:3K")
 0:00                     Virtual line for inserting at file beginning
 [START:HASH,END:HASH]    Range locator for delete (e.g., "[2:AA,89:BB]" deletes lines 2-89, boundary hash verified)
 
-## STRING ESCAPING (JSON-style)
+## STRING ESCAPING
 
-Content in double quotes supports JSON escape sequences:
+Content in double quotes supports string escape sequences:
 - `\"` → `"` (double quote)
 - `\\` → `\` (backslash)
 - `\t` → tab
 - `\r` → carriage return (typically at end of line for CRLF files)
+- `\xNN` → byte with hex value NN (e.g., `\x1b` = ESC, `\x41` = `A`)
 - `\uXXXX` → Unicode character
 
 **`\n` is not allowed** in edit content. Each inserted content payload is exactly one line. To insert multiple lines at one anchor, provide multiple quoted payloads after a single `+`.

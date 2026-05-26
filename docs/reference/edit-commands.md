@@ -95,18 +95,18 @@ EOF
 
 See [locator.md](locator.md) for detailed documentation on locators and hashline.
 
-### String Escaping (JSON-style)
+### String Escaping
 
-Content in double quotes supports JSON escape sequences:
+Content in double quotes supports string escape sequences:
 
-| Escape   | Result             |
-| -------- | ------------------ |
-| `\"`     | `"` (double quote) |
-| `\\`     | `\` (backslash)    |
-| `\n`     | newline            |
-| `\t`     | tab                |
-| `\r`     | carriage return    |
-| `\uXXXX` | Unicode character  |
+| Escape   | Result                                                    |
+| -------- | --------------------------------------------------------- |
+| `\"`     | `"` (double quote)                                        |
+| `\\`     | `\` (backslash)                                           |
+| `\t`     | tab                                                       |
+| `\r`     | carriage return                                           |
+| `\xNN`   | byte with hex value NN (e.g., `\x1b` = ESC, `\x41` = `A`) |
+| `\uXXXX` | Unicode character                                         |
 
 **Rules:**
 - `\n` is rejected. Each content payload is exactly one line.

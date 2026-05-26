@@ -11,7 +11,9 @@ mod languages;
 mod lsp;
 mod server;
 
-use aifed_common::{ensure_default_config, load_lsp_registry_for_workspace, lock_path, log_path, socket_path};
+use aifed_common::{
+    ensure_default_config, load_lsp_registry_for_workspace, lock_path, log_path, socket_path,
+};
 use anyhow::Context;
 use args::Args;
 use clap::Parser;

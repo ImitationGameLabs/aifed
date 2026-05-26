@@ -84,6 +84,6 @@ aifed edit main.rs + 0:00 "// Copyright 2026"
 
 ## String Content
 
-Content in double quotes supports JSON escape sequences (`\"`, `\\`, `\t`, `\r`, `\uXXXX`).
+Content in double quotes supports string escape sequences (`\"`, `\\`, `\t`, `\r`, `\xNN`, `\uXXXX`).
 `\n` is rejected — each content payload is exactly one line. Use multiple quoted payloads
 to insert multiple lines at one locator.

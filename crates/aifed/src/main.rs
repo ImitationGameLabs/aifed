@@ -3,6 +3,7 @@ mod batch;
 mod commands;
 mod diff;
 mod error;
+mod escape;
 mod file;
 mod hash;
 mod locator;
