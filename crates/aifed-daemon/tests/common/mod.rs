@@ -92,6 +92,9 @@ impl Response {
 pub struct DaemonFixture {
     /// Holds TempDir to prevent cleanup until struct is dropped
     _workspace: tempfile::TempDir,
+    /// Isolates the daemon from the user's real `~/.config/aifed/config.toml`
+    /// so tests are hermetic — the daemon writes/reads only this temp dir.
+    _config_dir: tempfile::TempDir,
     socket_path: std::path::PathBuf,
     daemon: Child,
     /// HTTP client for making requests to the daemon
@@ -119,7 +122,6 @@ impl DaemonFixture {
             workspace.path().join("aifed.toml"),
             r#"[[lsp]]
 language = "rust"
-file_extensions = ["rs"]
 root_markers = ["Cargo.toml"]
 command = "rust-analyzer"
 display_name = "rust-analyzer"
@@ -165,6 +167,11 @@ display_name = "rust-analyzer"
             .unwrap();
         assert!(status.success(), "Failed to build aifed-daemon");
 
+        // Hermetic global config dir: the spawned daemon reads its global config
+        // from here (writing the shipped default) instead of the user's real
+        // ~/.config/aifed/config.toml, so tests don't depend on the environment.
+        let config_dir = tempfile::tempdir().unwrap();
+
         // Spawn daemon process (use workspace root target directory)
         let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let workspace_dir = manifest_dir
@@ -179,6 +186,7 @@ display_name = "rust-analyzer"
             .arg(&socket_path)
             .arg("--idle-timeout-secs")
             .arg("3600")
+            .env("AIFED_CONFIG_DIR", config_dir.path())
             .spawn()
             .unwrap();
 
@@ -186,7 +194,14 @@ display_name = "rust-analyzer"
         let client = HttpClient::new(&socket_path);
         Self::wait_for_socket(&client).await;
 
-        Self { _workspace: workspace, socket_path, daemon, client, main_rs_path }
+        Self {
+            _workspace: workspace,
+            _config_dir: config_dir,
+            socket_path,
+            daemon,
+            client,
+            main_rs_path,
+        }
     }
 
     async fn wait_for_socket(client: &HttpClient) {

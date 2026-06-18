@@ -12,7 +12,7 @@ mod lsp;
 mod server;
 
 use aifed_common::{
-    ensure_default_config, load_lsp_registry_for_workspace, lock_path, log_path, socket_path,
+    ensure_default_config, load_registry_for_workspace, lock_path, log_path, socket_path,
 };
 use anyhow::Context;
 use args::Args;
@@ -251,7 +251,7 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("Log file: {}", log_file.display());
     }
 
-    let registry = load_lsp_registry_for_workspace(Some(&workspace)).with_context(|| {
+    let registry = load_registry_for_workspace(Some(&workspace)).with_context(|| {
         format!(
             "Failed to load LSP config for workspace: {}",
             workspace.display()

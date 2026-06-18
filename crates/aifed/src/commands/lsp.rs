@@ -3,12 +3,13 @@
 use crate::args::LspCommands;
 use crate::error::{Error, Result};
 use crate::hash::{hash_file, hash_line};
+use crate::language::LanguageResolver;
 use crate::locator::{Locator, SymbolLocator};
 use crate::output::{self, OutputFormat, RenameFileDiff};
-use aifed_common::load_lsp_registry_for_path;
 use aifed_common::{
     DiagnosticsRequest, HoverRequest, LineDiffDto, LspPositionRequest, Position, RenameRequest,
 };
+use aifed_common::{Registry, load_registry_for_path};
 use aifed_daemon_client::DaemonClient;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
@@ -20,15 +21,32 @@ fn canonicalize_path(path: &Path) -> Result<PathBuf> {
         .map_err(|e| Error::InvalidIo { path: path.to_path_buf(), source: e })
 }
 
-/// Detect language from file extension
+/// Resolve the language of `file` via the shared language registry, then confirm
+/// an LSP server is configured for it. `detect_language_with` holds the logic so
+/// it can be unit-tested without touching the filesystem.
 fn detect_language(file: &Path) -> Result<String> {
-    let registry = load_lsp_registry_for_path(file)?;
-    registry
-        .detect_language_for_file(file)
-        .map(|entry| entry.language.clone())
-        .ok_or_else(|| Error::Lsp {
-            message: format!("No configured LSP matches file: {}", file.display()),
-        })
+    let registry = load_registry_for_path(file)?;
+    detect_language_with(file, &registry)
+}
+
+fn detect_language_with(file: &Path, registry: &Registry) -> Result<String> {
+    // `resolved` owns the language name that `detect` borrows, so it must
+    // outlive that use below.
+    let resolved = LanguageResolver::with_overlays(registry.language_overlays());
+    let language = match resolved.detect(file) {
+        Some(language) => language,
+        None => {
+            return Err(Error::Lsp {
+                message: format!("No configured language matches file: {}", file.display()),
+            });
+        }
+    };
+    if registry.find_by_language(language).is_none() {
+        return Err(Error::Lsp {
+            message: format!("No LSP server configured for language '{language}'"),
+        });
+    }
+    Ok(language.to_string())
 }
 
 /// Read a specific line from a file (1-based line number)
@@ -396,5 +414,86 @@ pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFor
 
         // Symbols is handled above with early return, this arm is unreachable
         LspCommands::Symbols { .. } => unreachable!(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aifed_common::{LanguageConfig, LspServerConfig};
+
+    fn lsp_entry(language: &str) -> LspServerConfig {
+        LspServerConfig {
+            language: language.to_string(),
+            root_markers: Vec::new(),
+            command: format!("{language}-lsp"),
+            args: Vec::new(),
+            display_name: None,
+            initialization_options: None,
+        }
+    }
+
+    fn overlay(language: &str, additional: &[&str]) -> LanguageConfig {
+        LanguageConfig {
+            language: language.to_string(),
+            additional_extensions: additional.iter().map(|s| s.to_string()).collect(),
+            exclude_extensions: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn grammar_language_with_lsp_entry_resolves() {
+        // `rust` is a grammar default and has an LSP entry → resolves to rust.
+        let registry = Registry::from_parts(vec![lsp_entry("rust")], vec![]);
+        assert_eq!(
+            detect_language_with(Path::new("a.rs"), &registry).unwrap(),
+            "rust".to_string()
+        );
+    }
+
+    #[test]
+    fn grammar_language_without_lsp_entry_errors_clearly() {
+        // `markdown` is a grammar default but ships no LSP → distinct message
+        // (not the generic "no language matches").
+        let registry = Registry::from_parts(vec![lsp_entry("rust")], vec![]);
+        let err = detect_language_with(Path::new("a.md"), &registry).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("No LSP server configured for language 'markdown'"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn unknown_extension_errors_no_language_match() {
+        let registry = Registry::from_parts(vec![lsp_entry("rust")], vec![]);
+        let err = detect_language_with(Path::new("a.xyz"), &registry).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("No configured language matches file"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn config_only_language_with_lsp_entry_resolves() {
+        // `foo` has no shipped grammar but is declared as a language and has an
+        // LSP entry.
+        let registry = Registry::from_parts(vec![lsp_entry("foo")], vec![overlay("foo", &["foo"])]);
+        assert_eq!(
+            detect_language_with(Path::new("a.foo"), &registry).unwrap(),
+            "foo".to_string()
+        );
+    }
+
+    #[test]
+    fn config_only_language_without_lsp_entry_errors() {
+        let registry = Registry::from_parts(vec![], vec![overlay("foo", &["foo"])]);
+        let err = detect_language_with(Path::new("a.foo"), &registry).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("No LSP server configured for language 'foo'"),
+            "{err}"
+        );
     }
 }

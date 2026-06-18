@@ -44,7 +44,6 @@ mod tests {
     fn config_backed_server_preserves_language_and_display_name() {
         let config = LspServerConfig {
             language: "rust".into(),
-            file_extensions: vec!["rs".into()],
             root_markers: vec!["Cargo.toml".into()],
             command: "rust-analyzer".into(),
             args: vec!["--stdio".into()],

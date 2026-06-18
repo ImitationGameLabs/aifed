@@ -22,7 +22,9 @@ pub enum ConfigError {
         source: toml::de::Error,
     },
 
-    #[error("Duplicate LSP config for language '{language}' in '{path}'")]
+    // Wording is language-neutral: the same `[[language]]` name may appear in
+    // either an `[[lsp]]` entry or a `[[language]]` overlay.
+    #[error("Duplicate entry for language '{language}' in '{path}'")]
     DuplicateLanguage { path: PathBuf, language: String },
 
     #[error("Invalid LSP config for language '{language}' in '{path}': {reason}")]
@@ -36,19 +38,24 @@ pub enum ConfigError {
     },
 }
 
+/// Top-level config file: a list of LSP server entries plus a list of language
+/// extension overlays. Both are `[[array]]` tables in TOML.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FileConfig {
     #[serde(default)]
     lsp: Vec<LspServerConfig>,
+    #[serde(default)]
+    language: Vec<LanguageConfig>,
 }
 
+/// An LSP server entry. References a language by name only — extension matching
+/// is owned by the language registry (`aifed::language`), not by this entry, so
+/// a language can have an outline grammar without an LSP (e.g. Markdown).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LspServerConfig {
     pub language: String,
-    #[serde(default)]
-    pub file_extensions: Vec<String>,
     #[serde(default)]
     pub root_markers: Vec<String>,
     pub command: String,
@@ -68,11 +75,6 @@ impl LspServerConfig {
     fn normalize(&mut self) {
         self.language = normalize_language(&self.language);
         self.command = self.command.trim().to_string();
-        self.file_extensions = dedup(
-            self.file_extensions
-                .iter()
-                .map(|ext| normalize_extension(ext)),
-        );
         self.root_markers = dedup(
             self.root_markers
                 .iter()
@@ -85,10 +87,6 @@ impl LspServerConfig {
         }
     }
 
-    fn matches_extension(&self, extension: &str) -> bool {
-        self.file_extensions.iter().any(|ext| ext == extension)
-    }
-
     fn matches_workspace(&self, workspace: &Path) -> bool {
         self.root_markers
             .iter()
@@ -96,26 +94,74 @@ impl LspServerConfig {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct LspRegistry {
-    entries: Vec<LspServerConfig>,
+/// A language extension overlay. Layers on top of a grammar's built-in default
+/// extensions (see `aifed::language::GRAMMAR_DEFAULTS`):
+///
+/// `effective = (grammar_defaults ∪ additional_extensions) − exclude_extensions`
+///
+/// For a language with no shipped grammar, `additional_extensions` is its full
+/// extension set — outline resolves it but reports "no outline grammar".
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LanguageConfig {
+    pub language: String,
+    #[serde(default)]
+    pub additional_extensions: Vec<String>,
+    #[serde(default)]
+    pub exclude_extensions: Vec<String>,
 }
 
-impl LspRegistry {
+impl LanguageConfig {
+    fn normalize(&mut self) {
+        self.language = normalize_language(&self.language);
+        self.additional_extensions = dedup(
+            self.additional_extensions
+                .iter()
+                .map(|e| normalize_extension(e)),
+        );
+        self.exclude_extensions = dedup(
+            self.exclude_extensions
+                .iter()
+                .map(|e| normalize_extension(e)),
+        );
+    }
+}
+
+/// The loaded, merged configuration: LSP server entries plus language extension
+/// overlays. Built fresh per command by merging the global config
+/// (`$AIFED_CONFIG_DIR/config.toml` or `~/.config/aifed/config.toml`) with the
+/// project config (`<workspace>/aifed.toml`); project entries wholesale-replace
+/// same-name global entries.
+#[derive(Debug, Clone)]
+pub struct Registry {
+    entries: Vec<LspServerConfig>,
+    language_overlays: Vec<LanguageConfig>,
+}
+
+impl Registry {
+    /// Construct directly from parts, bypassing file loading. For tests and
+    /// embedding only — inputs are NOT normalized or validated; callers must
+    /// pre-normalize language names and extensions.
+    pub fn from_parts(
+        entries: Vec<LspServerConfig>,
+        language_overlays: Vec<LanguageConfig>,
+    ) -> Self {
+        Self { entries, language_overlays }
+    }
+
     pub fn entries(&self) -> &[LspServerConfig] {
         &self.entries
+    }
+
+    /// `[[language]]` overlays, global-then-project merged (project replaces
+    /// same-name global). Consumed by `aifed::language::LanguageResolver`.
+    pub fn language_overlays(&self) -> &[LanguageConfig] {
+        &self.language_overlays
     }
 
     pub fn find_by_language(&self, language: &str) -> Option<&LspServerConfig> {
         let language = normalize_language(language);
         self.entries.iter().find(|entry| entry.language == language)
-    }
-
-    pub fn detect_language_for_file(&self, file: &Path) -> Option<&LspServerConfig> {
-        let extension = normalize_extension(file.extension()?.to_str()?);
-        self.entries
-            .iter()
-            .find(|entry| entry.matches_extension(&extension))
     }
 
     pub fn detect_languages_for_workspace(&self, workspace: &Path) -> Vec<&LspServerConfig> {
@@ -153,41 +199,42 @@ pub fn ensure_default_config() -> Result<(), ConfigError> {
     Ok(())
 }
 
-pub fn load_lsp_registry_for_workspace(
-    workspace_root: Option<&Path>,
-) -> Result<LspRegistry, ConfigError> {
+pub fn load_registry_for_workspace(workspace_root: Option<&Path>) -> Result<Registry, ConfigError> {
     let global_path = global_config_path();
     let project_path = workspace_root.map(|root| root.join("aifed.toml"));
-    load_lsp_registry_from_paths(global_path.as_deref(), project_path.as_deref())
+    load_registry_from_paths(global_path.as_deref(), project_path.as_deref())
 }
 
-pub fn load_lsp_registry_for_path(path: &Path) -> Result<LspRegistry, ConfigError> {
+pub fn load_registry_for_path(path: &Path) -> Result<Registry, ConfigError> {
     let workspace_root =
         detect_workspace(if path.is_dir() { path } else { path.parent().unwrap_or(path) })
             .map(|workspace| workspace.root().to_path_buf());
 
-    load_lsp_registry_for_workspace(workspace_root.as_deref())
+    load_registry_for_workspace(workspace_root.as_deref())
 }
 
-fn load_lsp_registry_from_paths(
+fn load_registry_from_paths(
     global_path: Option<&Path>,
     project_path: Option<&Path>,
-) -> Result<LspRegistry, ConfigError> {
+) -> Result<Registry, ConfigError> {
     let mut entries = Vec::new();
+    let mut language_overlays = Vec::new();
 
     if let Some(path) = global_path
         && let Some(config) = load_config_file(path)?
     {
         merge_entries(&mut entries, config.lsp);
+        merge_language_entries(&mut language_overlays, config.language);
     }
 
     if let Some(path) = project_path
         && let Some(config) = load_config_file(path)?
     {
         merge_entries(&mut entries, config.lsp);
+        merge_language_entries(&mut language_overlays, config.language);
     }
 
-    Ok(LspRegistry { entries })
+    Ok(Registry { entries, language_overlays })
 }
 
 fn load_config_file(path: &Path) -> Result<Option<FileConfig>, ConfigError> {
@@ -201,6 +248,7 @@ fn load_config_file(path: &Path) -> Result<Option<FileConfig>, ConfigError> {
         .map_err(|source| ConfigError::Parse { path: path.to_path_buf(), source })?;
 
     validate_entries(path, &mut config.lsp)?;
+    validate_language_entries(path, &mut config.language)?;
     Ok(Some(config))
 }
 
@@ -233,6 +281,31 @@ fn validate_entries(path: &Path, entries: &mut [LspServerConfig]) -> Result<(), 
     Ok(())
 }
 
+/// Reject duplicate `language` names within a single file's `[[language]]` list.
+fn validate_language_entries(
+    path: &Path,
+    entries: &mut [LanguageConfig],
+) -> Result<(), ConfigError> {
+    let mut seen = std::collections::HashSet::new();
+    for entry in entries {
+        entry.normalize();
+        if entry.language.is_empty() {
+            return Err(ConfigError::InvalidEntry {
+                path: path.to_path_buf(),
+                language: "<unknown>".into(),
+                reason: "language must not be empty".into(),
+            });
+        }
+        if !seen.insert(entry.language.clone()) {
+            return Err(ConfigError::DuplicateLanguage {
+                path: path.to_path_buf(),
+                language: entry.language.clone(),
+            });
+        }
+    }
+    Ok(())
+}
+
 fn merge_entries(entries: &mut Vec<LspServerConfig>, overrides: Vec<LspServerConfig>) {
     for override_entry in overrides {
         if let Some(position) = entries
@@ -246,11 +319,33 @@ fn merge_entries(entries: &mut Vec<LspServerConfig>, overrides: Vec<LspServerCon
     }
 }
 
-fn normalize_language(language: &str) -> String {
+/// Project entries wholesale-replace same-name global entries (same model as
+/// `merge_entries`). Note: restating a language in the project resets its
+/// `exclude_extensions` — see docs/reference/configuration.md.
+fn merge_language_entries(entries: &mut Vec<LanguageConfig>, overrides: Vec<LanguageConfig>) {
+    for override_entry in overrides {
+        if let Some(position) = entries
+            .iter()
+            .position(|entry| entry.language == override_entry.language)
+        {
+            entries[position] = override_entry;
+        } else {
+            entries.push(override_entry);
+        }
+    }
+}
+
+/// Normalize a language name: trim, lowercase. Shared by the config layer
+/// (language-key matching at load/merge) and `aifed::language` (overlay
+/// matching), so there is a single definition of "normalized language".
+pub fn normalize_language(language: &str) -> String {
     language.trim().to_ascii_lowercase()
 }
 
-fn normalize_extension(extension: &str) -> String {
+/// Normalize a file extension: trim, strip a leading dot, lowercase. Shared by
+/// the config layer (overlay normalization at load) and `aifed::language`
+/// (file-extension resolution), so there is a single definition of "normalized".
+pub fn normalize_extension(extension: &str) -> String {
     extension
         .trim()
         .trim_start_matches('.')
@@ -285,13 +380,12 @@ mod tests {
     }
 
     #[test]
-    fn global_config_provides_language_detection() {
+    fn loads_lsp_entries_and_workspace_detection() {
         let dir = tempfile::tempdir().unwrap();
         write_file(
             &dir.path().join("Cargo.toml"),
             "[package]\nname='demo'\nversion='0.1.0'\n",
         );
-        write_file(&dir.path().join("src/main.rs"), "fn main() {}\n");
 
         let global_config = dir.path().join("config.toml");
         write_file(
@@ -299,27 +393,23 @@ mod tests {
             r#"
 [[lsp]]
 language = "rust"
-file_extensions = ["rs"]
 root_markers = ["Cargo.toml"]
 command = "rust-analyzer"
 "#,
         );
 
-        let registry = load_lsp_registry_from_paths(Some(&global_config), None).unwrap();
-        let file_language = registry
-            .detect_language_for_file(&dir.path().join("src/main.rs"))
-            .unwrap();
+        let registry = load_registry_from_paths(Some(&global_config), None).unwrap();
+        assert_eq!(registry.entries().len(), 1);
         let workspace_languages = registry.detect_languages_for_workspace(dir.path());
-
-        assert_eq!(file_language.language, "rust");
         assert_eq!(workspace_languages.len(), 1);
         assert_eq!(workspace_languages[0].language, "rust");
     }
 
     #[test]
     fn empty_registry_when_no_config() {
-        let registry = load_lsp_registry_from_paths(None, None).unwrap();
+        let registry = load_registry_from_paths(None, None).unwrap();
         assert!(registry.entries().is_empty());
+        assert!(registry.language_overlays().is_empty());
     }
 
     #[test]
@@ -331,44 +421,87 @@ command = "rust-analyzer"
             r#"
 [[lsp]]
 language = "rust"
-file_extensions = ["rs", "rust"]
 root_markers = ["Cargo.toml", "rust-project.json"]
 command = "custom-rust-analyzer"
 args = ["--stdio"]
 "#,
         );
 
-        let registry = load_lsp_registry_from_paths(None, Some(&project_config)).unwrap();
+        let registry = load_registry_from_paths(None, Some(&project_config)).unwrap();
         let rust = registry.find_by_language("rust").unwrap();
 
         assert_eq!(rust.command, "custom-rust-analyzer");
         assert_eq!(rust.args, vec!["--stdio"]);
-        assert_eq!(rust.file_extensions, vec!["rs", "rust"]);
         assert_eq!(rust.root_markers, vec!["Cargo.toml", "rust-project.json"]);
     }
 
     #[test]
-    fn project_config_adds_custom_language() {
+    fn project_config_declares_config_only_language() {
+        // `foo` has no shipped grammar: it appears as a `[[language]]` overlay
+        // (so .foo resolves to it) plus an `[[lsp]]` entry. Resolution of
+        // .foo -> foo is exercised in crates/aifed/src/language.rs.
         let dir = tempfile::tempdir().unwrap();
         let project_config = dir.path().join("aifed.toml");
-        let custom_file = dir.path().join("main.foo");
-        write_file(&custom_file, "hello\n");
         write_file(
             &project_config,
             r#"
+[[language]]
+language = "foo"
+additional_extensions = ["foo"]
+
 [[lsp]]
 language = "foo"
-file_extensions = ["foo"]
 root_markers = ["foo.mod"]
 command = "foo-lsp"
 "#,
         );
 
-        let registry = load_lsp_registry_from_paths(None, Some(&project_config)).unwrap();
-        let foo = registry.detect_language_for_file(&custom_file).unwrap();
-
-        assert_eq!(foo.language, "foo");
+        let registry = load_registry_from_paths(None, Some(&project_config)).unwrap();
+        let foo = registry.find_by_language("foo").unwrap();
         assert_eq!(foo.command, "foo-lsp");
+        let overlay = registry
+            .language_overlays()
+            .iter()
+            .find(|o| o.language == "foo")
+            .unwrap();
+        assert_eq!(overlay.additional_extensions, vec!["foo"]);
+    }
+
+    #[test]
+    fn language_overlay_merge_replaces_global() {
+        // Project restates `markdown` wholesale, dropping the global exclude.
+        let dir = tempfile::tempdir().unwrap();
+        let global_config = dir.path().join("global.toml");
+        let project_config = dir.path().join("project.toml");
+        write_file(
+            &global_config,
+            r#"
+[[language]]
+language = "markdown"
+exclude_extensions = ["mdx"]
+"#,
+        );
+        write_file(
+            &project_config,
+            r#"
+[[language]]
+language = "markdown"
+additional_extensions = ["mdown"]
+"#,
+        );
+
+        let registry =
+            load_registry_from_paths(Some(&global_config), Some(&project_config)).unwrap();
+        let md = registry
+            .language_overlays()
+            .iter()
+            .find(|o| o.language == "markdown")
+            .unwrap();
+        assert_eq!(md.additional_extensions, vec!["mdown"]);
+        assert!(
+            md.exclude_extensions.is_empty(),
+            "project replaced global wholesale"
+        );
     }
 
     #[test]
@@ -381,7 +514,6 @@ command = "foo-lsp"
             r#"
 [[lsp]]
 language = "rust"
-file_extensions = ["rs"]
 root_markers = ["Cargo.toml"]
 command = "global-rust-analyzer"
 "#,
@@ -391,14 +523,13 @@ command = "global-rust-analyzer"
             r#"
 [[lsp]]
 language = "rust"
-file_extensions = ["rs"]
 root_markers = ["Cargo.toml"]
 command = "project-rust-analyzer"
 "#,
         );
 
         let registry =
-            load_lsp_registry_from_paths(Some(&global_config), Some(&project_config)).unwrap();
+            load_registry_from_paths(Some(&global_config), Some(&project_config)).unwrap();
         assert_eq!(
             registry.find_by_language("rust").unwrap().command,
             "project-rust-analyzer"
@@ -406,7 +537,7 @@ command = "project-rust-analyzer"
     }
 
     #[test]
-    fn duplicate_language_in_single_file_is_rejected() {
+    fn duplicate_lsp_language_in_single_file_is_rejected() {
         let dir = tempfile::tempdir().unwrap();
         let project_config = dir.path().join("aifed.toml");
         write_file(
@@ -414,19 +545,38 @@ command = "project-rust-analyzer"
             r#"
 [[lsp]]
 language = "rust"
-file_extensions = ["rs"]
 root_markers = ["Cargo.toml"]
 command = "rust-analyzer"
 
 [[lsp]]
 language = "rust"
-file_extensions = ["rs"]
 root_markers = ["Cargo.toml"]
 command = "custom-rust-analyzer"
 "#,
         );
 
-        let error = load_lsp_registry_from_paths(None, Some(&project_config)).unwrap_err();
+        let error = load_registry_from_paths(None, Some(&project_config)).unwrap_err();
+        assert!(matches!(error, ConfigError::DuplicateLanguage { .. }));
+    }
+
+    #[test]
+    fn duplicate_language_overlay_in_single_file_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_config = dir.path().join("aifed.toml");
+        write_file(
+            &project_config,
+            r#"
+[[language]]
+language = "rust"
+additional_extensions = ["rs2"]
+
+[[language]]
+language = "rust"
+exclude_extensions = ["rs"]
+"#,
+        );
+
+        let error = load_registry_from_paths(None, Some(&project_config)).unwrap_err();
         assert!(matches!(error, ConfigError::DuplicateLanguage { .. }));
     }
 }

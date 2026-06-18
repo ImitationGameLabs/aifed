@@ -79,9 +79,10 @@ pub enum Commands {
     /// Extract a structural outline (symbols/headings + line ranges)
     ///
     /// Read the outline FIRST, then `aifed read <FILE> [start,end]` for a section.
-    /// Supports .rs and .md. Daemon-free. Ranges include leading doc comments.
-    /// For code, the leading preamble collapses into a `file header` region and
-    /// top-level ranges tile the whole file.
+    /// Daemon-free; supports any language with a built-in outline grammar.
+    /// Ranges include leading doc comments. For code, the leading preamble
+    /// collapses into a `file header` region and top-level ranges tile the whole
+    /// file.
     Outline {
         /// File to outline
         file: PathBuf,

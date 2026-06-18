@@ -44,7 +44,7 @@ Output shape:
 
 Notes:
 
-- Daemon-free; supports .rs and .md (.md has no LSP, so outline covers it)
+- Daemon-free; outlines any language with a built-in outline grammar (currently Rust and Markdown), extensible via `[[language]]` config
 - Ranges include leading doc comments, so read returns the documented item
 - `--imports` surfaces `use` items that appear *after* the first symbol; leading
   imports are part of the `file header` region regardless
@@ -176,7 +176,8 @@ aifed lsp rename <FILE> <LINE:HASH> <SINDEX:NAME> <NAME> - Rename symbol
 - Project config: `aifed.toml` in workspace root
 - Merge order: global config < project config
 - First run auto-creates a default global config with Rust/rust-analyzer; edit or replace as needed
-- Each `[[lsp]]` object has: `language`, `file_extensions`, `root_markers`, `command`, optional `args`, `display_name`, `initialization_options`
+- Each `[[lsp]]` object has: `language`, `root_markers`, `command`, optional `args`, `display_name`, `initialization_options`. It references a language **by name only** — file extensions are not declared here.
+- File extensions come from the grammar-default table in code; override or extend them with a `[[language]]` overlay object: `language`, optional `additional_extensions`, `exclude_extensions`. Effective extensions = (grammar defaults ∪ additional) − exclude. A language may have an outline grammar with no LSP (e.g. Markdown), or an LSP with no outline grammar.
 - If an LSP request targets a configured language whose server is not running yet, the daemon will try to start it on demand
 
 ## DAEMON COMMANDS

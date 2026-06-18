@@ -12,8 +12,9 @@ mod types;
 pub mod workspace;
 
 pub use config::{
-    ConfigError, LspRegistry, LspServerConfig, ensure_default_config, global_config_path,
-    load_lsp_registry_for_path, load_lsp_registry_for_workspace,
+    ConfigError, LanguageConfig, LspServerConfig, Registry, ensure_default_config,
+    global_config_path, load_registry_for_path, load_registry_for_workspace, normalize_extension,
+    normalize_language,
 };
 pub use error::*;
 pub use socket::*;

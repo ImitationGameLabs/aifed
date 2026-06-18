@@ -1,9 +1,13 @@
 # Default LSP configuration for aifed.
 # Override via ~/.config/aifed/config.toml (global) or aifed.toml (project).
+#
+# Note: a language's file extensions are NOT declared here. They come from the
+# grammar-default table in code (crates/aifed/src/language.rs::GRAMMAR_DEFAULTS);
+# `[[lsp]]` entries reference a language by name only. To add or override
+# extensions, declare a [[language]] overlay (see docs/reference/configuration.md).
 
 [[lsp]]
 language = "rust"
-file_extensions = ["rs"]
 root_markers = ["Cargo.toml"]
 command = "rust-analyzer"
 display_name = "rust-analyzer"

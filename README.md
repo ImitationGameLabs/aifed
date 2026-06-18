@@ -40,6 +40,9 @@ See the [Installation Guide](docs/installation-guide.md) for setup instructions.
 | Rust       | `.rs`                        | Ready  |
 | Markdown   | `.md`, `.markdown`, `.mdx`   | Ready  |
 
+Extensions are the shipped grammar defaults and may lag the code; they're
+overridable via a `[[language]]` overlay (see the [Configuration reference](docs/reference/configuration.md)).
+
 For code, the leading preamble collapses into a `file header` region and the
 top-level ranges tile the whole file — read the ranges in order to reconstruct
 it end-to-end.

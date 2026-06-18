@@ -10,19 +10,38 @@ let
 
   tomlFormat = pkgs.formats.toml { };
 
-  # Filter null values: TOML does not support null, so optional fields
-  # (displayName, initializationOptions) must be omitted when not set.
-  lspEntries = lib.mapAttrsToList (_name: lsp:
+  # Filter null values: TOML has no null, so optional fields (displayName,
+  # initializationOptions) must be omitted when unset.
+  lspEntries = lib.mapAttrsToList (
+    _name: lsp:
     lib.filterAttrs (_: v: v != null) {
       inherit (lsp) language command args;
-      file_extensions = lsp.fileExtensions;
       root_markers = lsp.rootMarkers;
       display_name = lsp.displayName;
       initialization_options = lsp.initializationOptions;
     }
   ) cfg.lspServers;
 
-  configFile = tomlFormat.generate "aifed-config.toml" { lsp = lspEntries; };
+  # `[[language]]` extension overlays layer on the in-code grammar defaults:
+  # effective = (grammar_defaults ∪ additional) − exclude. Empty extension lists
+  # are omitted; empty by default since grammar languages resolve from code.
+  languageEntries = lib.mapAttrsToList (
+    _name: lang:
+    {
+      inherit (lang) language;
+    }
+    // lib.optionalAttrs (lang.additionalExtensions != [ ]) {
+      additional_extensions = lang.additionalExtensions;
+    }
+    // lib.optionalAttrs (lang.excludeExtensions != [ ]) {
+      exclude_extensions = lang.excludeExtensions;
+    }
+  ) cfg.languageOverlays;
+
+  configFile = tomlFormat.generate "aifed-config.toml" {
+    lsp = lspEntries;
+    language = languageEntries;
+  };
 in
 {
   options.programs.aifed = {
@@ -46,12 +65,6 @@ in
             command = lib.mkOption {
               type = lib.types.str;
               description = "Executable used to launch the language server.";
-            };
-
-            fileExtensions = lib.mkOption {
-              type = lib.types.listOf lib.types.str;
-              default = [ ];
-              description = "File extensions mapped to this language.";
             };
 
             rootMarkers = lib.mkOption {
@@ -84,7 +97,6 @@ in
         rust = {
           language = "rust";
           command = "rust-analyzer";
-          fileExtensions = [ "rs" ];
           rootMarkers = [ "Cargo.toml" ];
           displayName = "rust-analyzer";
           initializationOptions = {
@@ -94,6 +106,40 @@ in
         };
       };
       description = "LSP server configurations, keyed by language name.";
+    };
+
+    languageOverlays = lib.mkOption {
+      type = lib.types.attrsOf (
+        lib.types.submodule {
+          options = {
+            language = lib.mkOption {
+              type = lib.types.str;
+              description = "Language identifier this overlay targets.";
+            };
+
+            additionalExtensions = lib.mkOption {
+              type = lib.types.listOf lib.types.str;
+              default = [ ];
+              description = "Extensions to add to the language's grammar defaults.";
+            };
+
+            excludeExtensions = lib.mkOption {
+              type = lib.types.listOf lib.types.str;
+              default = [ ];
+              description = "Default extensions to remove for this language.";
+            };
+          };
+        }
+      );
+      default = { };
+      description = ''
+        `[[language]]` extension overlays, keyed by name. Layer on the in-code
+        grammar defaults:
+        effective = (defaults ∪ additionalExtensions) − excludeExtensions.
+        Empty by default; grammar languages (rust, markdown) resolve from code
+        without any overlay. Use this to add extensions to a grammar language,
+        or to declare a config-only language (one aifed can't outline).
+      '';
     };
   };
 

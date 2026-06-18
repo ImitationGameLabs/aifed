@@ -6,6 +6,7 @@ mod error;
 mod escape;
 mod file;
 mod hash;
+mod language;
 mod locator;
 mod outline;
 mod output;
