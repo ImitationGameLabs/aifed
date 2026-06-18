@@ -16,6 +16,40 @@ This prevents AI agents from making edits based on stale file state.
   Example: To re-read line 15, use `aifed read file.rs [12,18]`
 - **Large files**: If the file is very large and full read is impractical, read relevant sections with extra context.
 
+## OUTLINE-FIRST READING
+
+Before reading a large or unfamiliar file, get its structure first:
+
+aifed outline <FILE>            # summary header + tree of symbols with locators
+
+Then read only the section you need:
+
+aifed read <FILE> [start,end]   # range copied from the outline
+
+Output shape:
+
+- Line 1 is a summary: `<path> [<language>] <N> lines, <M> items`.
+- Each symbol row is `<kind> <name> [start,end]` (e.g. `fn main [52,77]`,
+  `const VERSION [168,168]`) — single-line items show `[N,N]`. Every range
+  copies directly into `aifed read`. Nested symbols are indented.
+- For code, the leading preamble (leading `mod`/`use`, inner docs, comments
+  before the first symbol) is collapsed into one **`file header [1,N]`** row,
+  set off by a divider line. It is a synthetic region, **not a symbol** — read
+  it with `aifed read <FILE> [1,N]`.
+- For code, **top-level ranges tile the whole file** (no gaps or overlaps *at
+  the top level*): reading them in order reconstructs the file end-to-end. A
+  top-level range may include free-floating lines between it and the next
+  symbol; for a precise single-symbol slice, read a nested child. Nested symbols
+  keep precise ranges so `read <FILE> [a,b]` returns just that symbol.
+
+Notes:
+
+- Daemon-free; supports .rs and .md (.md has no LSP, so outline covers it)
+- Ranges include leading doc comments, so read returns the documented item
+- `--imports` surfaces `use` items that appear *after* the first symbol; leading
+  imports are part of the `file header` region regardless
+- Structural map of the whole file; for per-line identifier locators use aifed lsp symbols <FILE> <LINE>
+
 ## OUTPUT FORMAT (aifed read)
 
 LINE:HASH|CONTENT
@@ -190,6 +224,11 @@ Notes:
 # Read file
 aifed read main.rs              # First read: get full file with hashes
 aifed read main.rs [12,18]      # Re-read with context (targeting line 15)
+# Outline-first: get structure, then read a section
+aifed outline main.rs            # file header + symbols + locators
+aifed outline main.rs --imports  # surface mid-file use items
+aifed outline README.md          # markdown headings + section ranges
+aifed read main.rs [42,88]       # read a range copied from the outline
 
 # Single edit - use heredoc with 'EOF' to prevent shell expansion
 aifed edit main.rs <<'EOF'

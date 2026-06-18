@@ -88,6 +88,10 @@ pub enum Error {
 
     #[error("Parse error at line {line}:{column}: {reason}")]
     Syntax { line: usize, column: usize, reason: String },
+    /// Unsupported file extension, or (rarely) a tree-sitter grammar that
+    /// failed to load or parse. `reason` carries the detail for either case.
+    #[error("outline unsupported for '{path}': {reason}")]
+    OutlineUnsupported { path: PathBuf, reason: String },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

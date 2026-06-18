@@ -23,6 +23,7 @@ See the [Installation Guide](docs/installation-guide.md) for setup instructions.
 | `read` - Read file content with hashlines       | Ready  |
 | `edit` - Edit file with hashline verification   | Ready  |
 | `lsp` - LSP integration (Rust first)            | Ready  |
+| `outline` - Structural outline (Rust, Markdown) | Ready  |
 | `history/undo/redo` - Edit history and recovery | Ready  |
 | `copy/paste/clipboard` - Clipboard operations   | Ready  |
 
@@ -31,6 +32,17 @@ See the [Installation Guide](docs/installation-guide.md) for setup instructions.
 | Language   | LSP Server    | Status  |
 | ---------- | ------------- | ------- |
 | Any via `[[lsp]]` config | User-defined | Supported |
+
+### Outline *Support*
+
+| Language   | Extensions                   | Status |
+| ---------- | ---------------------------- | ------ |
+| Rust       | `.rs`                        | Ready  |
+| Markdown   | `.md`, `.markdown`, `.mdx`   | Ready  |
+
+For code, the leading preamble collapses into a `file header` region and the
+top-level ranges tile the whole file — read the ranges in order to reconstruct
+it end-to-end.
 
 ### Platform Support
 
@@ -44,7 +56,7 @@ See the [Installation Guide](docs/installation-guide.md) for setup instructions.
 
 ## Usage Examples
 
-> **Note:** The examples below illustrate the typical workflow. All core commands (`read`, `edit`, `lsp`, `history/undo/redo`) are implemented.
+> **Note:** The examples below illustrate the typical workflow. All core commands (`read`, `edit`, `outline`, `lsp`, `history/undo/redo`) are implemented.
 
 AI agents can obtain the full usage guide with:
 ```bash

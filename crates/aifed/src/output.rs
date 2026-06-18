@@ -128,6 +128,13 @@ pub fn format_file_info(info: &FileInfo, format: OutputFormat) -> String {
         OutputFormat::Json => serde_json::to_string_pretty(&info).unwrap_or_default(),
     }
 }
+/// Format a structural outline for output (text tree or JSON).
+pub fn format_outline(outline: &crate::outline::Outline, format: OutputFormat) -> String {
+    match format {
+        OutputFormat::Text => crate::outline::render_text(outline),
+        OutputFormat::Json => serde_json::to_string_pretty(outline).unwrap_or_default(),
+    }
+}
 
 /// Compute diff summary from edit changes
 pub fn compute_change_summary(changes: &[EditChange]) -> String {

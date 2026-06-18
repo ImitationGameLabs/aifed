@@ -19,6 +19,9 @@ json-escape = { workspace = true }
 time = { workspace = true }
 tracing = { workspace = true }
 content_inspector = { workspace = true }
+tree-sitter = { workspace = true }
+tree-sitter-rust = { workspace = true }
+tree-sitter-md = { workspace = true }
 aifed-daemon-client = { path = "../aifed-daemon-client" }
 aifed-common = { path = "../aifed-common" }
 

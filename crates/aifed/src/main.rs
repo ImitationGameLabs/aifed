@@ -7,6 +7,7 @@ mod escape;
 mod file;
 mod hash;
 mod locator;
+mod outline;
 mod output;
 mod scanner;
 mod text_edit;
@@ -33,6 +34,7 @@ enum DaemonRequirement {
 fn daemon_requirement(cmd: &Commands) -> DaemonRequirement {
     match cmd {
         Commands::Info { .. } => DaemonRequirement::None,
+        Commands::Outline { .. } => DaemonRequirement::None,
         Commands::Daemon(daemon_cmd) => match daemon_cmd {
             DaemonCommands::Status | DaemonCommands::Stop { .. } => DaemonRequirement::None,
         },
@@ -102,6 +104,7 @@ async fn run(args: Args, format: OutputFormat) -> Result<()> {
             .await
         }
         Commands::Info { file } => commands::info(&file, format),
+        Commands::Outline { file, imports } => commands::outline(&file, imports, format),
         Commands::Edit { file, dry_run } => {
             commands::edit(&file, dry_run, format, daemon_client.as_ref()).await
         }

@@ -1,0 +1,252 @@
+//! Structural outline extraction for `aifed outline`.
+//!
+//! Dispatches by file extension to a tree-sitter grammar. Daemon-free and
+//! deliberately independent of the LSP config registry — outline is pure
+//! syntax, and Markdown (a first-class use case) has no usable LSP.
+
+mod markdown;
+mod model;
+mod render;
+mod rust;
+
+pub use model::Outline;
+// Re-exported so `output::format_outline` can render without owning the logic.
+use model::{ItemKind, OutlineItem};
+pub(crate) use render::render_text;
+
+use std::path::Path;
+
+use tree_sitter::Node;
+
+use crate::error::{Error, Result};
+
+/// Extract the outline of `source` (read from `path`), choosing the grammar by
+/// file extension. `imports` controls whether Rust `use` items appear.
+pub fn extract(path: &Path, source: &str, imports: bool) -> Result<Outline> {
+    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+    let total_lines = source.lines().count();
+    let (language, items) = match ext {
+        "rs" => {
+            let raw = rust::extract(source, imports, path)?;
+            // Rust extracts precise node ranges; fold the preamble and tile the
+            // top-level ranges, then add the shared `file header` region.
+            (
+                "rust",
+                prepend_file_header(rust::tile_top_level(raw, total_lines), total_lines),
+            )
+        }
+        "md" | "markdown" | "mdx" => {
+            // Markdown uses section-spanning ranges (trailing-blank-trimmed, so
+            // not a strict tile); only the shared `file header` prepend applies.
+            (
+                "markdown",
+                prepend_file_header(markdown::extract(source, path)?, total_lines),
+            )
+        }
+        _ => {
+            return Err(Error::OutlineUnsupported {
+                path: crate::file::to_absolute(path),
+                reason: if ext.is_empty() {
+                    "file has no extension; outline supports .rs, .md, .mdx — use `aifed read` to view it directly".to_string()
+                } else {
+                    format!(
+                        "no outline grammar for '.{ext}' (supported: .rs, .md, .mdx) — use `aifed read` to view the file directly"
+                    )
+                },
+            });
+        }
+    };
+    Ok(Outline { path: path.display().to_string(), language, total_lines, items })
+}
+
+/// Prepend a synthetic `file header` region when content precedes the first
+/// symbol (leading `mod`/`use`, inner docs, comments) so the outline's
+/// top-level ranges tile `[1, total_lines]`. The region covers
+/// `[1, first.start - 1]`, or `[1, total_lines]` when there are no symbols.
+/// Shared by both extractors.
+fn prepend_file_header(mut items: Vec<OutlineItem>, total_lines: usize) -> Vec<OutlineItem> {
+    let end = match items.first() {
+        Some(first) if first.start_line > 1 => first.start_line - 1,
+        Some(_) => return items,
+        None if total_lines > 0 => total_lines,
+        None => return items,
+    };
+    items.insert(
+        0,
+        OutlineItem {
+            kind: ItemKind::FileHeader,
+            name: "file header".to_string(),
+            start_line: 1,
+            end_line: end,
+            has_body: false,
+            level: None,
+            detail: None,
+            children: Vec::new(),
+        },
+    );
+    items
+}
+
+/// First named child of `node` whose kind matches. Shared by both extractors.
+pub(super) fn find_child_by_kind<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
+    (0..node.named_child_count())
+        .filter_map(|i| node.named_child(i as u32))
+        .find(|c| c.kind() == kind)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dispatches_rust_and_markdown() {
+        let rust = extract(Path::new("a.rs"), "fn main() {}\n", false).unwrap();
+        assert_eq!(rust.language, "rust");
+        assert_eq!(rust.items.len(), 1);
+        let md = extract(Path::new("a.md"), "# T\n", false).unwrap();
+        assert_eq!(md.language, "markdown");
+        assert_eq!(md.items.len(), 1);
+        // markdown alias + mdx
+        assert_eq!(
+            extract(Path::new("a.markdown"), "# T\n", false)
+                .unwrap()
+                .language,
+            "markdown"
+        );
+        assert_eq!(
+            extract(Path::new("a.mdx"), "# T\n", false)
+                .unwrap()
+                .language,
+            "markdown"
+        );
+    }
+
+    #[test]
+    fn unknown_extension_errors() {
+        let err = extract(Path::new("a.toml"), "x = 1\n", false).unwrap_err();
+        assert!(err.to_string().contains("no outline grammar"), "{}", err);
+    }
+
+    #[test]
+    fn no_extension_errors() {
+        let err = extract(Path::new("Makefile"), "all:\n", false).unwrap_err();
+        assert!(err.to_string().contains("no extension"), "{}", err);
+    }
+
+    #[test]
+    fn empty_source_yields_empty_items() {
+        let out = extract(Path::new("a.rs"), "", false).unwrap();
+        assert!(out.items.is_empty());
+    }
+
+    // --- full pipeline: tile_top_level + file-header prepend ---
+
+    #[test]
+    fn rust_preamble_becomes_file_header_and_ranges_tile() {
+        let out = extract(Path::new("a.rs"), "mod a;\nmod b;\nfn main() {}\n", false).unwrap();
+        // file header over [1,2], then `fn main` at line 3 tiling to end of file.
+        assert_eq!(out.items.len(), 2);
+        assert_eq!(out.items[0].kind, ItemKind::FileHeader);
+        assert_eq!((out.items[0].start_line, out.items[0].end_line), (1, 2));
+        assert_eq!(out.items[1].name, "main");
+        // top-level ranges tile [1, total_lines].
+        assert_eq!(out.items[0].start_line, 1);
+        assert_eq!(out.items[0].end_line + 1, out.items[1].start_line);
+        assert_eq!(out.items.last().unwrap().end_line, out.total_lines);
+    }
+
+    #[test]
+    fn no_file_header_when_file_opens_with_definition() {
+        let out = extract(Path::new("a.rs"), "fn main() {}\n", false).unwrap();
+        assert!(out.items.iter().all(|i| i.kind != ItemKind::FileHeader));
+        assert_eq!(out.items.len(), 1);
+    }
+
+    #[test]
+    fn header_only_file_when_just_declarations() {
+        let out = extract(Path::new("a.rs"), "mod a;\nmod b;\n", false).unwrap();
+        assert_eq!(out.items.len(), 1);
+        assert_eq!(out.items[0].kind, ItemKind::FileHeader);
+        assert_eq!(out.total_lines, 2);
+        assert_eq!(out.items[0].end_line, out.total_lines);
+    }
+
+    #[test]
+    fn markdown_prepends_header_for_pre_heading_content() {
+        let out = extract(Path::new("a.md"), "intro\n# Title\n", false).unwrap();
+        // first heading at line 2 → file header over [1,1], then the heading.
+        assert_eq!(out.items[0].kind, ItemKind::FileHeader);
+        assert_eq!((out.items[0].start_line, out.items[0].end_line), (1, 1));
+        assert_eq!(out.items[1].kind, ItemKind::Heading);
+    }
+
+    #[test]
+    fn markdown_no_header_when_heading_at_line_one() {
+        let out = extract(Path::new("a.md"), "# Title\nbody\n", false).unwrap();
+        assert!(out.items.iter().all(|i| i.kind != ItemKind::FileHeader));
+    }
+
+    #[test]
+    fn total_lines_and_cover_invariant_hold_across_trailing_newlines() {
+        // total_lines must match the 1-based rows tree-sitter emits, and the
+        // last top-level range must reach it, regardless of trailing newlines.
+        // The preamble fixture also exercises the header + tiled-last case.
+        for src in [
+            "fn a() {}\n",
+            "fn a() {}\nfn b() {}\n",
+            "fn a() {}\n\nfn b() {}\n",
+            "fn a() {}",
+            "mod m;\nfn a() {}\n",
+        ] {
+            let out = extract(Path::new("a.rs"), src, false).unwrap();
+            assert_eq!(out.total_lines, src.lines().count(), "src={src:?}");
+            assert_eq!(
+                out.items.last().unwrap().end_line,
+                out.total_lines,
+                "src={src:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn imports_surfaces_mid_file_use_while_leading_folds() {
+        // `--imports` keeps the mid-file `use b;` but the leading `use a;` still
+        // folds into the file-header region — and nothing overlaps that region.
+        let out = extract(
+            Path::new("a.rs"),
+            "use a;\nfn first() {}\nuse b;\nfn second() {}\n",
+            true,
+        )
+        .unwrap();
+        assert_eq!(out.items[0].kind, ItemKind::FileHeader);
+        assert_eq!((out.items[0].start_line, out.items[0].end_line), (1, 1));
+        assert!(
+            out.items.iter().all(|i| i.name != "a"),
+            "leading use folded away"
+        );
+        let use_b = out
+            .items
+            .iter()
+            .find(|i| i.name == "b")
+            .expect("mid-file use kept");
+        assert_eq!(use_b.kind, ItemKind::Imports);
+        // no top-level range overlaps the header region.
+        for item in &out.items[1..] {
+            assert!(item.start_line > out.items[0].end_line, "{item:?}");
+        }
+    }
+
+    #[test]
+    fn pipeline_ranges_are_locator_compatible() {
+        let out = extract(
+            Path::new("a.rs"),
+            "mod a;\nfn x() {}\nimpl C { fn y() {} }\n",
+            false,
+        )
+        .unwrap();
+        for item in &out.items {
+            let loc = format!("[{},{}]", item.start_line, item.end_line);
+            crate::locator::Locator::parse(&loc).unwrap();
+        }
+    }
+}

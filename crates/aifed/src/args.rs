@@ -75,6 +75,21 @@ pub enum Commands {
         /// File to inspect
         file: PathBuf,
     },
+    #[command(verbatim_doc_comment)]
+    /// Extract a structural outline (symbols/headings + line ranges)
+    ///
+    /// Read the outline FIRST, then `aifed read <FILE> [start,end]` for a section.
+    /// Supports .rs and .md. Daemon-free. Ranges include leading doc comments.
+    /// For code, the leading preamble collapses into a `file header` region and
+    /// top-level ranges tile the whole file.
+    Outline {
+        /// File to outline
+        file: PathBuf,
+        /// Show `use` items outside the file-header region (leading imports
+        /// fold into the file header regardless)
+        #[arg(long)]
+        imports: bool,
+    },
 
     #[command(verbatim_doc_comment)]
     /// Edit file content with hashline verification
