@@ -1,3 +1,4 @@
+use crate::edit_view::{EditRow, render_rows};
 use serde::Serialize;
 use std::path::Path;
 
@@ -5,7 +6,7 @@ use aifed_common::workspace::detect_workspace;
 
 // Re-export LSP response types for formatting
 pub use aifed_common::{
-    CompletionsResponse, DefinitionResponse, DiagnosticsResponse, HoverResponse, LineDiffDto,
+    CompletionsResponse, DefinitionResponse, DiagnosticsResponse, HoverResponse,
     ReferencesResponse, RenameResponse,
 };
 
@@ -72,9 +73,9 @@ pub struct BatchResult {
 #[derive(Debug, Clone)]
 pub struct RenameFileDiff {
     pub file_path: String,
+    /// LSP `TextEdit` count; not the number of changed display rows.
     pub edit_count: usize,
-    pub diffs: Vec<LineDiffDto>,
-    pub new_lines: Vec<String>,
+    pub rows: Vec<EditRow>,
 }
 
 /// Format hashed lines for output
@@ -145,10 +146,6 @@ pub fn compute_change_summary(changes: &[EditChange]) -> String {
         match change.operation.as_str() {
             "insert" => insertions += 1,
             "delete" => deletions += 1,
-            "replace" => {
-                deletions += 1;
-                insertions += 1;
-            }
             _ => {}
         }
     }
@@ -172,15 +169,27 @@ pub fn compute_change_summary(changes: &[EditChange]) -> String {
     if parts.is_empty() { "no changes".to_string() } else { parts.join(", ") }
 }
 
-/// Convert EditChange to LineDiffDto for diff formatting
-fn changes_to_diffs(changes: &[EditChange]) -> Vec<aifed_common::LineDiffDto> {
-    changes
-        .iter()
-        .map(|c| aifed_common::LineDiffDto {
-            line_num: c.line,
-            old_hash: None,
-            old_content: c.old_content.clone(),
-            new_content: c.new_content.clone(),
+/// Derive the JSON-bound [`EditChange`] list from an [`edit_view::EditRow`] sequence.
+///
+/// Emits only `"insert"`/`"delete"`: a replacement must be modeled as a
+/// delete+insert pair, never as `"replace"` (per the JSON contract). A deletion
+/// reports its original-file line; an insertion its new-file line.
+pub fn changes_from_rows(rows: &[EditRow]) -> Vec<EditChange> {
+    rows.iter()
+        .filter_map(|r| match r {
+            EditRow::Delete { old_line, old_content } => Some(EditChange {
+                operation: "delete".to_string(),
+                line: *old_line,
+                old_content: Some(old_content.clone()),
+                new_content: None,
+            }),
+            EditRow::Insert { new_line, new_content } => Some(EditChange {
+                operation: "insert".to_string(),
+                line: *new_line,
+                old_content: None,
+                new_content: Some(new_content.clone()),
+            }),
+            EditRow::Equal { .. } => None,
         })
         .collect()
 }
@@ -189,7 +198,7 @@ fn changes_to_diffs(changes: &[EditChange]) -> Vec<aifed_common::LineDiffDto> {
 pub fn format_batch_result_with_diff(
     result: &BatchResult,
     format: OutputFormat,
-    new_lines: &[String],
+    rows: &[EditRow],
 ) -> String {
     match format {
         OutputFormat::Text => {
@@ -204,9 +213,8 @@ pub fn format_batch_result_with_diff(
                     output.push(result.message.clone());
                 }
 
-                // Diff view with context (using new file content for context)
-                let diffs = changes_to_diffs(&result.changes);
-                let diff_view = crate::diff::format_diffs_with_context(&diffs, new_lines, 3);
+                // Diff view with context (post-edit hashlines).
+                let diff_view = render_rows(rows, 3);
                 if diff_view != "  (no changes)" {
                     output.push(diff_view);
                 }
@@ -425,8 +433,7 @@ fn format_rename_text(verb: &str, file_diffs: &[RenameFileDiff]) -> String {
         let display_path = display_rename_path(&file_diff.file_path);
         output.push(format!("File: {display_path}"));
 
-        let diff_view =
-            crate::diff::format_diffs_with_context(&file_diff.diffs, &file_diff.new_lines, 3);
+        let diff_view = render_rows(&file_diff.rows, 3);
         if diff_view != "  (no changes)" {
             output.push(diff_view);
         }
@@ -453,6 +460,7 @@ fn display_rename_path(file_path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::hash::hash_line;
     use aifed_common::{FileEdit, Position, Range, TextEdit};
 
     fn make_text_edit(
@@ -471,15 +479,6 @@ mod tests {
         }
     }
 
-    fn make_line_diff(line_num: usize, old: Option<&str>, new: Option<&str>) -> LineDiffDto {
-        LineDiffDto {
-            line_num,
-            old_hash: None,
-            old_content: old.map(str::to_string),
-            new_content: new.map(str::to_string),
-        }
-    }
-
     #[test]
     fn format_rename_preview_shows_single_file_header() {
         let response = RenameResponse {
@@ -491,11 +490,11 @@ mod tests {
         let file_diffs = vec![RenameFileDiff {
             file_path: "/workspace/src/main.rs".to_string(),
             edit_count: 1,
-            diffs: vec![make_line_diff(2, Some("let old_name = 1;"), Some("let new_name = 1;"))],
-            new_lines: vec![
-                "fn main() {".to_string(),
-                "let new_name = 1;".to_string(),
-                "}".to_string(),
+            rows: vec![
+                EditRow::equal(1, "fn main() {"),
+                EditRow::delete(2, "let old_name = 1;"),
+                EditRow::insert(2, "let new_name = 1;"),
+                EditRow::equal(3, "}"),
             ],
         }];
 
@@ -503,8 +502,14 @@ mod tests {
 
         assert!(output.contains("Rename preview in 1 file(s), 1 edit(s)"));
         assert!(output.contains("File: /workspace/src/main.rs"));
-        assert!(output.contains("-2|let old_name = 1;"));
-        assert!(output.contains("+2|let new_name = 1;"));
+        assert!(output.contains(&format!(
+            "-2:{}|let old_name = 1;",
+            hash_line("let old_name = 1;")
+        )));
+        assert!(output.contains(&format!(
+            "+2:{}|let new_name = 1;",
+            hash_line("let new_name = 1;")
+        )));
     }
 
     #[test]
@@ -525,14 +530,12 @@ mod tests {
             RenameFileDiff {
                 file_path: "/workspace/src/z.rs".to_string(),
                 edit_count: 1,
-                diffs: vec![make_line_diff(1, Some("z"), Some("renamed_z"))],
-                new_lines: vec!["renamed_z".to_string()],
+                rows: vec![EditRow::delete(1, "z"), EditRow::insert(1, "renamed_z")],
             },
             RenameFileDiff {
                 file_path: "/workspace/src/a.rs".to_string(),
                 edit_count: 1,
-                diffs: vec![make_line_diff(1, Some("a"), Some("renamed_a"))],
-                new_lines: vec!["renamed_a".to_string()],
+                rows: vec![EditRow::delete(1, "a"), EditRow::insert(1, "renamed_a")],
             },
         ];
 
@@ -555,8 +558,7 @@ mod tests {
         let file_diffs = vec![RenameFileDiff {
             file_path: "/workspace/src/main.rs".to_string(),
             edit_count: 1,
-            diffs: vec![make_line_diff(1, Some("a"), Some("renamed"))],
-            new_lines: vec!["renamed".to_string()],
+            rows: vec![EditRow::delete(1, "a"), EditRow::insert(1, "renamed")],
         }];
 
         let output = format_rename_result(&response, &file_diffs, OutputFormat::Text);
@@ -565,5 +567,54 @@ mod tests {
         assert!(!output.contains("diff --git"));
         assert!(!output.contains("\n--- "));
         assert!(!output.contains("\n+++ "));
+    }
+
+    #[test]
+    fn changes_preserve_coordinates_and_operations() {
+        let rows = vec![
+            EditRow::equal(1, "keep"),
+            EditRow::delete(4, "gone"),     // original coordinate
+            EditRow::insert(4, "REPLACED"), // new coordinate (single-line replace)
+        ];
+        let changes = changes_from_rows(&rows);
+        assert_eq!(changes.len(), 2);
+        assert_eq!(changes[0].operation, "delete");
+        assert_eq!(changes[0].line, 4);
+        assert_eq!(changes[0].old_content.as_deref(), Some("gone"));
+        assert!(changes[0].new_content.is_none());
+        assert_eq!(changes[1].operation, "insert");
+        assert_eq!(changes[1].line, 4);
+        assert!(changes[1].old_content.is_none());
+        assert_eq!(changes[1].new_content.as_deref(), Some("REPLACED"));
+    }
+
+    #[test]
+    fn changes_never_emit_replace_operation() {
+        let rows = vec![EditRow::delete(3, "x"), EditRow::insert(3, "y")];
+        for c in changes_from_rows(&rows) {
+            assert_ne!(c.operation, "replace");
+        }
+    }
+
+    #[test]
+    fn changes_json_contract() {
+        // Pin the --json shape via round-trip: only insert/delete, historical
+        // coordinates, and omitted (not null) absent content fields.
+        let rows = vec![
+            EditRow::equal(1, "keep"),
+            EditRow::delete(4, "gone"),
+            EditRow::insert(4, "REPLACED"),
+        ];
+        let parsed: Vec<serde_json::Value> =
+            serde_json::from_str(&serde_json::to_string(&changes_from_rows(&rows)).unwrap())
+                .unwrap();
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0]["operation"].as_str(), Some("delete"));
+        assert_eq!(parsed[0]["line"].as_u64(), Some(4));
+        assert_eq!(parsed[0]["old_content"].as_str(), Some("gone"));
+        assert!(parsed[0].get("new_content").is_none());
+        assert_eq!(parsed[1]["operation"].as_str(), Some("insert"));
+        assert_eq!(parsed[1]["new_content"].as_str(), Some("REPLACED"));
+        assert!(parsed[1].get("old_content").is_none());
     }
 }

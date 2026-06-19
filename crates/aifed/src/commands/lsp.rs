@@ -1,6 +1,7 @@
 //! LSP operation commands
 
 use crate::args::LspCommands;
+use crate::edit_view::{EditRow, rows_from_old_and_new};
 use crate::error::{Error, Result};
 use crate::hash::{hash_file, hash_line};
 use crate::language::LanguageResolver;
@@ -161,7 +162,7 @@ struct PreparedRenameFile {
     new_hash: String,
     new_content: String,
     diffs: Vec<LineDiffDto>,
-    new_lines: Vec<String>,
+    rows: Vec<EditRow>,
 }
 
 impl PreparedRenameFile {
@@ -169,8 +170,7 @@ impl PreparedRenameFile {
         RenameFileDiff {
             file_path: self.file_path.clone(),
             edit_count: self.edit_count,
-            diffs: self.diffs.clone(),
-            new_lines: self.new_lines.clone(),
+            rows: self.rows.clone(),
         }
     }
 }
@@ -183,9 +183,9 @@ fn prepare_rename_file(file_edit: &aifed_common::FileEdit) -> Result<PreparedRen
 
     let new_content = crate::text_edit::apply_edits(&content, file_edit.edits.clone())?;
     let new_hash = hash_file(new_content.as_bytes());
-    let new_lines = crate::file::split_lines_owned(&new_content);
     let updated_lines = crate::file::split_lines(&new_content);
     let diffs = compute_rename_diffs(&original_lines, &updated_lines);
+    let rows = rows_from_old_and_new(&original_lines, &updated_lines);
 
     Ok(PreparedRenameFile {
         path,
@@ -195,7 +195,7 @@ fn prepare_rename_file(file_edit: &aifed_common::FileEdit) -> Result<PreparedRen
         new_hash,
         new_content,
         diffs,
-        new_lines,
+        rows,
     })
 }
 

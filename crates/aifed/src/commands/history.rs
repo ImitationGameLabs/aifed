@@ -1,5 +1,6 @@
 //! History command - view edit history for a file
 
+use crate::edit_view::{EditRow, changed_rows_from_diffs};
 use crate::error::{Error, Result};
 use crate::output::OutputFormat;
 use aifed_common::{HistoryEntryDto, LineDiffDto};
@@ -64,25 +65,20 @@ fn print_verbose(entries: &[HistoryEntryDto]) {
 }
 
 /// Print a single diff hunk
+/// Intentionally plain `+content`/`-content` (no hashline), diverging from
+/// `edit_view::render_rows`.
 fn print_diff_hunk(diff: &LineDiffDto) {
-    match (&diff.old_content, &diff.new_content) {
-        (None, Some(new)) => {
-            // Insertion
-            println!("@@ {} @@", diff.line_num);
-            println!("+{}", new);
+    let rows = changed_rows_from_diffs(std::slice::from_ref(diff));
+    if rows.is_empty() {
+        return;
+    }
+    println!("@@ {} @@", diff.line_num);
+    for row in &rows {
+        match row {
+            EditRow::Insert { new_content, .. } => println!("+{}", new_content),
+            EditRow::Delete { old_content, .. } => println!("-{}", old_content),
+            EditRow::Equal { .. } => {}
         }
-        (Some(old), None) => {
-            // Deletion
-            println!("@@ {} @@", diff.line_num);
-            println!("-{}", old);
-        }
-        (Some(_old), Some(new)) => {
-            // Replacement
-            println!("@@ {} @@", diff.line_num);
-            println!("-{}", _old);
-            println!("+{}", new);
-        }
-        (None, None) => {}
     }
 }
 

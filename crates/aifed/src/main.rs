@@ -2,6 +2,7 @@ mod args;
 mod batch;
 mod commands;
 mod diff;
+mod edit_view;
 mod error;
 mod escape;
 mod file;

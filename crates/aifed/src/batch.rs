@@ -8,10 +8,11 @@ use std::path::Path;
 
 use crate::file::write_file;
 
+use crate::edit_view::{EditRow, new_lines_from_rows};
 use crate::error::{Error, Result};
 use crate::hash::{hash_file, hash_line, is_virtual_hash};
 use crate::locator::Locator;
-use crate::output::{BatchResult, EditChange, OutputFormat, format_batch_result_with_diff};
+use crate::output::{BatchResult, OutputFormat, changes_from_rows, format_batch_result_with_diff};
 use crate::scanner::{PeekResult, Scanner, Token};
 use aifed_common::LineDiffDto;
 use aifed_daemon_client::DaemonClient;
@@ -164,57 +165,41 @@ impl EditPlan {
         }
     }
 
-    /// Apply the plan to build new file content.
-    ///
-    /// Returns the new lines and a list of changes for output.
-    fn apply(&self, original_lines: &[String]) -> (Vec<String>, Vec<EditChange>) {
-        let mut new_lines = Vec::new();
-        let mut changes = Vec::new();
+    /// Apply the plan, producing a typed row sequence (see `crate::edit_view`) that is
+    /// the single source of truth for the post-edit file (`new_lines_from_rows`) and
+    /// the JSON change list (`changes_from_rows`). Each row carries its own correct
+    /// coordinate(s), so display code never indexes a foreign array.
+    fn apply(&self, original_lines: &[String]) -> Vec<EditRow> {
+        let mut rows = Vec::new();
+        let mut new_line = 0usize;
 
-        // Process inserts at the beginning of file (virtual line 0)
+        // Inserts at the beginning of the file (virtual line 0).
         for content in &self.inserts_at_start {
-            new_lines.push(content.clone());
-            changes.push(EditChange {
-                operation: "insert".to_string(),
-                line: new_lines.len(), // Actual line number in new file
-                old_content: None,
-                new_content: Some(content.clone()),
-            });
+            new_line += 1;
+            rows.push(EditRow::insert(new_line, content));
         }
 
-        // Iterate through original file lines
+        // Walk the original file once, tracking both coordinates.
         for (i, original) in original_lines.iter().enumerate() {
-            let line_num = i + 1; // 1-based line number
+            let old_line = i + 1; // 1-based original line number
 
-            // Process the current line first
-            if self.deletions.contains(&line_num) {
-                // Delete: skip this line, record the change
-                changes.push(EditChange {
-                    operation: "delete".to_string(),
-                    line: line_num,
-                    old_content: Some(original.clone()),
-                    new_content: None,
-                });
+            if self.deletions.contains(&old_line) {
+                rows.push(EditRow::delete(old_line, original));
             } else {
-                // Keep original line
-                new_lines.push(original.clone());
+                new_line += 1;
+                rows.push(EditRow::equal(new_line, original));
             }
 
-            // Then process inserts after this line
-            if let Some(insert_contents) = self.inserts.get(&line_num) {
+            // Inserts after this original line.
+            if let Some(insert_contents) = self.inserts.get(&old_line) {
                 for content in insert_contents {
-                    new_lines.push(content.clone());
-                    changes.push(EditChange {
-                        operation: "insert".to_string(),
-                        line: new_lines.len(), // The actual line number of the new line
-                        old_content: None,
-                        new_content: Some(content.clone()),
-                    });
+                    new_line += 1;
+                    rows.push(EditRow::insert(new_line, content));
                 }
             }
         }
 
-        (new_lines, changes)
+        rows
     }
 }
 
@@ -520,12 +505,7 @@ pub async fn execute_batch(
             changes: Vec::new(),
             errors: Vec::new(),
         };
-        // Empty batch has no original lines to show in diff
-        let empty_lines: Vec<String> = Vec::new();
-        println!(
-            "{}",
-            format_batch_result_with_diff(&result, format, &empty_lines)
-        );
+        println!("{}", format_batch_result_with_diff(&result, format, &[]));
         return Ok(());
     }
 
@@ -635,7 +615,9 @@ async fn execute_atomic(
     }
 
     // Phase 2: Apply the edit plan to build new content
-    let (new_lines, changes) = plan.apply(lines);
+    let rows = plan.apply(lines);
+    let new_lines = new_lines_from_rows(&rows);
+    let changes = changes_from_rows(&rows);
 
     // Phase 3: Write file
     if !dry_run {
@@ -692,10 +674,7 @@ async fn execute_atomic(
         errors: Vec::new(),
     };
 
-    println!(
-        "{}",
-        format_batch_result_with_diff(&result, format, &result.new_lines)
-    );
+    println!("{}", format_batch_result_with_diff(&result, format, &rows));
     Ok(())
 }
 
@@ -908,7 +887,8 @@ mod tests {
             .into_iter()
             .map(String::from)
             .collect();
-        let (new_lines, _) = plan.apply(&original);
+        let rows = plan.apply(&original);
+        let new_lines = new_lines_from_rows(&rows);
 
         assert_eq!(new_lines, vec!["1", "3", "5"]);
     }
@@ -934,7 +914,8 @@ mod tests {
         });
 
         let original: Vec<String> = ["start"].into_iter().map(String::from).collect();
-        let (new_lines, _) = plan.apply(&original);
+        let rows = plan.apply(&original);
+        let new_lines = new_lines_from_rows(&rows);
 
         assert_eq!(new_lines, vec!["start", "a", "b", "c"]);
     }
@@ -955,7 +936,8 @@ mod tests {
         });
 
         let original: Vec<String> = ["1", "2", "3", "4"].into_iter().map(String::from).collect();
-        let (new_lines, _) = plan.apply(&original);
+        let rows = plan.apply(&original);
+        let new_lines = new_lines_from_rows(&rows);
 
         assert_eq!(new_lines, vec!["1", "2", "new", "4"]);
     }
@@ -989,7 +971,8 @@ mod tests {
             .into_iter()
             .map(String::from)
             .collect();
-        let (new_lines, _) = plan.apply(&original);
+        let rows = plan.apply(&original);
+        let new_lines = new_lines_from_rows(&rows);
 
         // L1, insert A after L1, skip deleted lines 2-3, insert NEW3 before L4.
         assert_eq!(new_lines, vec!["L1", "A", "NEW3", "L4"]);
@@ -1005,7 +988,8 @@ mod tests {
         });
 
         let original: Vec<String> = ["1", "2", "3", "4"].into_iter().map(String::from).collect();
-        let (new_lines, _) = plan.apply(&original);
+        let rows = plan.apply(&original);
+        let new_lines = new_lines_from_rows(&rows);
 
         assert_eq!(new_lines, vec!["1", "2", "new", "4"]);
     }
@@ -1020,7 +1004,8 @@ mod tests {
         });
 
         let original: Vec<String> = ["1", "2", "3"].into_iter().map(String::from).collect();
-        let (new_lines, _) = plan.apply(&original);
+        let rows = plan.apply(&original);
+        let new_lines = new_lines_from_rows(&rows);
 
         assert_eq!(new_lines, vec!["1", "a", "b", "3"]);
     }
@@ -1041,7 +1026,8 @@ mod tests {
         });
 
         let original: Vec<String> = ["existing"].into_iter().map(String::from).collect();
-        let (new_lines, _) = plan.apply(&original);
+        let rows = plan.apply(&original);
+        let new_lines = new_lines_from_rows(&rows);
 
         assert_eq!(new_lines, vec!["first", "second", "existing"]);
     }
