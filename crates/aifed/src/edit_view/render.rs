@@ -5,6 +5,7 @@
 //! motivated this module cannot recur here.
 
 use super::model::EditRow;
+use crate::escape::escape_for_display;
 use crate::hash::hash_line;
 
 /// Render a row sequence as a diff view.
@@ -65,13 +66,28 @@ fn visible_indices(rows: &[EditRow], changed: &[usize], context_lines: usize) ->
 fn render_row(r: &EditRow) -> String {
     match r {
         EditRow::Equal { new_line, content, .. } => {
-            format!(" {}:{}|{}", new_line, hash_line(content), content)
+            format!(
+                " {}:{}|{}",
+                new_line,
+                hash_line(content),
+                escape_for_display(content)
+            )
         }
         EditRow::Insert { new_line, new_content } => {
-            format!("+{}:{}|{}", new_line, hash_line(new_content), new_content)
+            format!(
+                "+{}:{}|{}",
+                new_line,
+                hash_line(new_content),
+                escape_for_display(new_content)
+            )
         }
         EditRow::Delete { old_line, old_content } => {
-            format!("-{}:{}|{}", old_line, hash_line(old_content), old_content)
+            format!(
+                "-{}:{}|{}",
+                old_line,
+                hash_line(old_content),
+                escape_for_display(old_content)
+            )
         }
     }
 }

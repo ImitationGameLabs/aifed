@@ -1,4 +1,5 @@
 use crate::edit_view::{EditRow, render_rows};
+use crate::escape::escape_for_display;
 use serde::Serialize;
 use std::path::Path;
 
@@ -85,13 +86,21 @@ pub fn format_lines(lines: &[HashedLine], format: OutputFormat, no_hashes: bool)
             if no_hashes {
                 lines
                     .iter()
-                    .map(|l| l.content.clone())
+                    // into_owned: join() needs Vec<String>, not Vec<Cow<str>>.
+                    .map(|l| escape_for_display(&l.content).into_owned())
                     .collect::<Vec<_>>()
                     .join("\n")
             } else {
                 lines
                     .iter()
-                    .map(|l| format!("{}:{}|{}", l.line, l.hash.as_ref().unwrap(), l.content))
+                    .map(|l| {
+                        format!(
+                            "{}:{}|{}",
+                            l.line,
+                            l.hash.as_ref().unwrap(),
+                            escape_for_display(&l.content)
+                        )
+                    })
                     .collect::<Vec<_>>()
                     .join("\n")
             }

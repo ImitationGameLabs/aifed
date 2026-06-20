@@ -2,6 +2,7 @@
 
 use crate::edit_view::{EditRow, changed_rows_from_diffs};
 use crate::error::{Error, Result};
+use crate::escape::escape_for_display;
 use crate::output::OutputFormat;
 use aifed_common::{HistoryEntryDto, LineDiffDto};
 use aifed_daemon_client::DaemonClient;
@@ -75,8 +76,8 @@ fn print_diff_hunk(diff: &LineDiffDto) {
     println!("@@ {} @@", diff.line_num);
     for row in &rows {
         match row {
-            EditRow::Insert { new_content, .. } => println!("+{}", new_content),
-            EditRow::Delete { old_content, .. } => println!("-{}", old_content),
+            EditRow::Insert { new_content, .. } => println!("+{}", escape_for_display(new_content)),
+            EditRow::Delete { old_content, .. } => println!("-{}", escape_for_display(old_content)),
             EditRow::Equal { .. } => {}
         }
     }

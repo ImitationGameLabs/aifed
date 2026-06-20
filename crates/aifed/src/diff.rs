@@ -3,6 +3,7 @@
 //! This module provides functions to apply line diffs to file content.
 
 use crate::edit_view::{EditRow, changed_rows_from_diffs};
+use crate::escape::escape_for_display;
 use aifed_common::LineDiffDto;
 
 /// Print diffs in a readable format (without context, for undo/redo commands)
@@ -18,10 +19,10 @@ pub fn print_diffs(diffs: &[LineDiffDto]) {
     for row in &rows {
         match row {
             EditRow::Insert { new_line, new_content } => {
-                println!("  +{}: {}", new_line, new_content)
+                println!("  +{}: {}", new_line, escape_for_display(new_content))
             }
             EditRow::Delete { old_line, old_content } => {
-                println!("  -{}: {}", old_line, old_content)
+                println!("  -{}: {}", old_line, escape_for_display(old_content))
             }
             EditRow::Equal { .. } => {}
         }

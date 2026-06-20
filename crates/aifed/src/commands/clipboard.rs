@@ -1,6 +1,7 @@
 //! Clipboard command - show clipboard content
 
 use crate::error::Result;
+use crate::escape::escape_for_display;
 use crate::output::OutputFormat;
 use aifed_daemon_client::DaemonClient;
 
@@ -20,7 +21,7 @@ pub async fn execute(client: &DaemonClient, format: OutputFormat) -> Result<()> 
                 println!("{}", serde_json::to_string_pretty(&output).unwrap());
             }
             OutputFormat::Text => {
-                println!("{}", content);
+                println!("{}", escape_for_display(&content));
             }
         },
         None => match format {

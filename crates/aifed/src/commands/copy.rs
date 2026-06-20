@@ -3,6 +3,7 @@
 use std::path::Path;
 
 use crate::error::{Error, Result};
+use crate::escape::escape_for_display;
 use crate::hash::hash_line;
 use crate::locator::Locator;
 use crate::output::OutputFormat;
@@ -115,7 +116,7 @@ pub async fn execute(
                 path.display()
             );
             for (i, line) in copied.split('\n').enumerate() {
-                println!("{}|{}", start + i, line);
+                println!("{}|{}", start + i, escape_for_display(line));
             }
         }
     }

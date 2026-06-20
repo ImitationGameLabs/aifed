@@ -137,6 +137,14 @@ Content in double quotes supports string escape sequences:
 
 Example: `"code: println!(\"hello\");"` becomes `code: println!("hello");`
 
+## CONTROL BYTE DISPLAY
+
+`read`, `copy`, `clipboard`, `history`, `undo`/`redo`, and edit/rename diffs
+render non-printable control bytes with the escapes above, so a line can be
+copied back verbatim: CR shows as `\r`; DEL and other C0 controls show as
+`\xNN` (e.g., ESC as `\x1b`). Tab is shown literally. The hash is over the
+raw bytes, so `42:3K|\x1b...` is a valid, copyable hashline anchor.
+
 ## BATCH MODE
 
 All edits use heredoc syntax. Multiple operations can be provided in one heredoc.

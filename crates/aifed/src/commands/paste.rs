@@ -80,11 +80,50 @@ pub async fn execute(
     batch::execute_batch(path, operations, false, format, Some(daemon_client)).await
 }
 
-/// Escape content for batch operation string (JSON-style)
+/// Escape content for a batch operation string so clipboard lines survive
+/// `parse_batch_operations` byte-for-byte: `\`/`"`, named `\t`/`\r`, and every
+/// remaining control byte as `\xNN` (the batch-source counterpart of
+/// `escape::escape_for_display`).
+/// Expects a single line (no `\n`); callers split multi-line clipboard content first.
 fn escape_content(content: &str) -> String {
-    content
-        .replace('\\', "\\\\")
-        .replace('\"', "\\\"")
-        .replace('\t', "\\t")
-        .replace('\r', "\\r")
+    let mut out = String::with_capacity(content.len() + 8);
+    for c in content.chars() {
+        match c {
+            '\\' | '"' => {
+                out.push('\\');
+                out.push(c);
+            }
+            '\t' => out.push_str("\\t"),
+            '\r' => out.push_str("\\r"),
+            // Other C0 controls and DEL -> \xNN (tab/CR/quote/backslash handled above).
+            c if c.is_ascii() && crate::escape::control_needs_hex(c as u8) => {
+                out.push_str(&format!("\\x{:02x}", c as u32));
+            }
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn escape_content_escapes_control_bytes() {
+        // Raw control bytes become \xNN so they survive parse_batch_operations,
+        // closing the copy -> paste round-trip hole.
+        assert_eq!(escape_content("a\x1bb"), r"a\x1bb");
+        assert_eq!(escape_content("\u{0}"), r"\x00");
+        assert_eq!(escape_content("\u{c}"), r"\x0c");
+        assert_eq!(escape_content("\u{7f}"), r"\x7f");
+    }
+
+    #[test]
+    fn escape_content_keeps_named_escapes() {
+        assert_eq!(escape_content("a\tb"), r"a\tb");
+        assert_eq!(escape_content("a\rb"), r"a\rb");
+        assert_eq!(escape_content(r"a\b"), r"a\\b");
+        assert_eq!(escape_content("a\"b"), r#"a\"b"#);
+    }
 }
