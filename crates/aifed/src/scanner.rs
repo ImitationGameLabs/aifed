@@ -17,6 +17,7 @@ pub enum Token<'a> {
     Comma,
     Quoted(&'a str),
     Unquoted(&'a str),
+    Indent(i32),
 }
 
 /// Owned peek result that does not borrow the [`Scanner`].
@@ -109,6 +110,7 @@ impl<'a> Scanner<'a> {
                 Some(Ok(Token::Comma))
             }
             '"' => self.scan_quoted(),
+            '@' => self.scan_indent(),
             _ => self.scan_unquoted(),
         }
     }
@@ -214,6 +216,51 @@ impl<'a> Scanner<'a> {
         } else {
             Some(Ok(Token::Unquoted(raw)))
         }
+    }
+
+    /// Scan an indent directive `@N`: `@`, an optional sign, then one or more
+    /// digits. Bare `@N` means `+N`. `@` without valid digits is a syntax error.
+    fn scan_indent(&mut self) -> Option<Result<Token<'a>>> {
+        self.advance('@');
+        let negative = match self.input[self.pos..].chars().next() {
+            Some('+') => {
+                self.advance('+');
+                false
+            }
+            Some('-') => {
+                self.advance('-');
+                true
+            }
+            _ => false,
+        };
+        let start = self.pos;
+        while self.pos < self.input.len() {
+            let ch = self.input[self.pos..].chars().next().unwrap();
+            if !ch.is_ascii_digit() {
+                break;
+            }
+            self.advance(ch);
+        }
+        if self.pos == start {
+            return Some(Err(Error::Syntax {
+                line: self.line,
+                column: self.column,
+                reason: "Indent directive must be '@' followed by an optional sign and digits"
+                    .to_string(),
+            }));
+        }
+        let magnitude: i32 = match self.input[start..self.pos].parse() {
+            Ok(m) => m,
+            Err(_) => {
+                return Some(Err(Error::Syntax {
+                    line: self.line,
+                    column: self.column,
+                    reason: "Indent directive magnitude out of range".to_string(),
+                }));
+            }
+        };
+        let value = if negative { -magnitude } else { magnitude };
+        Some(Ok(Token::Indent(value)))
     }
 }
 
@@ -544,5 +591,44 @@ mod tests {
             t,
             vec![Token::Plus, Token::Unquoted("1:AA"), Token::Unquoted("foo#bar")]
         );
+    }
+
+    // ── indent directive @N ──────────────────────────────────────────
+
+    #[test]
+    fn test_indent_directive_lexes() {
+        assert_eq!(collect("@0"), vec![Token::Indent(0)]);
+        assert_eq!(collect("@1"), vec![Token::Indent(1)]);
+        assert_eq!(collect("@+1"), vec![Token::Indent(1)]);
+        assert_eq!(collect("@-2"), vec![Token::Indent(-2)]);
+    }
+
+    #[test]
+    fn test_indent_directive_after_locator() {
+        let t = collect("+ 42:AB @1");
+        assert_eq!(
+            t,
+            vec![Token::Plus, Token::Unquoted("42:AB"), Token::Indent(1)]
+        );
+    }
+
+    #[test]
+    fn test_indent_glued_to_locator_stays_one_token() {
+        let t = collect("42:AB@0");
+        assert_eq!(t, vec![Token::Unquoted("42:AB@0")]);
+    }
+
+    #[test]
+    fn test_indent_at_inside_unquoted_stays_one_token() {
+        let t = collect("foo@bar");
+        assert_eq!(t, vec![Token::Unquoted("foo@bar")]);
+    }
+
+    #[test]
+    fn test_indent_directive_errors() {
+        for bad in ["@", "@x", "@+", "@-", "@+x"] {
+            let err = Scanner::new(bad).next_token();
+            assert!(matches!(err, Some(Err(_))), "expected error for {bad:?}");
+        }
     }
 }

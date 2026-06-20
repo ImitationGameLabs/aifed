@@ -43,6 +43,9 @@ pub enum Error {
     #[error("Batch parse error on line {line_number}: '{line_content}'\n  Reason: {reason}")]
     InvalidBatchOp { line_number: usize, line_content: String, reason: String },
 
+    #[error("{reason}")]
+    IndentDirective { reason: String },
+
     #[error("stdin not available for reading")]
     StdinNotAvailable,
 

@@ -34,12 +34,16 @@ pub struct ValidatedOp {
 }
 
 /// Validate an operation against the current file state
+#[allow(clippy::too_many_arguments)]
 pub fn validate_operation(
     lines: &[String],
     operation: Operation,
     locator: &Locator,
     contents: &[String],
     path: &Path,
+    indent: Option<i32>,
+    resolved: &crate::indent::ResolvedIndent,
+    assist_enabled: bool,
 ) -> Result<ValidatedOp> {
     // Validate content requirement
     match operation {
@@ -63,7 +67,8 @@ pub fn validate_operation(
             });
         }
 
-        return Ok(ValidatedOp { operation, target_line: 0, new_contents: contents.to_vec() });
+        let new_contents = apply_directive(contents, indent, None, resolved, assist_enabled)?;
+        return Ok(ValidatedOp { operation, target_line: 0, new_contents });
     }
 
     // Get line number and hash from locator
@@ -110,7 +115,74 @@ pub fn validate_operation(
         });
     }
 
-    Ok(ValidatedOp { operation, target_line, new_contents: contents.to_vec() })
+    let new_contents = apply_directive(
+        contents,
+        indent,
+        Some(&actual_content),
+        resolved,
+        assist_enabled,
+    )?;
+    Ok(ValidatedOp { operation, target_line, new_contents })
+}
+
+/// Apply an optional indent directive (`@N`) to content lines, returning the
+/// transformed lines or a hard error. No directive -> verbatim. The anchor is
+/// the line the edit is relative to (`Some` for insert/replace, `None` for the
+/// virtual `0:00` line).
+fn apply_directive(
+    contents: &[String],
+    indent: Option<i32>,
+    anchor: Option<&str>,
+    resolved: &crate::indent::ResolvedIndent,
+    assist_enabled: bool,
+) -> Result<Vec<String>> {
+    use crate::indent::{IndentKind, UnknownReason, apply_indent, leading_indent};
+
+    let Some(n) = indent else {
+        return Ok(contents.to_vec());
+    };
+
+    let fail = |reason: String| Error::IndentDirective { reason };
+
+    if !assist_enabled {
+        return Err(fail(format!(
+            "Indent directive @{n} cannot be applied: indent assist is disabled in config. Drop @{n} and provide exact indentation, or enable indent_assist."
+        )));
+    }
+
+    let anchor_indent = anchor.map(leading_indent).unwrap_or("");
+
+    if n == 0 {
+        return Ok(contents
+            .iter()
+            .map(|c| apply_indent(c, anchor_indent, 0, &resolved.kind))
+            .collect());
+    }
+
+    if anchor.is_none() {
+        return Err(fail(format!(
+            "Indent directive @{n} cannot be applied: virtual line 0:00 has no anchor to derive indentation levels from. Drop @{n} and provide exact indentation."
+        )));
+    }
+    if resolved.config_conflict {
+        return Err(fail(format!(
+            "Indent directive @{n} cannot be applied: configured indent does not match the file. Fix the config or unify the file's indentation."
+        )));
+    }
+    match &resolved.kind {
+        IndentKind::Unknown(reason) => Err(fail(match reason {
+            UnknownReason::Mixed => format!(
+                "Indent directive @{n} cannot be applied: file mixes tabs and spaces. Unify the indentation convention (all tabs or all spaces), or drop @{n} and provide exact indentation."
+            ),
+            UnknownReason::Undeterminable => format!(
+                "Indent directive @{n} cannot be applied: indent width could not be determined (insufficient or inconsistent indentation). Set indent_width in config, or drop @{n} and provide exact indentation."
+            ),
+        })),
+        kind => Ok(contents
+            .iter()
+            .map(|c| apply_indent(c, anchor_indent, n, kind))
+            .collect()),
+    }
 }
 
 /// Parsed single operation from batch input
@@ -119,6 +191,7 @@ pub struct EditOp {
     pub operation: Operation,
     pub locator: Locator,
     pub contents: Vec<String>,
+    pub indent: Option<i32>,
 }
 
 /// Edit plan that records all modifications based on original line numbers.
@@ -267,6 +340,35 @@ pub fn parse_batch_operations(input: &str) -> Result<Vec<EditOp>> {
             ));
         }
 
+        // Optional indent directive @N (after the locator, before content).
+        let indent = match scanner.peek_token() {
+            Some(PeekResult::Token(Token::Indent(n))) => {
+                scanner.next_token();
+                Some(n)
+            }
+            _ => None,
+        };
+        // Indent directives apply to insert/replace content, not delete.
+        if op == Operation::Delete && indent.is_some() {
+            return Err(invalid_op(
+                scanner.line(),
+                locator.to_string(),
+                "Indent directive is not valid for delete operations",
+            ));
+        }
+        // At most one indent directive per operation.
+        if matches!(
+            scanner.peek_token(),
+            Some(PeekResult::Token(Token::Indent(_)))
+        ) {
+            scanner.next_token();
+            return Err(invalid_op(
+                scanner.line(),
+                locator.to_string(),
+                "Only one indent directive (@N) is allowed per operation",
+            ));
+        }
+
         // Parse content tokens.
         let contents = collect_content_tokens(&mut scanner)?;
 
@@ -294,7 +396,7 @@ pub fn parse_batch_operations(input: &str) -> Result<Vec<EditOp>> {
             _ => {}
         }
 
-        operations.push(EditOp { operation: op, locator, contents });
+        operations.push(EditOp { operation: op, locator, contents, indent });
     }
 
     Ok(operations)
@@ -481,6 +583,7 @@ pub async fn execute_batch(
     dry_run: bool,
     format: OutputFormat,
     daemon_client: Option<&DaemonClient>,
+    indent_settings: &crate::indent::IndentSettings,
 ) -> Result<()> {
     if !path.exists() {
         return Err(Error::FileNotFound {
@@ -524,6 +627,7 @@ pub async fn execute_batch(
         format,
         daemon_client,
         &expected_hash,
+        indent_settings,
     )
     .await
 }
@@ -538,8 +642,10 @@ async fn execute_atomic(
     format: OutputFormat,
     daemon_client: Option<&DaemonClient>,
     expected_hash: &str,
+    indent_settings: &crate::indent::IndentSettings,
 ) -> Result<()> {
     // Phase 1: Validate all operations and build edit plan
+    let resolved = crate::indent::resolve(lines, indent_settings);
     let mut plan = EditPlan::new();
     for (idx, op) in operations.iter().enumerate() {
         // Handle HashlineRange by expanding into individual delete operations
@@ -601,14 +707,21 @@ async fn execute_atomic(
             }
         } else {
             // Standard single-line operation
-            let validated =
-                validate_operation(lines, op.operation, &op.locator, &op.contents, path).map_err(
-                    |e| Error::InvalidBatchOp {
-                        line_number: idx + 1,
-                        line_content: op.to_string(),
-                        reason: e.to_string(),
-                    },
-                )?;
+            let validated = validate_operation(
+                lines,
+                op.operation,
+                &op.locator,
+                &op.contents,
+                path,
+                op.indent,
+                &resolved,
+                indent_settings.assist_enabled,
+            )
+            .map_err(|e| Error::InvalidBatchOp {
+                line_number: idx + 1,
+                line_content: op.to_string(),
+                reason: e.to_string(),
+            })?;
 
             plan.add(validated);
         }
@@ -692,6 +805,9 @@ impl EditOp {
 impl std::fmt::Display for EditOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} {}", self.operation_str(), self.locator)?;
+        if let Some(n) = self.indent {
+            write!(f, " @{n}")?;
+        }
         for content in &self.contents {
             write!(f, " \"{}\"", escape_content(content))?;
         }
@@ -710,6 +826,7 @@ fn escape_content(content: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::indent::IndentSettings;
 
     #[test]
     fn test_parse_simple_operations() {
@@ -1052,9 +1169,16 @@ mod tests {
         let input = format!(r#"+ 1:{hash} "a" "b" "c""#);
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text, None)
-            .await
-            .unwrap();
+        execute_batch(
+            &path,
+            ops,
+            false,
+            OutputFormat::Text,
+            None,
+            &IndentSettings::detecting(),
+        )
+        .await
+        .unwrap();
 
         // Verify result: start, a, b, c (in that order) with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
@@ -1088,9 +1212,16 @@ mod tests {
         );
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text, None)
-            .await
-            .unwrap();
+        execute_batch(
+            &path,
+            ops,
+            false,
+            OutputFormat::Text,
+            None,
+            &IndentSettings::detecting(),
+        )
+        .await
+        .unwrap();
 
         // Verify result: 1, 3, 5 with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
@@ -1126,9 +1257,16 @@ mod tests {
         );
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text, None)
-            .await
-            .unwrap();
+        execute_batch(
+            &path,
+            ops,
+            false,
+            OutputFormat::Text,
+            None,
+            &IndentSettings::detecting(),
+        )
+        .await
+        .unwrap();
 
         // Verify result: L1, A, NEW3, L4, L5 with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
@@ -1164,9 +1302,16 @@ mod tests {
         );
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text, None)
-            .await
-            .unwrap();
+        execute_batch(
+            &path,
+            ops,
+            false,
+            OutputFormat::Text,
+            None,
+            &IndentSettings::detecting(),
+        )
+        .await
+        .unwrap();
 
         // Verify result: L1, NEW3, L4 with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
@@ -1191,9 +1336,16 @@ mod tests {
         let input = format!(r#"= 2:{hash2} "REPLACED""#);
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text, None)
-            .await
-            .unwrap();
+        execute_batch(
+            &path,
+            ops,
+            false,
+            OutputFormat::Text,
+            None,
+            &IndentSettings::detecting(),
+        )
+        .await
+        .unwrap();
 
         let result = std::fs::read_to_string(&path).unwrap();
         assert_eq!(result, "L1\nREPLACED\nL3\n");
@@ -1220,9 +1372,16 @@ mod tests {
         );
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text, None)
-            .await
-            .unwrap();
+        execute_batch(
+            &path,
+            ops,
+            false,
+            OutputFormat::Text,
+            None,
+            &IndentSettings::detecting(),
+        )
+        .await
+        .unwrap();
 
         let result = std::fs::read_to_string(&path).unwrap();
         assert_eq!(result, "L1\nA\nB\nL3\n");
@@ -1472,9 +1631,16 @@ mod tests {
         );
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text, None)
-            .await
-            .unwrap();
+        execute_batch(
+            &path,
+            ops,
+            false,
+            OutputFormat::Text,
+            None,
+            &IndentSettings::detecting(),
+        )
+        .await
+        .unwrap();
 
         let result = std::fs::read_to_string(&path).unwrap();
         assert_eq!(result, "L1\nA\nB\nL5\nL6\n");
@@ -1505,9 +1671,16 @@ mod tests {
         let input = format!("- [2:{hash2},9:{hash9}]");
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text, None)
-            .await
-            .unwrap();
+        execute_batch(
+            &path,
+            ops,
+            false,
+            OutputFormat::Text,
+            None,
+            &IndentSettings::detecting(),
+        )
+        .await
+        .unwrap();
 
         // Verify result: L1, L10 with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
@@ -1531,9 +1704,16 @@ mod tests {
         let input = format!("- [3:{hash3},3:{hash3}]");
         let ops = parse_batch_operations(&input).unwrap();
 
-        execute_batch(&path, ops, false, OutputFormat::Text, None)
-            .await
-            .unwrap();
+        execute_batch(
+            &path,
+            ops,
+            false,
+            OutputFormat::Text,
+            None,
+            &IndentSettings::detecting(),
+        )
+        .await
+        .unwrap();
 
         // Verify result: L1, L2, L4, L5 with trailing newline
         let result = std::fs::read_to_string(&path).unwrap();
@@ -1554,7 +1734,15 @@ mod tests {
         let input = "- [2:VV,9:VV]";
         let ops = parse_batch_operations(input).unwrap();
 
-        let result = execute_batch(&path, ops, false, OutputFormat::Text, None).await;
+        let result = execute_batch(
+            &path,
+            ops,
+            false,
+            OutputFormat::Text,
+            None,
+            &IndentSettings::detecting(),
+        )
+        .await;
 
         // Should fail with hash mismatch error
         assert!(result.is_err());
@@ -1564,5 +1752,161 @@ mod tests {
             "Error: {}",
             err
         );
+    }
+
+    #[tokio::test]
+    async fn directive_at_zero_copies_anchor() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("t.txt");
+        let lines: Vec<String> = ["    a", "        b", ""]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        write_file(&path, &lines).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        let hash = crate::hash::hash_line(&crate::file::split_lines_owned(&content)[0]);
+        let ops = parse_batch_operations(&format!("= 1:{hash} @0 REPLACED")).unwrap();
+        execute_batch(
+            &path,
+            ops,
+            false,
+            OutputFormat::Text,
+            None,
+            &IndentSettings::detecting(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "    REPLACED\n        b\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn directive_at_plus_one_tab() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("t.txt");
+        let lines: Vec<String> = ["\ta", ""].into_iter().map(String::from).collect();
+        write_file(&path, &lines).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        let hash = crate::hash::hash_line(&crate::file::split_lines_owned(&content)[0]);
+        let ops = parse_batch_operations(&format!("+ 1:{hash} @+1 b")).unwrap();
+        execute_batch(
+            &path,
+            ops,
+            false,
+            OutputFormat::Text,
+            None,
+            &IndentSettings::detecting(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "\ta\n\t\tb\n");
+    }
+
+    #[tokio::test]
+    async fn directive_at_plus_one_unknown_errors_atomic() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("t.txt");
+        // 4 and 6 spaces are not a common multiple -> Unknown -> @+1 hard-errors.
+        let lines: Vec<String> = ["a", "    b", "      c", ""]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        write_file(&path, &lines).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        let original = content.clone();
+        let hash = crate::hash::hash_line(&crate::file::split_lines_owned(&content)[0]);
+        let ops = parse_batch_operations(&format!("+ 1:{hash} @+1 d")).unwrap();
+        let result = execute_batch(
+            &path,
+            ops,
+            false,
+            OutputFormat::Text,
+            None,
+            &IndentSettings::detecting(),
+        )
+        .await;
+        assert!(
+            result.is_err(),
+            "@+1 on an inconsistent file must hard-error"
+        );
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+    }
+
+    #[tokio::test]
+    async fn directive_on_delete_errors() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("t.txt");
+        let lines: Vec<String> = ["a", "b", ""].into_iter().map(String::from).collect();
+        write_file(&path, &lines).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        let hash = crate::hash::hash_line(&crate::file::split_lines_owned(&content)[0]);
+        let err = parse_batch_operations(&format!("- 1:{hash} @0")).unwrap_err();
+        assert!(err.to_string().contains("not valid for delete"));
+    }
+
+    #[test]
+    fn directive_rejects_second_directive() {
+        let err = parse_batch_operations("+ 1:AA @0 @1 body").unwrap_err();
+        assert!(err.to_string().contains("Only one indent directive"));
+    }
+
+    #[tokio::test]
+    async fn directive_assist_disabled_rejects() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("t.txt");
+        let lines: Vec<String> = ["    a", "        b", ""]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        write_file(&path, &lines).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        let hash = crate::hash::hash_line(&crate::file::split_lines_owned(&content)[0]);
+        let ops = parse_batch_operations(&format!("= 1:{hash} @0 c")).unwrap();
+        let disabled =
+            IndentSettings { assist_enabled: false, forced_style: None, forced_width: None };
+        let result = execute_batch(&path, ops, false, OutputFormat::Text, None, &disabled).await;
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("assist is disabled"), "got: {err}");
+    }
+
+    #[tokio::test]
+    async fn directive_on_virtual_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("t.txt");
+        let lines: Vec<String> = ["    a", "        b", ""]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        write_file(&path, &lines).unwrap();
+        // @0 on the virtual line succeeds, inserting at column 0.
+        let ops = parse_batch_operations("+ 0:00 @0 TOP").unwrap();
+        execute_batch(
+            &path,
+            ops,
+            false,
+            OutputFormat::Text,
+            None,
+            &IndentSettings::detecting(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "TOP\n    a\n        b\n"
+        );
+        // @+1 on the virtual line has no anchor -> hard error.
+        let ops = parse_batch_operations("+ 0:00 @+1 x").unwrap();
+        let result = execute_batch(
+            &path,
+            ops,
+            false,
+            OutputFormat::Text,
+            None,
+            &IndentSettings::detecting(),
+        )
+        .await;
+        assert!(result.is_err(), "@+1 on virtual line must hard-error");
     }
 }

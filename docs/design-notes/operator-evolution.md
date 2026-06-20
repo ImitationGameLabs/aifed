@@ -92,3 +92,7 @@ which the old implementation did not (`new_content: Option<String>` was single-l
 
 All three are parsed in `batch.rs` and processed through `EditPlan` which
 internally uses only two sets: `deletions` (HashSet) and `inserts` (HashMap).
+
+## Indent Directive `@N`
+
+The `@N` directive (after the locator, on `+`/`=`) is not a new operator but a content transform: it derives a line's leading whitespace from its anchor so agents don't count spaces. `@0` copies the anchor's indent (always works); `@+N` / `@-N` adjust by levels and require a consistent file style (all tabs, or all spaces at one width). When `@±N` can't be applied, the batch fails atomically rather than silently writing wrong indentation — consistent with the hashline refuse-and-retry model. No directive preserves the original verbatim behavior.

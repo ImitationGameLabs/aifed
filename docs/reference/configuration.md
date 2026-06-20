@@ -92,13 +92,31 @@ exclude_extensions = ["mdx"]        # stop treating .mdx as markdown
 | `language`              | string       | yes      | Language id this overlay targets |
 | `additional_extensions` | string array | no       | Extensions to add to the grammar defaults |
 | `exclude_extensions`    | string array | no       | Default extensions to remove for this language |
+| `indent_assist`         | bool          | no       | Override global `assist` for this language (absent = inherit global) |
+| `indent_style`          | "tab"/"space" | no       | Assert the file's indent style; skips detection |
+| `indent_width`          | integer       | no       | Assert spaces per level (pairs with `indent_style = "space"`) |
+
+### `[indent]` — indent directive
+
+Global settings for the `@N` edit directive (see edit-commands.md).
+
+```toml
+[indent]
+assist = true
+```
+
+| Field | Type | Required | Default | Description |
+| ----- | ---- | -------- | ------- | ----------- |
+| `assist` | bool | no | `true` | Gate the `@N` directive. `false` rejects every directive (hard error). |
+
+A `[[language]]` overlay can override `assist` and declare `indent_style`/`indent_width` to skip detection. Declaring a style/width asserts the file matches — a contradicting file is a hard error, not a silent rewrite.
 
 ### Validation Rules
 
 - `language` must be unique within a single file's `[[lsp]]` list, and within its `[[language]]` list.
 - `command` (on `[[lsp]]`) must not be empty.
 - Unknown fields are rejected.
-- Later config layers replace earlier entries for the same `language`, **per section**. Note: restating a `[[language]]` in the project wholesale-replaces the global one, so it resets any `exclude_extensions` you set globally — restate them if you want to keep them.
+- Later config layers replace earlier entries for the same `language`, **per section**. Note: restating a `[[language]]` in the project wholesale-replaces the global one, so it resets any `exclude_extensions` **or indent fields** you set globally — restate them if you want to keep them.
 
 ---
 

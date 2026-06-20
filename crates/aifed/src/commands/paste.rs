@@ -77,7 +77,15 @@ pub async fn execute(
     ops_input.push('\n');
 
     let operations = batch::parse_batch_operations(&ops_input)?;
-    batch::execute_batch(path, operations, false, format, Some(daemon_client)).await
+    batch::execute_batch(
+        path,
+        operations,
+        false,
+        format,
+        Some(daemon_client),
+        &crate::indent::IndentSettings::detecting(),
+    )
+    .await
 }
 
 /// Escape content for a batch operation string so clipboard lines survive

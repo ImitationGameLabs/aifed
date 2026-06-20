@@ -3,7 +3,9 @@ use std::path::Path;
 
 use crate::batch;
 use crate::error::{Error, Result};
+use crate::indent::IndentSettings;
 use crate::output::OutputFormat;
+use aifed_common::load_registry_for_path;
 use aifed_daemon_client::DaemonClient;
 
 /// Execute the edit command (batch mode from stdin only)
@@ -29,5 +31,14 @@ pub async fn execute(
         .read_to_string(&mut input)
         .map_err(|_| Error::StdinNotAvailable)?;
     let operations = batch::parse_batch_operations(&input)?;
-    batch::execute_batch(path, operations, dry_run, format, daemon_client).await
+    let settings = match load_registry_for_path(path) {
+        Ok(reg) => IndentSettings::from_registry(&reg, path),
+        Err(e) => {
+            eprintln!(
+                "Warning: config load failed, indent directives will use file-detection: {e}"
+            );
+            IndentSettings::detecting()
+        }
+    };
+    batch::execute_batch(path, operations, dry_run, format, daemon_client, &settings).await
 }

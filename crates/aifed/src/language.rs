@@ -173,6 +173,9 @@ mod tests {
             language: language.to_string(),
             additional_extensions: additional.iter().map(|s| s.to_string()).collect(),
             exclude_extensions: exclude.iter().map(|s| s.to_string()).collect(),
+            indent_assist: None,
+            indent_style: None,
+            indent_width: None,
         }
     }
 

@@ -107,6 +107,8 @@ To change trailing newline status:
 -   Delete line at locator (supports range: `- [START:HASH,END:HASH]`)
 =   Replace line at locator (syntactic sugar for `-` + `+` at same locator)
 
+An optional `@N` indent directive after the locator (on `+`/`=`) derives indentation from the anchor — see INDENT DIRECTIVE @N below.
+
 Replacement is written as a single `=` operator, or as delete plus insert for ranges:
 
 ```text
@@ -136,6 +138,23 @@ Content in double quotes supports string escape sequences:
 **`\n` is not allowed** in edit content. Each inserted content payload is exactly one line. To insert multiple lines at one anchor, provide multiple quoted payloads after a single `+`.
 
 Example: `"code: println!(\"hello\");"` becomes `code: println!("hello");`
+
+## INDENT DIRECTIVE @N
+
+An optional `@N` token after the locator (on `+` and `=`) derives indentation from the anchor line, so you don't have to count leading spaces.
+
+```text
+= 282:0K @0 "stmt;"     # replace, keep line 282's indent
++ 286:A2 @+1 "stmt;"    # insert one level deeper than line 286
+```
+
+- `@0` copies the anchor's leading whitespace verbatim. Always works — even on mixed/inconsistent files and the virtual `0:00` line (column 0).
+- `@+N` / `@-N` adjusts by N levels (`@1` = `@+1`). Requires a consistent style (all tabs, or all spaces at one width). Sub-level alignment snaps to the grid; use `@0` for exact bytes. `@-N` floors at column 0.
+
+`@N` applies to every content payload of one operation, and is invalid on `-` (delete). No directive = exact verbatim content (unchanged behavior).
+
+If `@±N` can't be applied — mixed tabs/spaces, undetectable width, `0:00` with no anchor, or `[indent] assist = false` — the batch fails atomically. Drop `@N` and provide exact indentation, or unify the file's convention. Set `indent_style`/`indent_width` per language in config to skip detection (it also asserts the file matches).
+
 
 ## CONTROL BYTE DISPLAY
 

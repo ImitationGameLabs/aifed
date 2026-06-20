@@ -38,6 +38,38 @@ pub enum ConfigError {
     },
 }
 
+/// Declared indentation style for a language. When set on a [[language]]
+/// overlay it skips detection and asserts the file matches the convention
+/// (a mismatch is a hard error, not a silent rewrite). Per-variant rename
+/// keeps the lowercase TOML form without a rename_all, which the codebase
+/// does not use elsewhere.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IndentStyleConfig {
+    #[serde(rename = "tab")]
+    Tab,
+    #[serde(rename = "space")]
+    Space,
+}
+
+/// Global configuration for the @N indent directive (see aifed::indent).
+/// assist gates the whole feature; it defaults to true so the directive is
+/// honored unless a project explicitly opts out.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IndentConfig {
+    #[serde(default = "default_assist_true")]
+    pub assist: bool,
+}
+
+impl Default for IndentConfig {
+    fn default() -> Self {
+        Self { assist: true }
+    }
+}
+
+fn default_assist_true() -> bool {
+    true
+}
+
 /// Top-level config file: a list of LSP server entries plus a list of language
 /// extension overlays. Both are `[[array]]` tables in TOML.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -47,6 +79,8 @@ struct FileConfig {
     lsp: Vec<LspServerConfig>,
     #[serde(default)]
     language: Vec<LanguageConfig>,
+    #[serde(default)]
+    indent: IndentConfig,
 }
 
 /// An LSP server entry. References a language by name only — extension matching
@@ -109,6 +143,16 @@ pub struct LanguageConfig {
     pub additional_extensions: Vec<String>,
     #[serde(default)]
     pub exclude_extensions: Vec<String>,
+    /// Override indent assist for this language. None inherits the global
+    /// [indent] assist; Some(false) disables the directive for the language.
+    #[serde(default)]
+    pub indent_assist: Option<bool>,
+    /// Declared indent style; skips detection and asserts file consistency.
+    #[serde(default)]
+    pub indent_style: Option<IndentStyleConfig>,
+    /// Declared spaces per level; pairs with indent_style = "space".
+    #[serde(default)]
+    pub indent_width: Option<u32>,
 }
 
 impl LanguageConfig {
@@ -136,6 +180,7 @@ impl LanguageConfig {
 pub struct Registry {
     entries: Vec<LspServerConfig>,
     language_overlays: Vec<LanguageConfig>,
+    indent: IndentConfig,
 }
 
 impl Registry {
@@ -145,8 +190,9 @@ impl Registry {
     pub fn from_parts(
         entries: Vec<LspServerConfig>,
         language_overlays: Vec<LanguageConfig>,
+        indent: IndentConfig,
     ) -> Self {
-        Self { entries, language_overlays }
+        Self { entries, language_overlays, indent }
     }
 
     pub fn entries(&self) -> &[LspServerConfig] {
@@ -157,6 +203,11 @@ impl Registry {
     /// same-name global). Consumed by `aifed::language::LanguageResolver`.
     pub fn language_overlays(&self) -> &[LanguageConfig] {
         &self.language_overlays
+    }
+
+    /// Resolved global [indent] settings (project overrides global).
+    pub fn indent(&self) -> &IndentConfig {
+        &self.indent
     }
 
     pub fn find_by_language(&self, language: &str) -> Option<&LspServerConfig> {
@@ -219,12 +270,14 @@ fn load_registry_from_paths(
 ) -> Result<Registry, ConfigError> {
     let mut entries = Vec::new();
     let mut language_overlays = Vec::new();
+    let mut indent = IndentConfig::default();
 
     if let Some(path) = global_path
         && let Some(config) = load_config_file(path)?
     {
         merge_entries(&mut entries, config.lsp);
         merge_language_entries(&mut language_overlays, config.language);
+        indent = config.indent;
     }
 
     if let Some(path) = project_path
@@ -232,9 +285,10 @@ fn load_registry_from_paths(
     {
         merge_entries(&mut entries, config.lsp);
         merge_language_entries(&mut language_overlays, config.language);
+        indent = config.indent;
     }
 
-    Ok(Registry { entries, language_overlays })
+    Ok(Registry { entries, language_overlays, indent })
 }
 
 fn load_config_file(path: &Path) -> Result<Option<FileConfig>, ConfigError> {
@@ -502,6 +556,38 @@ additional_extensions = ["mdown"]
             md.exclude_extensions.is_empty(),
             "project replaced global wholesale"
         );
+    }
+
+    #[test]
+    fn indent_config_parses_and_defaults() {
+        // No [indent] table at all -> default assist = true.
+        let registry = load_registry_from_paths(None, None).unwrap();
+        assert!(registry.indent().assist);
+
+        // Project declares [indent] and per-language indent fields.
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("project.toml");
+        write_file(
+            &project,
+            r#"
+[indent]
+assist = false
+
+[[language]]
+language = "rust"
+indent_style = "space"
+indent_width = 4
+"#,
+        );
+        let registry = load_registry_from_paths(None, Some(&project)).unwrap();
+        assert!(!registry.indent().assist);
+        let rust = registry
+            .language_overlays()
+            .iter()
+            .find(|o| o.language == "rust")
+            .unwrap();
+        assert_eq!(rust.indent_style, Some(IndentStyleConfig::Space));
+        assert_eq!(rust.indent_width, Some(4));
     }
 
     #[test]

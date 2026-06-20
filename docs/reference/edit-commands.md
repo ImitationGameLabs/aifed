@@ -27,6 +27,8 @@ All edit operations are provided via stdin using heredoc syntax.
 - `-` - Minus suggests "remove" or "delete"
 - `=` - Equals suggests "assign" or "replace"
 
+An optional `@N` indent directive may follow the locator on `+`/`=` — see Indent Directives below.
+
 ### Multi-line Content (Insert Only)
 
 When inserting many lines at once with `+`, content payloads can wrap to separate lines:
@@ -236,6 +238,22 @@ Edit operations:
 ```
 
 Hashes are content-based, so they remain valid regardless of other edits.
+
+### Indent Directives (@N)
+
+An optional `@N` token after the locator (on `+` and `=`) derives a line's indentation from its anchor instead of requiring you to count leading spaces.
+
+| Directive | Meaning |
+| --------- | ------- |
+| `@0`      | Copy the anchor line's leading whitespace verbatim. |
+| `@+N`     | N levels deeper than the anchor (`@1` = `@+1`). |
+| `@-N`     | N levels shallower; floors at column 0. |
+
+For `+`, the anchor is the locator line (so `@0` inserts a sibling, `@+1` a child). For `=`, the anchor is the replaced line (`@0` keeps its indent). `@N` applies to every content payload of the operation and is invalid on `-`.
+
+`@0` always works — even on files with mixed or inconsistent indentation, and on the virtual `0:00` line (column 0). `@±N` requires a consistent style: all tabs, or all spaces at a single width (detected via minimum positive width that divides every indent). Sub-level alignment snaps to the level grid; use `@0` when exact bytes matter.
+
+If `@±N` cannot be applied, the batch fails atomically (see Failure Handling) with one of: mixed tabs/spaces; undetectable/inconsistent width; `0:00` with no anchor; or `[indent] assist = false`. Drop `@N` and provide exact indentation, or declare `indent_style`/`indent_width` per language in config (which also asserts the file matches the declaration).
 
 ### Failure Handling
 

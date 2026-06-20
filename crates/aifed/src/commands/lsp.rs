@@ -420,7 +420,7 @@ pub async fn execute(cmd: &LspCommands, client: &DaemonClient, format: OutputFor
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aifed_common::{LanguageConfig, LspServerConfig};
+    use aifed_common::{IndentConfig, LanguageConfig, LspServerConfig};
 
     fn lsp_entry(language: &str) -> LspServerConfig {
         LspServerConfig {
@@ -438,13 +438,17 @@ mod tests {
             language: language.to_string(),
             additional_extensions: additional.iter().map(|s| s.to_string()).collect(),
             exclude_extensions: Vec::new(),
+            indent_assist: None,
+            indent_style: None,
+            indent_width: None,
         }
     }
 
     #[test]
     fn grammar_language_with_lsp_entry_resolves() {
         // `rust` is a grammar default and has an LSP entry → resolves to rust.
-        let registry = Registry::from_parts(vec![lsp_entry("rust")], vec![]);
+        let registry =
+            Registry::from_parts(vec![lsp_entry("rust")], vec![], IndentConfig::default());
         assert_eq!(
             detect_language_with(Path::new("a.rs"), &registry).unwrap(),
             "rust".to_string()
@@ -455,7 +459,8 @@ mod tests {
     fn grammar_language_without_lsp_entry_errors_clearly() {
         // `markdown` is a grammar default but ships no LSP → distinct message
         // (not the generic "no language matches").
-        let registry = Registry::from_parts(vec![lsp_entry("rust")], vec![]);
+        let registry =
+            Registry::from_parts(vec![lsp_entry("rust")], vec![], IndentConfig::default());
         let err = detect_language_with(Path::new("a.md"), &registry).unwrap_err();
         assert!(
             err.to_string()
@@ -466,7 +471,8 @@ mod tests {
 
     #[test]
     fn unknown_extension_errors_no_language_match() {
-        let registry = Registry::from_parts(vec![lsp_entry("rust")], vec![]);
+        let registry =
+            Registry::from_parts(vec![lsp_entry("rust")], vec![], IndentConfig::default());
         let err = detect_language_with(Path::new("a.xyz"), &registry).unwrap_err();
         assert!(
             err.to_string()
@@ -479,7 +485,11 @@ mod tests {
     fn config_only_language_with_lsp_entry_resolves() {
         // `foo` has no shipped grammar but is declared as a language and has an
         // LSP entry.
-        let registry = Registry::from_parts(vec![lsp_entry("foo")], vec![overlay("foo", &["foo"])]);
+        let registry = Registry::from_parts(
+            vec![lsp_entry("foo")],
+            vec![overlay("foo", &["foo"])],
+            IndentConfig::default(),
+        );
         assert_eq!(
             detect_language_with(Path::new("a.foo"), &registry).unwrap(),
             "foo".to_string()
@@ -488,7 +498,11 @@ mod tests {
 
     #[test]
     fn config_only_language_without_lsp_entry_errors() {
-        let registry = Registry::from_parts(vec![], vec![overlay("foo", &["foo"])]);
+        let registry = Registry::from_parts(
+            vec![],
+            vec![overlay("foo", &["foo"])],
+            IndentConfig::default(),
+        );
         let err = detect_language_with(Path::new("a.foo"), &registry).unwrap_err();
         assert!(
             err.to_string()
