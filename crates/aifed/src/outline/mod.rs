@@ -7,10 +7,13 @@
 //! still works out of the box. Markdown is a first-class outline target even
 //! though it has no LSP.
 
+mod helpers;
 mod markdown;
 mod model;
 mod render;
 mod rust;
+mod spec;
+mod walker;
 
 pub use model::Outline;
 // Re-exported so `output::format_outline` can render without owning the logic.
@@ -18,8 +21,6 @@ use model::{ItemKind, OutlineItem};
 pub(crate) use render::render_text;
 
 use std::path::Path;
-
-use tree_sitter::Node;
 
 use crate::error::{Error, Result};
 use crate::language::LanguageResolver;
@@ -111,13 +112,6 @@ fn prepend_file_header(mut items: Vec<OutlineItem>, total_lines: usize) -> Vec<O
         },
     );
     items
-}
-
-/// First named child of `node` whose kind matches. Shared by both extractors.
-pub(super) fn find_child_by_kind<'a>(node: Node<'a>, kind: &str) -> Option<Node<'a>> {
-    (0..node.named_child_count())
-        .filter_map(|i| node.named_child(i as u32))
-        .find(|c| c.kind() == kind)
 }
 
 #[cfg(test)]

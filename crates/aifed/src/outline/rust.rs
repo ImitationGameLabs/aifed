@@ -8,31 +8,17 @@
 
 use std::path::Path;
 
-use tree_sitter::Node;
+use tree_sitter::{Language, Node};
 
-use super::find_child_by_kind;
+use super::helpers::{field_text, find_child_by_kind};
 use super::model::{ItemKind, OutlineItem};
-use crate::error::{Error, Result};
+use super::spec::{Classified, DocPolicy, Spec};
+use super::walker;
+use crate::error::Result;
 
 /// Extract a Rust source outline. `imports` controls whether `use` items appear.
 pub fn extract(source: &str, imports: bool, path: &Path) -> Result<Vec<OutlineItem>> {
-    let mut parser = tree_sitter::Parser::new();
-    let language = tree_sitter_rust::LANGUAGE.into();
-    parser
-        .set_language(&language)
-        .map_err(|e| Error::OutlineUnsupported {
-            path: path.to_path_buf(),
-            reason: format!("failed to load rust grammar: {e}"),
-        })?;
-    let tree = parser
-        .parse(source, None)
-        .ok_or_else(|| Error::OutlineUnsupported {
-            path: path.to_path_buf(),
-            reason: "rust parser returned no tree".to_string(),
-        })?;
-    // Precompute source lines once; `effective_start_row` consults them per item.
-    let lines: Vec<&str> = source.split('\n').collect();
-    Ok(collect_items(tree.root_node(), source, &lines, imports))
+    walker::extract(&RustSpec, source, imports, path)
 }
 
 /// Fold the leading preamble and tile the top-level ranges so the outline's
@@ -51,7 +37,7 @@ pub fn extract(source: &str, imports: bool, path: &Path) -> Result<Vec<OutlineIt
 ///   inside its parent's).
 ///
 /// Under normal sibling ordering the next item's `start_line` is always greater
-/// than this item's node end — `effective_start_row` pulls a start back only
+/// than this item's node end — `effective_start_line` pulls a start back only
 /// over its *own* preceding doc/attribute siblings, which sit *after* the
 /// previous item's node end — so the tiled `end` never inverts. The
 /// `max(start_line)` clamp nonetheless guarantees `start <= end` should a parser
@@ -82,134 +68,82 @@ pub fn tile_top_level(mut items: Vec<OutlineItem>, total_lines: usize) -> Vec<Ou
     items
 }
 
-/// Enumerate the named children of `node`, mapping each to an outline item.
-fn collect_items(node: Node<'_>, source: &str, lines: &[&str], imports: bool) -> Vec<OutlineItem> {
-    let mut items = Vec::new();
-    for i in 0..node.named_child_count() {
-        if let Some(child) = node.named_child(i as u32)
-            && let Some(item) = map_item(child, source, lines, imports)
-        {
-            items.push(item);
-        }
+/// Per-language spec driving the generic walker for Rust.
+pub struct RustSpec;
+
+/// Doc/attribute attribution for Rust: outer `///`/`/**` doc comments and
+/// `#[...]` outer attributes, with a blank-line break.
+const RUST_DOC_POLICY: DocPolicy = DocPolicy {
+    attribute_kinds: &["attribute_item"],
+    decorator_kinds: &[],
+    attach_extras: true,
+    doc_prefixes: &["///", "/**"],
+    expand_backward: true,
+    blank_line_breaks: true,
+};
+
+impl Spec for RustSpec {
+    fn language(&self) -> Language {
+        tree_sitter_rust::LANGUAGE.into()
     }
-    items
-}
 
-/// Map a single Rust item node to an outline item, or `None` for non-items
-/// (comments, standalone attributes, unknown kinds — skipped for forward-compat).
-fn map_item(node: Node<'_>, source: &str, lines: &[&str], imports: bool) -> Option<OutlineItem> {
-    let kind = match node.kind() {
-        "function_item" | "function_signature_item" => ItemKind::Function,
-        "struct_item" => ItemKind::Struct,
-        "enum_item" => ItemKind::Enum,
-        "union_item" => ItemKind::Union,
-        "trait_item" => ItemKind::Trait,
-        "impl_item" => ItemKind::Impl,
-        "mod_item" => ItemKind::Module,
-        "type_item" | "associated_type" => ItemKind::TypeAlias,
-        "const_item" => ItemKind::Const,
-        "static_item" => ItemKind::Static,
-        "macro_definition" => ItemKind::Macro,
-        "foreign_mod_item" => ItemKind::Extern,
-        "use_declaration" if imports => ItemKind::Imports,
-        // Skip-list: standalone attributes, inner attributes, empty statements,
-        // comments, ERROR/MISSING nodes, and any unrecognized kind.
-        _ => return None,
-    };
-
-    let name = match kind {
-        ItemKind::Impl => impl_name(node, source),
-        ItemKind::Extern => extern_name(node, source),
-        ItemKind::Imports => field_text(node, "argument", source),
-        _ => name_text(node, source),
-    };
-
-    let mut item = make_item(kind, name, node, source, lines);
-    // Only containers with a `body` field are recursed into; recording that fact
-    // lets `tile_top_level` tell a bodyless `mod foo;` (forward declaration) apart from
-    // an inline `mod foo {}` (both may have empty children).
-    let body = if matches!(
-        kind,
-        ItemKind::Impl | ItemKind::Trait | ItemKind::Module | ItemKind::Extern
-    ) {
-        node.child_by_field_name("body")
-    } else {
-        None
-    };
-    item.has_body = body.is_some();
-    if let Some(body) = body {
-        item.children = collect_items(body, source, lines, imports);
+    fn grammar_name(&self) -> &'static str {
+        "rust"
     }
-    Some(item)
-}
 
-/// Build an outline item, extending its start over attached docs/attributes.
-fn make_item(
-    kind: ItemKind,
-    name: String,
-    node: Node<'_>,
-    source: &str,
-    lines: &[&str],
-) -> OutlineItem {
-    OutlineItem {
-        kind,
-        name,
-        start_line: effective_start_row(node, source, lines) + 1,
-        end_line: node.end_position().row + 1,
-        has_body: false,
-        level: None,
-        detail: None,
-        children: Vec::new(),
-    }
-}
-
-/// Lowest row of the item itself plus any contiguous preceding outer doc
-/// comments (`///`, `/**`) and outer attributes (`#[...]`).
-///
-/// Stops at the first non-attached sibling, a blank-line gap, or an inner doc
-/// comment (`//!`/`/*!` belong to the enclosing item, not this one).
-fn effective_start_row(node: Node<'_>, source: &str, lines: &[&str]) -> usize {
-    let bytes = source.as_bytes();
-    let mut min_row = node.start_position().row;
-    let mut cur = node;
-    while let Some(prev) = cur.prev_sibling() {
-        let attach = if prev.kind() == "attribute_item" {
-            true
-        } else if prev.is_extra() {
-            // Only outer doc comments attach; plain `//` and inner `//!` do not.
-            matches!(prev.utf8_text(bytes), Ok(t) if t.starts_with("///") || t.starts_with("/**"))
-        } else {
-            false
+    fn classify<'a>(&self, node: Node<'a>, source: &str) -> Option<Classified<'a>> {
+        let kind = match node.kind() {
+            "function_item" | "function_signature_item" => ItemKind::Function,
+            "struct_item" => ItemKind::Struct,
+            "enum_item" => ItemKind::Enum,
+            "union_item" => ItemKind::Union,
+            "trait_item" => ItemKind::Trait,
+            "impl_item" => ItemKind::Impl,
+            "mod_item" => ItemKind::Module,
+            "type_item" | "associated_type" => ItemKind::TypeAlias,
+            "const_item" => ItemKind::Const,
+            "static_item" => ItemKind::Static,
+            "macro_definition" => ItemKind::Macro,
+            "foreign_mod_item" => ItemKind::Extern,
+            "use_declaration" => ItemKind::Imports,
+            // Skip-list: standalone attributes, inner attributes, empty
+            // statements, comments, ERROR/MISSING nodes, unrecognized kinds.
+            _ => return None,
         };
-        if !attach {
-            break;
-        }
-        // Stop if a blank line separates `prev` from the attached region.
-        // (Node end_row is unreliable here — comments include their trailing
-        // newline — so detect blank lines from the source text.)
-        let prev_start = prev.start_position().row;
-        let gap_has_blank =
-            (prev_start + 1..min_row).any(|r| r < lines.len() && lines[r].trim().is_empty());
-        if gap_has_blank {
-            break;
-        }
-        min_row = min_row.min(prev_start);
-        cur = prev;
+
+        let imports_gated = matches!(kind, ItemKind::Imports);
+
+        let name = match kind {
+            ItemKind::Impl => impl_name(node, source),
+            ItemKind::Extern => extern_name(node, source),
+            ItemKind::Imports => field_text(node, "argument", source),
+            _ => name_text(node, source),
+        };
+
+        // Only containers with a `body` field are recursed into; recording
+        // that fact lets `tile_top_level` tell a bodyless `mod foo;` (forward
+        // declaration) apart from an inline `mod foo {}` (both may have empty
+        // children).
+        let body = if matches!(
+            kind,
+            ItemKind::Impl | ItemKind::Trait | ItemKind::Module | ItemKind::Extern
+        ) {
+            node.child_by_field_name("body")
+        } else {
+            None
+        };
+
+        Some(Classified { kind, name, body, detail: None, imports_gated })
     }
-    min_row
+
+    fn doc_policy(&self) -> &'static DocPolicy {
+        &RUST_DOC_POLICY
+    }
 }
 
 /// Text of the `name` field (identifier or metavariable), trimmed.
 fn name_text(node: Node<'_>, source: &str) -> String {
     field_text(node, "name", source)
-}
-
-/// Text of a named field, trimmed.
-fn field_text(node: Node<'_>, field: &str, source: &str) -> String {
-    node.child_by_field_name(field)
-        .and_then(|n| n.utf8_text(source.as_bytes()).ok())
-        .map(|t| t.trim().to_string())
-        .unwrap_or_default()
 }
 
 /// Display name for an `impl` block: `Trait for Type` when a trait is present,

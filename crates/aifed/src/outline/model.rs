@@ -49,6 +49,10 @@ pub struct OutlineItem {
     /// `mod { .. }`/`extern { .. }`). Distinguishes a bodyless `mod foo;`
     /// forward declaration from an inline `mod foo {}` so the preamble fold can
     /// target only the former.
+    ///
+    /// Derived in the walker as `has_body == classified.body.is_some()` — i.e.
+    /// "had a recurse-target at all", not "has children": an empty inline
+    /// `mod foo {}` has a body but zero children.
     #[serde(skip_serializing_if = "is_false", default)]
     pub has_body: bool,
     /// Markdown heading depth (1-6); absent for code items.
