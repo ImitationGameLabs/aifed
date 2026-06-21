@@ -62,17 +62,35 @@
             inherit pkgs lib common;
           };
 
-          checks = import ./nix/dev/checks.nix {
+          checks = import ./nix/checks.nix {
             inherit pkgs common;
             inherit (inputs) advisory-db;
             myPkgs = packages;
           };
+          inherit (common) craneLib;
         in
         {
           inherit packages checks;
 
-          devShells.default = import ./nix/dev/shell.nix {
-            inherit pkgs common checks;
+          devShells.default = craneLib.devShell {
+            inherit checks;
+
+            # Extra inputs can be added here; cargo and rustc are provided by default.
+            packages = with pkgs; [
+              # Rust
+              cargo-hakari
+              rust-analyzer
+
+              # Nix
+              nixd
+              nixfmt
+              statix
+
+              # TOML toolkit (linter, formatter)
+              taplo
+
+              bashInteractive
+            ];
           };
         };
     };

@@ -12,11 +12,10 @@ AI Agent working guide. This document provides code structure and decision rules
 │   ├── agent-action-wizards/ # Step-by-step guides for AI agents
 │   └── reference/            # CLI command reference
 └── nix/
-      ├── common.nix   # Core config (crate paths, dependencies)
-      ├── packages.nix # Flake output packages
-      └── dev/
-            ├── shell.nix  # Development environment
-            └── checks.nix # CI checks
+      ├── common.nix              # Core config (crate paths, dependencies)
+      ├── packages.nix            # Flake output packages
+      ├── checks.nix              # CI checks (clippy, fmt, audit, nextest)
+      └── home-manager-modules/   # Home-manager modules for binary deployment
 ```
 
 ## Common Tasks
