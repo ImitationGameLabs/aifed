@@ -94,7 +94,7 @@ exclude_extensions = ["mdx"]        # stop treating .mdx as markdown
 | `exclude_extensions`    | string array | no       | Default extensions to remove for this language |
 | `indent_assist`         | bool          | no       | Override global `assist` for this language (absent = inherit global) |
 | `indent_style`          | "tab"/"space" | no       | Assert the file's indent style; skips detection |
-| `indent_width`          | integer       | no       | Assert spaces per level (pairs with `indent_style = "space"`) |
+| `indent_width`          | integer (>=1 with space) | no       | Assert spaces per level; must be >= 1 with `indent_style = "space"` |
 
 ### `[indent]` — indent directive
 
@@ -116,6 +116,7 @@ A `[[language]]` overlay can override `assist` and declare `indent_style`/`inden
 - `language` must be unique within a single file's `[[lsp]]` list, and within its `[[language]]` list.
 - `command` (on `[[lsp]]`) must not be empty.
 - Unknown fields are rejected.
+- `indent_width` must be >= 1 when `indent_style` is `"space"` (0 is rejected at load).
 - Later config layers replace earlier entries for the same `language`, **per section**. Note: restating a `[[language]]` in the project wholesale-replaces the global one, so it resets any `exclude_extensions` **or indent fields** you set globally — restate them if you want to keep them.
 
 ---

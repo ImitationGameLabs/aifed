@@ -356,6 +356,13 @@ fn validate_language_entries(
                 language: entry.language.clone(),
             });
         }
+        if entry.indent_style == Some(IndentStyleConfig::Space) && entry.indent_width == Some(0) {
+            return Err(ConfigError::InvalidEntry {
+                path: path.to_path_buf(),
+                language: entry.language.clone(),
+                reason: "indent_width must be at least 1 for indent_style space".into(),
+            });
+        }
     }
     Ok(())
 }
@@ -588,6 +595,26 @@ indent_width = 4
             .unwrap();
         assert_eq!(rust.indent_style, Some(IndentStyleConfig::Space));
         assert_eq!(rust.indent_width, Some(4));
+    }
+
+    #[test]
+    fn language_overlay_rejects_zero_space_indent_width() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("project.toml");
+        write_file(
+            &project,
+            r#"
+[[language]]
+language = "rust"
+indent_style = "space"
+indent_width = 0
+"#,
+        );
+        let err = load_registry_from_paths(None, Some(&project)).unwrap_err();
+        assert!(
+            err.to_string().contains("indent_width must be at least 1"),
+            "{err}"
+        );
     }
 
     #[test]

@@ -216,10 +216,13 @@ pub fn resolve(lines: &[String], settings: &IndentSettings) -> ResolvedIndent {
             // File must use tabs only (no space-indented line, no intra-run mix).
             (IndentKind::Tab, a.space_leading || a.mixed_run)
         }
-        (Some(IndentStyleConfig::Space), Some(0)) => (detected, true),
         (Some(IndentStyleConfig::Space), Some(w)) => {
-            let conflict =
-                a.tab_leading || a.mixed_run || a.space_counts.iter().any(|&c| c % w != 0);
+            // Config validation only runs on file-loaded entries; IndentSettings
+            // can be built directly (overlays, tests), so guard width 0 here too.
+            let conflict = w == 0
+                || a.tab_leading
+                || a.mixed_run
+                || a.space_counts.iter().any(|&c| c % w != 0);
             (IndentKind::Space { width: w }, conflict)
         }
         // A style forced without a width cannot assert -> detect.
@@ -494,5 +497,14 @@ mod tests {
         let r = resolve(&l, &settings(Some(IndentStyleConfig::Space), None));
         assert_eq!(r.kind, Space { width: 4 });
         assert!(!r.config_conflict);
+    }
+
+    #[test]
+    fn resolve_forced_space_zero_width_is_conflict() {
+        // Space-indented input keeps space_counts non-empty so the c % w path runs;
+        // width 0 must short-circuit to a conflict without dividing by zero.
+        let l = lines(&["a", "    b", "        c"]);
+        let r = resolve(&l, &settings(Some(IndentStyleConfig::Space), Some(0)));
+        assert!(r.config_conflict);
     }
 }
