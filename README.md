@@ -18,27 +18,35 @@ See the [Installation Guide](docs/installation-guide.md) for setup instructions.
 
 ### Features
 
-| Feature                                         | Status |
-| ----------------------------------------------- | ------ |
-| `read` - Read file content with hashlines       | Ready  |
-| `edit` - Edit file with hashline verification   | Ready  |
-| `lsp` - LSP integration (Rust first)            | Ready  |
-| `outline` - Structural outline (Rust, Markdown) | Ready  |
-| `history/undo/redo` - Edit history and recovery | Ready  |
-| `copy/paste/clipboard` - Clipboard operations   | Ready  |
+| Feature                                                 | Status |
+| ------------------------------------------------------- | ------ |
+| `read` - Read file content with hashlines               | Ready  |
+| `edit` - Edit file with hashline verification           | Ready  |
+| `lsp` - LSP integration (Rust first)                    | Ready  |
+| `outline` - Structural outline (8 languages; see below) | Ready  |
+| `history/undo/redo` - Edit history and recovery         | Ready  |
+| `copy/paste/clipboard` - Clipboard operations           | Ready  |
 
 ### LSP *Support*
 
-| Language   | LSP Server    | Status  |
-| ---------- | ------------- | ------- |
-| Any via `[[lsp]]` config | User-defined | Supported |
+| Language                 | LSP Server                        | Status    |
+| ------------------------ | --------------------------------- | --------- |
+| Rust                     | `rust-analyzer` (shipped default) | Supported |
+| Nix                      | `nil` (shipped default)           | Supported |
+| Any via `[[lsp]]` config | User-defined                      | Supported |
 
 ### Outline *Support*
 
-| Language   | Extensions                   | Status |
-| ---------- | ---------------------------- | ------ |
-| Rust       | `.rs`                        | Ready  |
-| Markdown   | `.md`, `.markdown`, `.mdx`   | Ready  |
+| Language   | Extensions                                   | Status |
+| ---------- | -------------------------------------------- | ------ |
+| Rust       | `.rs`                                        | Ready  |
+| Markdown   | `.md`, `.markdown`, `.mdx`                   | Ready  |
+| Go         | `.go`                                        | Ready  |
+| Python     | `.py`                                        | Ready  |
+| JavaScript | `.js`, `.mjs`, `.cjs`                        | Ready  |
+| TypeScript | `.ts`, `.tsx`                                | Ready  |
+| C          | `.c`, `.h`                                   | Ready  |
+| C++        | `.cpp`, `.cc`, `.cxx`, `.hpp`, `.hh`, `.hxx` | Ready  |
 
 Extensions are the shipped grammar defaults and may lag the code; they're
 overridable via a `[[language]]` overlay (see the [Configuration reference](docs/reference/configuration.md)).

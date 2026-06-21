@@ -7,12 +7,21 @@
 //! still works out of the box. Markdown is a first-class outline target even
 //! though it has no LSP.
 
+mod c;
+mod cpp;
+mod ecmascript;
+mod go;
 mod helpers;
+mod javascript;
 mod markdown;
 mod model;
+mod python;
 mod render;
 mod rust;
 mod spec;
+#[cfg(test)]
+mod test_support;
+mod typescript;
 mod walker;
 
 pub use model::Outline;
@@ -51,6 +60,30 @@ pub fn extract(
         Some("markdown") => (
             "markdown",
             prepend_file_header(markdown::extract(source, path)?, total_lines),
+        ),
+        Some("go") => (
+            "go",
+            prepend_file_header(go::extract(source, imports, path)?, total_lines),
+        ),
+        Some("python") => (
+            "python",
+            prepend_file_header(python::extract(source, imports, path)?, total_lines),
+        ),
+        Some("javascript") => (
+            "javascript",
+            prepend_file_header(javascript::extract(source, imports, path)?, total_lines),
+        ),
+        Some("typescript") => (
+            "typescript",
+            prepend_file_header(typescript::extract(source, imports, path)?, total_lines),
+        ),
+        Some("c") => (
+            "c",
+            prepend_file_header(c::extract(source, imports, path)?, total_lines),
+        ),
+        Some("cpp") => (
+            "cpp",
+            prepend_file_header(cpp::extract(source, imports, path)?, total_lines),
         ),
         Some(other) => {
             return Err(Error::OutlineUnsupported {
@@ -151,7 +184,16 @@ mod tests {
         // Iterating GRAMMAR_DEFAULTS (not a separate list) keeps the table and
         // this test in sync: a missing minimal source panics, and a missing
         // dispatch arm makes extract error with "no outline grammar for 'X'".
-        let minimal_source: &[(&str, &str)] = &[("rust", "fn a() {}\n"), ("markdown", "# T\n")];
+        let minimal_source: &[(&str, &str)] = &[
+            ("rust", "fn a() {}\n"),
+            ("markdown", "# T\n"),
+            ("go", "func a() {}\n"),
+            ("python", "def a():\n    pass\n"),
+            ("javascript", "function a() {}\n"),
+            ("typescript", "function a(): void {}\n"),
+            ("c", "void a(void) {}\n"),
+            ("cpp", "void a() {}\n"),
+        ];
         let reg = registry();
         for (lang, exts) in GRAMMAR_DEFAULTS {
             let src = minimal_source

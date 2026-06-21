@@ -53,10 +53,10 @@ pub struct DocPolicy {
     pub decorator_kinds: &'static [&'static str],
     /// Treat `is_extra()` siblings (comments) as attachment candidates.
     pub attach_extras: bool,
-    /// If non-empty, an extra sibling attaches only when its text starts with
-    /// one of these prefixes (e.g. Rust `///`/`/**`). Empty + `attach_extras`
-    /// means no extras attach. See each language's `DocPolicy` const for the
-    /// concrete set.
+    /// When non-empty, an extra sibling attaches only when its text starts with
+    /// one of these prefixes (e.g. Rust `///`/`/**`). When **empty** +
+    /// `attach_extras`, EVERY extra attaches — any contiguous preceding comment
+    /// is treated as a doc (Go/C/C++/JS/TS). See each language's `DocPolicy`.
     pub doc_prefixes: &'static [&'static str],
     /// Walk `prev_sibling` backward at all. False for Python (docstrings in-body).
     pub expand_backward: bool,
@@ -78,7 +78,8 @@ pub trait Spec {
 
     /// Fan a node out into the nodes to classify. Default: the node itself.
     /// Override to drill containers (Go `type_declaration` -> its `type_spec`
-    /// children; C `declaration` -> `init_declarator`s; pierce `preproc_if`).
+    /// children; C `declaration` -> its struct/enum/union specifier or a prototype;
+    /// pierce `preproc_if`/`#ifdef`/`#else`/`#elif` recursively).
     /// Doc attribution always uses the pre-expand container, so an override only
     /// changes *which nodes get classified*, not where their docs attach.
     fn expand<'a>(&self, node: Node<'a>) -> Vec<Node<'a>> {

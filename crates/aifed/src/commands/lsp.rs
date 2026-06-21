@@ -510,4 +510,26 @@ mod tests {
             "{err}"
         );
     }
+
+    #[test]
+    fn nix_resolves_to_nil_server() {
+        // Nix has no shipped outline grammar; it is a config-only language whose
+        // default LSP server is `nil` (see default-config.toml). A `.nix` file
+        // resolves for `aifed lsp` when a nix overlay + nil entry are configured.
+        let nil = LspServerConfig {
+            language: "nix".to_string(),
+            command: "nil".to_string(),
+            ..lsp_entry("nix")
+        };
+        let registry = Registry::from_parts(
+            vec![nil],
+            vec![overlay("nix", &["nix"])],
+            IndentConfig::default(),
+        );
+        assert_eq!(
+            detect_language_with(Path::new("flake.nix"), &registry).unwrap(),
+            "nix".to_string()
+        );
+        assert_eq!(registry.find_by_language("nix").unwrap().command, "nil");
+    }
 }

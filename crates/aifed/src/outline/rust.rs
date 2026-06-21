@@ -181,6 +181,7 @@ fn extern_name(node: Node<'_>, source: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::outline::test_support::find;
     use std::path::Path;
     // `extract` returns RAW items with precise node ranges (pre-tiling): the
     // range assertions below check the raw extractor. The preamble fold and
@@ -189,13 +190,6 @@ mod tests {
 
     fn extract(src: &str, imports: bool) -> Vec<OutlineItem> {
         super::extract(src, imports, Path::new("test.rs")).unwrap()
-    }
-
-    fn find<'a>(items: &'a [OutlineItem], name: &str) -> &'a OutlineItem {
-        items
-            .iter()
-            .find(|i| i.name == name)
-            .unwrap_or_else(|| panic!("item '{name}' not found in {items:?}"))
     }
 
     #[test]

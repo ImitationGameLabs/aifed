@@ -1,10 +1,12 @@
 # Default LSP configuration for aifed.
 # Override via ~/.config/aifed/config.toml (global) or aifed.toml (project).
 #
-# Note: a language's file extensions are NOT declared here. They come from the
-# grammar-default table in code (crates/aifed/src/language.rs::GRAMMAR_DEFAULTS);
-# `[[lsp]]` entries reference a language by name only. To add or override
-# extensions, declare a [[language]] overlay (see docs/reference/configuration.md).
+# Note: A language's file extensions usually come from the grammar-default
+# table in code (crates/aifed/src/language.rs::GRAMMAR_DEFAULTS); `[[lsp]]`
+# entries reference a language by name only. A language WITHOUT a shipped
+# outline grammar (e.g. Nix) declares its extension here via a [[language]]
+# overlay. To add or override extensions, declare a [[language]] overlay
+# (see docs/reference/configuration.md).
 
 [[lsp]]
 language = "rust"
@@ -17,3 +19,15 @@ command = "clippy"
 
 [lsp.initialization_options.cargo]
 allFeatures = true
+
+# Nix has no shipped outline grammar, so it is a config-only language
+# (declared here, not in GRAMMAR_DEFAULTS) paired with the `nil` LSP server.
+[[language]]
+language = "nix"
+additional_extensions = ["nix"]
+
+[[lsp]]
+language = "nix"
+root_markers = ["flake.nix", "default.nix", "shell.nix"]
+command = "nil"
+display_name = "nil"

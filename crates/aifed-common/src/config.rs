@@ -433,6 +433,27 @@ where
 mod tests {
     use super::*;
 
+    #[test]
+    fn default_config_ships_nix_with_nil() {
+        // Nix has no shipped outline grammar, so it is a config-only language
+        // (declared here, not in GRAMMAR_DEFAULTS) paired with the `nil` LSP server.
+        let config: FileConfig =
+            toml::from_str(DEFAULT_CONFIG_TOML).expect("default config parses");
+        let nix = config
+            .language
+            .iter()
+            .find(|l| l.language == "nix")
+            .expect("default config declares a nix language overlay");
+        assert!(nix.additional_extensions.contains(&"nix".to_string()));
+        let server = config
+            .lsp
+            .iter()
+            .find(|s| s.language == "nix")
+            .expect("default config declares an LSP server for nix");
+        assert_eq!(server.command, "nil");
+        assert!(server.root_markers.contains(&"flake.nix".to_string()));
+    }
+
     fn write_file(path: &Path, content: &str) {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).unwrap();

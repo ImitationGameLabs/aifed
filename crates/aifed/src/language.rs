@@ -23,8 +23,16 @@ use aifed_common::{LanguageConfig, normalize_extension, normalize_language};
 /// `outline::extract`, and the grammar crate dependency. Tests assert every row
 /// has a matching dispatch arm and that [`LanguageResolver::supported_extensions`]
 /// equals exactly the union of these rows, so the three can't silently drift.
-pub const GRAMMAR_DEFAULTS: &[(&str, &[&str])] =
-    &[("rust", &["rs"]), ("markdown", &["md", "markdown", "mdx"])];
+pub const GRAMMAR_DEFAULTS: &[(&str, &[&str])] = &[
+    ("rust", &["rs"]),
+    ("markdown", &["md", "markdown", "mdx"]),
+    ("go", &["go"]),
+    ("python", &["py"]),
+    ("javascript", &["js", "mjs", "cjs"]),
+    ("typescript", &["ts", "tsx"]),
+    ("c", &["c", "h"]),
+    ("cpp", &["cpp", "cc", "cxx", "hpp", "hh", "hxx"]),
+];
 
 /// A language resolved to its effective extension set.
 #[derive(Debug)]
@@ -195,7 +203,27 @@ mod tests {
         // by bytes (`.markdown` precedes `.md` because 'a' < 'd' at index 2).
         assert_eq!(
             reg.supported_extensions(),
-            vec![".markdown".to_string(), ".md".into(), ".mdx".into(), ".rs".into(),]
+            vec![
+                ".c".into(),
+                ".cc".into(),
+                ".cjs".into(),
+                ".cpp".into(),
+                ".cxx".into(),
+                ".go".to_string(),
+                ".h".into(),
+                ".hh".into(),
+                ".hpp".into(),
+                ".hxx".into(),
+                ".js".into(),
+                ".markdown".to_string(),
+                ".md".into(),
+                ".mdx".into(),
+                ".mjs".into(),
+                ".py".into(),
+                ".rs".into(),
+                ".ts".into(),
+                ".tsx".into(),
+            ]
         );
     }
 

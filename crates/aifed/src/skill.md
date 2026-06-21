@@ -44,7 +44,7 @@ Output shape:
 
 Notes:
 
-- Daemon-free; outlines any language with a built-in outline grammar (currently Rust and Markdown), extensible via `[[language]]` config
+- Daemon-free; outlines any language with a built-in outline grammar (Rust, Go, Python, JavaScript, TypeScript, C, C++, Markdown), extensible via `[[language]]` config
 - Ranges include leading doc comments, so read returns the documented item
 - `--imports` surfaces `use` items that appear *after* the first symbol; leading
   imports are part of the `file header` region regardless
