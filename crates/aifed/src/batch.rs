@@ -827,6 +827,7 @@ fn escape_content(content: &str) -> String {
 mod tests {
     use super::*;
     use crate::indent::IndentSettings;
+    use aifed_common::IndentStyleConfig;
 
     #[test]
     fn test_parse_simple_operations() {
@@ -1908,5 +1909,86 @@ mod tests {
         )
         .await;
         assert!(result.is_err(), "@+1 on virtual line must hard-error");
+    }
+
+    #[tokio::test]
+    async fn directive_forced_space_config_consistent() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("t.txt");
+        let lines: Vec<String> = ["fn() {", "    x", "}", ""]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        write_file(&path, &lines).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        let hash = crate::hash::hash_line(&crate::file::split_lines_owned(&content)[1]);
+        // One distinct space count -> undetectable; only the forced Space{4} resolves,
+        // so this guards the forced-config path (detection would error instead).
+        let forced = IndentSettings {
+            assist_enabled: true,
+            forced_style: Some(IndentStyleConfig::Space),
+            forced_width: Some(4),
+        };
+        let ops = parse_batch_operations(&format!("+ 2:{hash} @+1 y")).unwrap();
+        execute_batch(&path, ops, false, OutputFormat::Text, None, &forced)
+            .await
+            .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "fn() {\n    x\n        y\n}\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn directive_forced_space_config_conflict_atomic() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("t.txt");
+        let lines: Vec<String> = ["fn() {", "\tx", "}"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        write_file(&path, &lines).unwrap();
+        let original = std::fs::read_to_string(&path).unwrap();
+        let hash = crate::hash::hash_line(&crate::file::split_lines_owned(&original)[1]);
+        // Forced config is an assertion: a tab-indented file conflicts with forced
+        // Space -> hard-error, and the file is left untouched (atomic).
+        let forced = IndentSettings {
+            assist_enabled: true,
+            forced_style: Some(IndentStyleConfig::Space),
+            forced_width: Some(4),
+        };
+        let ops = parse_batch_operations(&format!("+ 2:{hash} @+1 y")).unwrap();
+        let result = execute_batch(&path, ops, false, OutputFormat::Text, None, &forced).await;
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("configured indent does not match"),
+            "got: {err}"
+        );
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+    }
+
+    #[tokio::test]
+    async fn directive_applies_to_every_payload() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("t.txt");
+        let lines: Vec<String> = ["\ta", ""].into_iter().map(String::from).collect();
+        write_file(&path, &lines).unwrap();
+        let content = std::fs::read_to_string(&path).unwrap();
+        let hash = crate::hash::hash_line(&crate::file::split_lines_owned(&content)[0]);
+        let ops = parse_batch_operations(&format!("+ 1:{hash} @+1 \"b\" \"c\"")).unwrap();
+        execute_batch(
+            &path,
+            ops,
+            false,
+            OutputFormat::Text,
+            None,
+            &IndentSettings::detecting(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "\ta\n\t\tb\n\t\tc\n"
+        );
     }
 }

@@ -626,4 +626,15 @@ mod tests {
         assert_eq!(parsed[1]["new_content"].as_str(), Some("REPLACED"));
         assert!(parsed[1].get("old_content").is_none());
     }
+
+    #[test]
+    fn format_error_json_wraps_indent_directive() {
+        let reason = "synthetic indent reason".to_string();
+        let rendered = format_error(
+            &crate::error::Error::IndentDirective { reason: reason.clone() },
+            OutputFormat::Json,
+        );
+        let parsed: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+        assert_eq!(parsed["error"].as_str(), Some(reason.as_str()));
+    }
 }
