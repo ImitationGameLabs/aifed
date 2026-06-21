@@ -76,6 +76,30 @@ aifed --skill
 
 Here's how an AI agent might work with aifed in typical development scenarios:
 
+### Surveying Structure
+
+```bash
+# Survey structure first — ranges pass straight to `read`
+aifed outline crates/aifed/src/outline/spec.rs
+```
+```
+crates/aifed/src/outline/spec.rs [rust] 96 lines, 8 items
+file header [1,13]
+────────────────────
+struct Classified [14,27]
+struct DocPolicy [28,66]
+trait Spec [67,96]
+  fn language [73,74]
+  fn grammar_name [76,77]
+  fn expand [79,87]
+  fn classify [89,91]
+  fn doc_policy [93,95]
+```
+```bash
+# Then read just the trait, using its range from the outline
+aifed read crates/aifed/src/outline/spec.rs [67,96]
+```
+
 ### Understanding Code
 
 ```bash
