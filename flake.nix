@@ -1,5 +1,5 @@
 {
-  description = "Nix Rust Template - A flake template for Rust projects with crane";
+  description = "aifed - AI-first text editor for AI agents";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
