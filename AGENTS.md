@@ -14,6 +14,7 @@ AI Agent working guide. This document provides code structure and decision rules
 └── nix/
       ├── common.nix              # Core config (crate paths, dependencies)
       ├── packages.nix            # Flake output packages
+      ├── tarball.nix             # FHS-ready tarball for non-Nix distribution
       ├── checks.nix              # CI checks (clippy, fmt, audit, nextest)
       └── home-manager-modules/   # Home-manager modules for binary deployment
 ```

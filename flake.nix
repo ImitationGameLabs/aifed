@@ -58,14 +58,22 @@
               ;
           };
 
-          packages = import ./nix/packages.nix {
+          basePackages = import ./nix/packages.nix {
             inherit pkgs lib common;
           };
+
+          packages =
+            basePackages
+            // import ./nix/tarball.nix {
+              inherit pkgs lib;
+              inherit (basePackages) aifed;
+              inherit (common) gitVersion;
+            };
 
           checks = import ./nix/checks.nix {
             inherit pkgs common;
             inherit (inputs) advisory-db;
-            myPkgs = packages;
+            myPkgs = basePackages; # base, not packages, so aifed-tarball isn't a check
           };
           inherit (common) craneLib;
         in
