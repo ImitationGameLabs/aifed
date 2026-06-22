@@ -132,7 +132,7 @@ pub fn extract_diagnostics(
     }
 }
 
-/// Convert WorkspaceEdit to Vec<FileEdit>
+/// Convert WorkspaceEdit to `Vec<FileEdit>`
 pub fn workspace_edit_to_file_edits(edit: lsp_types::WorkspaceEdit) -> Vec<FileEdit> {
     let mut result = Vec::new();
 

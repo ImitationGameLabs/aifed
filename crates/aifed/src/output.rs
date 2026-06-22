@@ -178,7 +178,7 @@ pub fn compute_change_summary(changes: &[EditChange]) -> String {
     if parts.is_empty() { "no changes".to_string() } else { parts.join(", ") }
 }
 
-/// Derive the JSON-bound [`EditChange`] list from an [`edit_view::EditRow`] sequence.
+/// Derive the JSON-bound [`EditChange`] list from an `edit_view::EditRow` sequence.
 ///
 /// Emits only `"insert"`/`"delete"`: a replacement must be modeled as a
 /// delete+insert pair, never as `"replace"` (per the JSON contract). A deletion

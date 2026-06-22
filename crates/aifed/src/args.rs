@@ -107,7 +107,7 @@ pub enum Commands {
     ///
     /// Operations:
     ///   +  Insert one or more new lines after locator
-    ///   -  Delete line at locator (or range with [start:end])
+    ///   -  Delete line at locator (or range with `[start:end]`)
     Edit {
         /// File to edit
         file: PathBuf,
@@ -164,7 +164,7 @@ pub enum Commands {
         /// File to copy from
         file: PathBuf,
 
-        /// Hashline range (e.g., "[1:AB,5:CD]")
+        /// Hashline range (e.g., `[1:AB,5:CD]`)
         range: String,
     },
 

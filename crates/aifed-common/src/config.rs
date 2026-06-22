@@ -38,7 +38,7 @@ pub enum ConfigError {
     },
 }
 
-/// Declared indentation style for a language. When set on a [[language]]
+/// Declared indentation style for a language. When set on a `[[language]]`
 /// overlay it skips detection and asserts the file matches the convention
 /// (a mismatch is a hard error, not a silent rewrite). Per-variant rename
 /// keeps the lowercase TOML form without a rename_all, which the codebase
@@ -144,7 +144,7 @@ pub struct LanguageConfig {
     #[serde(default)]
     pub exclude_extensions: Vec<String>,
     /// Override indent assist for this language. None inherits the global
-    /// [indent] assist; Some(false) disables the directive for the language.
+    /// `[indent]` assist; Some(false) disables the directive for the language.
     #[serde(default)]
     pub indent_assist: Option<bool>,
     /// Declared indent style; skips detection and asserts file consistency.
@@ -205,7 +205,7 @@ impl Registry {
         &self.language_overlays
     }
 
-    /// Resolved global [indent] settings (project overrides global).
+    /// Resolved global `[indent]` settings (project overrides global).
     pub fn indent(&self) -> &IndentConfig {
         &self.indent
     }

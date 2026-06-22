@@ -1,7 +1,7 @@
 //! Character-level scanner for batch edit input.
 //!
 //! Walks input character-by-character, treating newlines as ordinary
-//! whitespace. Produces a token stream consumed by the parser in [`batch`].
+//! whitespace. Produces a token stream consumed by the parser in `batch`.
 
 use crate::error::{Error, Result};
 

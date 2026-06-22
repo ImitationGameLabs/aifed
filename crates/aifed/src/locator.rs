@@ -7,9 +7,9 @@ pub enum Locator {
     Hashline { line: usize, hash: String },
     /// Single line: just a line number (e.g., "42")
     Line(usize),
-    /// Line range: start and end line numbers (e.g., "[10,20]")
+    /// Line range: start and end line numbers (e.g., `[10,20]`)
     LineRange { start: usize, end: usize },
-    /// Hashline range: start/end lines with hashes for range delete (e.g., "[2:AA,89:BB]")
+    /// Hashline range: start/end lines with hashes for range delete (e.g., `[2:AA,89:BB]`)
     HashlineRange { start: usize, start_hash: String, end: usize, end_hash: String },
 }
 
@@ -19,8 +19,8 @@ impl Locator {
     /// Formats:
     /// - "42:AB" -> Hashline { line: 42, hash: "AB" }
     /// - "42" -> Line(42)
-    /// - "[10,20]" -> LineRange { start: 10, end: 20 }
-    /// - "[2:AA,89:BB]" -> HashRange { start: 2, start_hash: "AA", end: 89, end_hash: "BB" }
+    /// - `[10,20]` -> LineRange { start: 10, end: 20 }
+    /// - `[2:AA,89:BB]` -> HashRange { start: 2, start_hash: "AA", end: 89, end_hash: "BB" }
     pub fn parse(input: &str) -> Result<Self> {
         let input = input.trim();
 
@@ -142,7 +142,7 @@ impl std::fmt::Display for Locator {
 }
 
 /// Symbol locator for positioning within a line
-/// Format: "S<index>:<name>" (e.g., "S1:config")
+/// Format: `"S<index>:<name>"` (e.g., "S1:config")
 #[derive(Debug, Clone, PartialEq)]
 pub struct SymbolLocator {
     /// 1-based index of the symbol on the line
@@ -154,7 +154,7 @@ pub struct SymbolLocator {
 impl SymbolLocator {
     /// Parse a symbol locator string.
     ///
-    /// Format: "S<index>:<name>" (e.g., "S1:config")
+    /// Format: `"S<index>:<name>"` (e.g., "S1:config")
     pub fn parse(input: &str) -> Result<Self> {
         let input = input.trim();
 
