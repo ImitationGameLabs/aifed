@@ -27,6 +27,12 @@ let
         pkgs.libiconv
       ];
 
+    # Tests run via the `aifed-nextest` check (nix/checks.nix), not in this
+    # package build. Keep `doCheck = false` scoped here; do NOT hoist it into
+    # the shared commonArgs. crane's cargoNextest runs in checkPhase
+    # (`doCheck = args.doCheck or true`), so a shared false would silently
+    # disable aifed-nextest, and buildDepsOnly needs its default doCheck to
+    # cache dev-deps via `cargo test --no-run`.
     doCheck = false;
   };
 in
