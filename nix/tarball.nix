@@ -12,12 +12,19 @@
 }:
 
 let
-  # Standard FHS dynamic-loader path on x86_64 Linux.
-  fhs-interp = "/lib64/ld-linux-x86-64.so.2";
+  # FHS dynamic-loader path per Linux arch: where the loader lives on a stock
+  # distro (not the nix store path). darwin and any unlisted arch fall through
+  # to null, so no tarball is produced there (darwin has no ELF/FHS loader).
+  fhs-interp =
+    {
+      x86_64-linux = "/lib64/ld-linux-x86-64.so.2";
+      aarch64-linux = "/lib/ld-linux-aarch64.so.1";
+    }
+    .${pkgs.stdenv.hostPlatform.system} or null;
 in
-# x86_64-linux only: the patchelf'd interpreter is architecture-specific,
-# so don't ship a broken artifact on other platforms.
-lib.optionalAttrs (pkgs.stdenv.hostPlatform.isx86_64 && pkgs.stdenv.hostPlatform.isLinux) {
+# Produces a tarball only where fhs-interp is defined (Linux arches above);
+# darwin and unlisted arches get no output.
+lib.optionalAttrs (fhs-interp != null) {
   aifed-tarball = pkgs.runCommand "aifed-tarball" { nativeBuildInputs = [ pkgs.patchelf ]; } ''
     mkdir -p $out
     cp -r ${aifed}/bin bin
@@ -30,6 +37,6 @@ lib.optionalAttrs (pkgs.stdenv.hostPlatform.isx86_64 && pkgs.stdenv.hostPlatform
       patchelf --remove-rpath "$bin"
     done
 
-    tar -czf $out/aifed-${gitVersion}-linux-x86_64.tar.gz bin/
+    tar -czf $out/aifed-${gitVersion}.tar.gz bin/
   '';
 }
