@@ -97,6 +97,9 @@
               # TOML toolkit (linter, formatter)
               taplo
 
+              # Markdown formatter
+              prettier
+
               bashInteractive
             ];
           };
