@@ -132,6 +132,21 @@ Add aifed to your flake inputs. This can be done in either your NixOS configurat
 }
 ```
 
+**Option C: Via Overlay**
+
+Apply the overlay to your nixpkgs, then reference `pkgs.aifed`:
+
+```nix
+{
+  nixpkgs.overlays = [ inputs.aifed.overlays.default ];
+
+  environment.systemPackages = [ pkgs.aifed ];
+  # or, with home-manager: home.packages = [ pkgs.aifed ];
+}
+```
+
+This exposes `aifed` through the standard `pkgs` set. The overlay points at the flake's own built package, so it is identical to `inputs.aifed.packages.${system}.aifed`.
+
 ### Step 3: Apply Changes
 
 Rebuild your configuration:

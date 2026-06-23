@@ -32,6 +32,14 @@
         # Export home-manager modules
         homeManagerModules.default = import ./nix/home-manager-modules { flake = self; };
 
+        # Expose aifed as an overlay so consumers can do:
+        #   nixpkgs.overlays = [ aifed.overlays.default ];
+        # and then pkgs.aifed is available. Points at the flake's own built
+        # aifed (single source of truth, identical store path to `nix build .#aifed`).
+        overlays.default = final: prev: {
+          inherit (self.packages.${final.stdenv.hostPlatform.system}) aifed;
+        };
+
         # Export templates for user initialization (optional)
         # templates.default = {
         #   path = ./templates/default;
