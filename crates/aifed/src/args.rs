@@ -107,7 +107,7 @@ pub enum Commands {
     ///
     /// Operations:
     ///   +  Insert one or more new lines after locator
-    ///   -  Delete line at locator (or range with `[start:end]`)
+    ///   -  Delete line at locator (or range with `[start,end]`)
     Edit {
         /// File to edit
         file: PathBuf,
