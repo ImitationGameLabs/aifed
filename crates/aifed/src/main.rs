@@ -21,7 +21,7 @@ use crate::output::{OutputFormat, format_error};
 use aifed_common::ensure_default_config;
 use aifed_common::workspace::{Workspace, detect_workspace};
 use aifed_daemon_client::DaemonClient;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Duration;
 
 /// Daemon requirement level for different commands
@@ -166,37 +166,24 @@ async fn run(args: Args, format: OutputFormat) -> Result<()> {
 /// Returns a DaemonClient on success, or None on failure (for Required commands,
 /// the caller should error out if this returns None).
 async fn ensure_daemon(workspace: &Workspace) -> Option<DaemonClient> {
-    let socket_path = match workspace.socket_path() {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("Warning: could not determine socket path: {}", e);
-            return None;
-        }
-    };
-
-    let client = DaemonClient::new(&socket_path);
-
-    // Already running? Send heartbeat to keep it alive
-    if client.is_running().await {
+    // Already running? Send heartbeat to keep it alive.
+    if let Some(client) = DaemonClient::discover(workspace.root()).await {
         let _ = client.heartbeat().await;
         return Some(client);
     }
 
-    // Need to start daemon
-    match spawn_daemon(workspace, &socket_path) {
-        Ok(()) => {
-            // Wait for daemon to be ready
-            match wait_for_daemon(&client, Duration::from_secs(5)).await {
-                Ok(()) => {
-                    let _ = client.heartbeat().await;
-                    Some(client)
-                }
-                Err(e) => {
-                    eprintln!("Warning: daemon did not start in time: {}", e);
-                    None
-                }
+    // Start it, then wait for it to publish its endpoint and answer.
+    match spawn_daemon(workspace) {
+        Ok(()) => match wait_for_daemon(workspace, Duration::from_secs(5)).await {
+            Ok(client) => {
+                let _ = client.heartbeat().await;
+                Some(client)
             }
-        }
+            Err(e) => {
+                eprintln!("Warning: daemon did not start in time: {}", e);
+                None
+            }
+        },
         Err(e) => {
             eprintln!("Warning: could not start daemon: {}", e);
             None
@@ -207,26 +194,16 @@ async fn ensure_daemon(workspace: &Workspace) -> Option<DaemonClient> {
 /// Try to start daemon, print warning and return None on failure.
 /// For Optional commands that can work without daemon.
 async fn ensure_daemon_optional(workspace: &Workspace) -> Option<DaemonClient> {
-    let socket_path = match workspace.socket_path() {
-        Ok(p) => p,
-        Err(_) => {
-            print_daemon_unavailable_warning();
-            return None;
-        }
-    };
-
-    let client = DaemonClient::new(&socket_path);
-
-    // Already running? Send heartbeat to keep it alive
-    if client.is_running().await {
+    // Already running? Send heartbeat to keep it alive.
+    if let Some(client) = DaemonClient::discover(workspace.root()).await {
         let _ = client.heartbeat().await;
         return Some(client);
     }
 
-    // Try to start daemon
-    match spawn_daemon(workspace, &socket_path) {
-        Ok(()) => match wait_for_daemon(&client, Duration::from_secs(5)).await {
-            Ok(()) => {
+    // Try to start daemon.
+    match spawn_daemon(workspace) {
+        Ok(()) => match wait_for_daemon(workspace, Duration::from_secs(5)).await {
+            Ok(client) => {
                 let _ = client.heartbeat().await;
                 Some(client)
             }
@@ -249,13 +226,12 @@ fn print_daemon_unavailable_warning() {
     eprintln!("File operations will proceed without these protections.");
 }
 
-/// Spawn daemon process for the given workspace.
-fn spawn_daemon(workspace: &Workspace, socket_path: &Path) -> std::io::Result<()> {
+/// Spawn a daemon process for the given workspace. The daemon derives its own
+/// endpoint file path from the workspace, so no transport path is passed.
+fn spawn_daemon(workspace: &Workspace) -> std::io::Result<()> {
     std::process::Command::new("aifed-daemon")
         .arg("--workspace")
         .arg(workspace.root())
-        .arg("--socket")
-        .arg(socket_path)
         .arg("--idle-timeout-secs")
         .arg("1800")
         .stdin(std::process::Stdio::null())
@@ -265,13 +241,17 @@ fn spawn_daemon(workspace: &Workspace, socket_path: &Path) -> std::io::Result<()
     Ok(())
 }
 
-/// Wait for daemon to become ready by polling is_running().
-async fn wait_for_daemon(client: &DaemonClient, timeout: Duration) -> std::io::Result<()> {
+/// Wait for the daemon to become ready by repeatedly discovering it (reading
+/// its freshly-written endpoint file and probing `/health`).
+async fn wait_for_daemon(
+    workspace: &Workspace,
+    timeout: Duration,
+) -> std::io::Result<DaemonClient> {
     let start = std::time::Instant::now();
 
     while start.elapsed() < timeout {
-        if client.is_running().await {
-            return Ok(());
+        if let Some(client) = DaemonClient::discover(workspace.root()).await {
+            return Ok(client);
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
     }

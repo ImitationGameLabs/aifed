@@ -1,81 +1,71 @@
-//! Daemon management integration tests
+//! Daemon management integration tests.
 //!
-//! Tests for daemon lifecycle and HTTP API endpoints:
-//! - Health check: GET /api/v1/health
-//! - Status: GET /api/v1/status
-//! - Server list: GET /api/v1/lsp/servers
-//! - Start server: POST /api/v1/lsp/servers/start
-//! - Stop server: POST /api/v1/lsp/servers/stop
+//! Exercises the daemon lifecycle and management API via the typed
+//! `DaemonClient` (health, status, server list, start/stop).
 
 mod common;
 
-use aifed_common::{
-    ApiResponse, HealthResponse, ServersResponse, StartServerRequest, StatusResponse,
-    StopServerRequest,
-};
+use aifed_common::read_endpoint;
+use aifed_daemon_client::DaemonClient;
 use common::DaemonFixture;
 
 #[tokio::test]
 async fn test_health_endpoint() {
     let fixture = DaemonFixture::new().await;
-    let resp = fixture.client.get("/api/v1/health").await.unwrap();
+    let health = fixture.client.health().await.unwrap();
+    assert_eq!(health.status, "ok");
+}
 
-    assert!(resp.is_success());
-    let json: ApiResponse<HealthResponse> = resp.json();
-    assert!(json.success);
-    assert_eq!(json.data.unwrap().status, "ok");
+#[tokio::test]
+async fn test_wrong_token_is_rejected() {
+    let fixture = DaemonFixture::new().await;
+
+    // A client presenting the wrong bearer token must be rejected (401 → Err),
+    // while the fixture's authentic client still succeeds.
+    let port = read_endpoint(fixture.endpoint_file()).unwrap().port;
+    let imposter = DaemonClient::new(format!("http://127.0.0.1:{port}"), "not-the-token");
+    assert!(
+        imposter.health().await.is_err(),
+        "wrong token must be rejected"
+    );
+    assert!(
+        fixture.client.health().await.is_ok(),
+        "correct token must work"
+    );
+}
+
+#[tokio::test]
+async fn test_discover_returns_none_without_daemon() {
+    // A workspace with no running daemon has no endpoint file (or a stale one);
+    // discover must report None so the CLI spawns fresh rather than connecting
+    // to nothing.
+    let dir = tempfile::tempdir().unwrap();
+    assert!(DaemonClient::discover(dir.path()).await.is_none());
 }
 
 #[tokio::test]
 async fn test_status_endpoint() {
     let fixture = DaemonFixture::new().await;
-    let resp = fixture.client.get("/api/v1/status").await.unwrap();
-
-    assert!(resp.is_success());
-    let json: ApiResponse<StatusResponse> = resp.json();
-    assert!(json.success);
-    let data = json.data.unwrap();
+    let status = fixture.client.status().await.unwrap();
     assert!(
-        !data.workspace.is_empty(),
-        "Workspace path should not be empty"
+        !status.workspace.is_empty(),
+        "workspace path should not be empty"
     );
 }
 
 #[tokio::test]
 async fn test_list_servers() {
     let fixture = DaemonFixture::new().await;
-    let resp = fixture.client.get("/api/v1/lsp/servers").await.unwrap();
-
-    assert!(resp.is_success());
-    let json: ApiResponse<ServersResponse> = resp.json();
-    assert!(json.success);
-    // Should have auto-detected rust and started rust-analyzer
-    assert!(!json.data.unwrap().servers.is_empty());
+    let servers = fixture.client.list_servers().await.unwrap();
+    // The daemon auto-detects rust and starts rust-analyzer.
+    assert!(!servers.servers.is_empty());
 }
 
 #[tokio::test]
 async fn test_start_and_stop_server() {
     let fixture = DaemonFixture::new().await;
 
-    // Stop the auto-started rust server
-    let resp = fixture
-        .client
-        .post(
-            "/api/v1/lsp/servers/stop",
-            &StopServerRequest { language: "rust".into(), force: false },
-        )
-        .await
-        .unwrap();
-    assert!(resp.is_success());
-
-    // Start it again
-    let resp = fixture
-        .client
-        .post(
-            "/api/v1/lsp/servers/start",
-            &StartServerRequest { language: "rust".into() },
-        )
-        .await
-        .unwrap();
-    assert!(resp.is_success());
+    // Stop the auto-started rust server, then start it again.
+    fixture.client.stop_server("rust", false).await.unwrap();
+    fixture.client.start_server("rust").await.unwrap();
 }

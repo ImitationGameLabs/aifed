@@ -1,68 +1,50 @@
-//! LSP operations integration tests
+//! LSP operations integration tests.
 //!
-//! Tests for LSP HTTP API endpoints:
-//! - Document sync: didOpen, didChange, didClose
-//! - LSP queries: hover, definition, references, completions, diagnostics, rename
-//!
-//! Note: The daemon auto-starts LSP servers for detected languages in the workspace.
-//! For Rust workspaces, rust-analyzer is started automatically.
+//! Exercises document synchronization and LSP queries via the typed
+//! `DaemonClient`. The daemon auto-starts rust-analyzer for Rust workspaces.
 
 mod common;
 
 use aifed_common::{
-    ApiResponse, ContentChange, DiagnosticsRequest, DidChangeRequest, DidCloseRequest,
+    ClientError, ContentChange, DiagnosticsRequest, DidChangeRequest, DidCloseRequest,
     DidOpenRequest, HoverRequest, LspPositionRequest, Position, RenameRequest,
 };
 use common::DaemonFixture;
-use hyper::StatusCode;
 
-// --- Document Synchronization Tests (with server) ---
-// The daemon auto-starts rust-analyzer for Rust workspaces
+const MAIN_RS: &str = "fn main() {}\n";
+
+fn open_req(path: &str, text: &str) -> DidOpenRequest {
+    DidOpenRequest {
+        language: "rust".into(),
+        file_path: path.into(),
+        language_id: "rust".into(),
+        version: 1,
+        text: text.into(),
+    }
+}
+
+// --- Document Synchronization ---
 
 #[tokio::test]
 async fn test_did_open_with_server() {
     let fixture = DaemonFixture::new().await;
-
-    let req = DidOpenRequest {
-        language: "rust".into(),
-        file_path: fixture.main_rs_path.clone(),
-        language_id: "rust".into(),
-        version: 1,
-        text: "fn main() {}".into(),
-    };
-
-    let resp = fixture
+    fixture
         .client
-        .post("/api/v1/lsp/didOpen", &req)
+        .did_open(open_req(&fixture.main_rs_path, MAIN_RS))
         .await
         .unwrap();
-    // Should succeed since rust-analyzer is auto-started
-    assert!(resp.is_success());
-
-    let json: ApiResponse<serde_json::Value> = resp.json();
-    assert!(json.success);
 }
 
 #[tokio::test]
 async fn test_did_change_with_server() {
     let fixture = DaemonFixture::new().await;
-
-    // First open the document
-    let open_req = DidOpenRequest {
-        language: "rust".into(),
-        file_path: fixture.main_rs_path.clone(),
-        language_id: "rust".into(),
-        version: 1,
-        text: "fn main() {}".into(),
-    };
     fixture
         .client
-        .post("/api/v1/lsp/didOpen", &open_req)
+        .did_open(open_req(&fixture.main_rs_path, MAIN_RS))
         .await
         .unwrap();
 
-    // Then send a change
-    let change_req = DidChangeRequest {
+    let change = DidChangeRequest {
         language: "rust".into(),
         file_path: fixture.main_rs_path.clone(),
         version: 2,
@@ -71,115 +53,58 @@ async fn test_did_change_with_server() {
             text: "fn main() { println!(\"updated\"); }".into(),
         }],
     };
-    let resp = fixture
-        .client
-        .post("/api/v1/lsp/didChange", &change_req)
-        .await
-        .unwrap();
-    // Should succeed since rust-analyzer is auto-started
-    assert!(resp.is_success());
+    fixture.client.did_change(change).await.unwrap();
 }
 
 #[tokio::test]
 async fn test_did_close_with_server() {
     let fixture = DaemonFixture::new().await;
-
-    // Open first
-    let open_req = DidOpenRequest {
-        language: "rust".into(),
-        file_path: fixture.main_rs_path.clone(),
-        language_id: "rust".into(),
-        version: 1,
-        text: "fn main() {}".into(),
-    };
     fixture
         .client
-        .post("/api/v1/lsp/didOpen", &open_req)
+        .did_open(open_req(&fixture.main_rs_path, MAIN_RS))
         .await
         .unwrap();
 
-    // Then close
-    let close_req =
+    let close =
         DidCloseRequest { language: "rust".into(), file_path: fixture.main_rs_path.clone() };
-    let resp = fixture
-        .client
-        .post("/api/v1/lsp/didClose", &close_req)
-        .await
-        .unwrap();
-    // Should succeed since rust-analyzer is auto-started
-    assert!(resp.is_success());
-
-    let json: ApiResponse<serde_json::Value> = resp.json();
-    assert!(json.success);
+    fixture.client.did_close(close).await.unwrap();
 }
 
 #[tokio::test]
 async fn test_document_sync_full_workflow() {
     let fixture = DaemonFixture::new().await;
-
-    // 1. Open document
-    let open_req = DidOpenRequest {
-        language: "rust".into(),
-        file_path: fixture.main_rs_path.clone(),
-        language_id: "rust".into(),
-        version: 1,
-        text: "fn main() {}".into(),
-    };
-    let resp = fixture
+    fixture
         .client
-        .post("/api/v1/lsp/didOpen", &open_req)
+        .did_open(open_req(&fixture.main_rs_path, MAIN_RS))
         .await
         .unwrap();
-    assert!(resp.is_success());
 
-    // 2. Multiple changes
     for version in 2..=3 {
-        let change_req = DidChangeRequest {
+        let change = DidChangeRequest {
             language: "rust".into(),
             file_path: fixture.main_rs_path.clone(),
             version,
             content_changes: vec![ContentChange {
                 range: None,
-                text: format!("// v{}\nfn main() {{}}", version),
+                text: format!("// v{version}\nfn main() {{}}"),
             }],
         };
-        let resp = fixture
-            .client
-            .post("/api/v1/lsp/didChange", &change_req)
-            .await
-            .unwrap();
-        assert!(resp.is_success());
+        fixture.client.did_change(change).await.unwrap();
     }
 
-    // 3. Close
-    let close_req =
+    let close =
         DidCloseRequest { language: "rust".into(), file_path: fixture.main_rs_path.clone() };
-    let resp = fixture
-        .client
-        .post("/api/v1/lsp/didClose", &close_req)
-        .await
-        .unwrap();
-    assert!(resp.is_success());
+    fixture.client.did_close(close).await.unwrap();
 }
 
-// --- LSP Query Tests (with server) ---
-// The daemon auto-starts rust-analyzer for Rust workspaces
+// --- LSP Queries ---
 
 #[tokio::test]
 async fn test_hover_with_server() {
     let fixture = DaemonFixture::new().await;
-
-    // First open the document
-    let open_req = DidOpenRequest {
-        language: "rust".into(),
-        file_path: fixture.main_rs_path.clone(),
-        language_id: "rust".into(),
-        version: 1,
-        text: "fn main() {}".into(),
-    };
     fixture
         .client
-        .post("/api/v1/lsp/didOpen", &open_req)
+        .did_open(open_req(&fixture.main_rs_path, MAIN_RS))
         .await
         .unwrap();
 
@@ -188,70 +113,33 @@ async fn test_hover_with_server() {
         file_path: fixture.main_rs_path.clone(),
         position: Position { line: 0, character: 3 },
     };
-
-    let resp = fixture
-        .client
-        .post("/api/v1/lsp/hover", &req)
-        .await
-        .unwrap();
-    // Should succeed (may return empty hover if no info available)
-    assert!(resp.is_success());
-
-    let json: ApiResponse<serde_json::Value> = resp.json();
-    assert!(json.success);
+    // Succeeds (may carry empty hover info).
+    let _ = fixture.client.hover(req).await.unwrap();
 }
 
 #[tokio::test]
 async fn test_definition_with_server() {
     let fixture = DaemonFixture::new().await;
-
-    // First open the document
-    let open_req = DidOpenRequest {
-        language: "rust".into(),
-        file_path: fixture.main_rs_path.clone(),
-        language_id: "rust".into(),
-        version: 1,
-        text: "fn main() {}".into(),
-    };
     fixture
         .client
-        .post("/api/v1/lsp/didOpen", &open_req)
+        .did_open(open_req(&fixture.main_rs_path, MAIN_RS))
         .await
         .unwrap();
 
     let req = LspPositionRequest {
         language: "rust".into(),
         file_path: fixture.main_rs_path.clone(),
-        position: Position { line: 0, character: 3 }, // On "fn"
+        position: Position { line: 0, character: 3 },
     };
-
-    let resp = fixture
-        .client
-        .post("/api/v1/lsp/definition", &req)
-        .await
-        .unwrap();
-    // Should succeed (may return empty locations)
-    assert!(resp.is_success());
-
-    let json: ApiResponse<serde_json::Value> = resp.json();
-    assert!(json.success);
+    let _ = fixture.client.goto_definition(req).await.unwrap();
 }
 
 #[tokio::test]
 async fn test_references_with_server() {
     let fixture = DaemonFixture::new().await;
-
-    // First open the document
-    let open_req = DidOpenRequest {
-        language: "rust".into(),
-        file_path: fixture.main_rs_path.clone(),
-        language_id: "rust".into(),
-        version: 1,
-        text: "fn main() {}".into(),
-    };
     fixture
         .client
-        .post("/api/v1/lsp/didOpen", &open_req)
+        .did_open(open_req(&fixture.main_rs_path, MAIN_RS))
         .await
         .unwrap();
 
@@ -260,34 +148,15 @@ async fn test_references_with_server() {
         file_path: fixture.main_rs_path.clone(),
         position: Position { line: 0, character: 3 },
     };
-
-    let resp = fixture
-        .client
-        .post("/api/v1/lsp/references", &req)
-        .await
-        .unwrap();
-    // Should succeed (may return empty references)
-    assert!(resp.is_success());
-
-    let json: ApiResponse<serde_json::Value> = resp.json();
-    assert!(json.success);
+    let _ = fixture.client.references(req).await.unwrap();
 }
 
 #[tokio::test]
 async fn test_completions_with_server() {
     let fixture = DaemonFixture::new().await;
-
-    // First open the document
-    let open_req = DidOpenRequest {
-        language: "rust".into(),
-        file_path: fixture.main_rs_path.clone(),
-        language_id: "rust".into(),
-        version: 1,
-        text: "fn main() {}".into(),
-    };
     fixture
         .client
-        .post("/api/v1/lsp/didOpen", &open_req)
+        .did_open(open_req(&fixture.main_rs_path, MAIN_RS))
         .await
         .unwrap();
 
@@ -296,98 +165,53 @@ async fn test_completions_with_server() {
         file_path: fixture.main_rs_path.clone(),
         position: Position { line: 0, character: 3 },
     };
-
-    let resp = fixture
-        .client
-        .post("/api/v1/lsp/completions", &req)
-        .await
-        .unwrap();
-    // Should succeed (may return empty completions)
-    assert!(resp.is_success());
-
-    let json: ApiResponse<serde_json::Value> = resp.json();
-    assert!(json.success);
+    let _ = fixture.client.completions(req).await.unwrap();
 }
 
 #[tokio::test]
 async fn test_diagnostics_with_server() {
     let fixture = DaemonFixture::new().await;
-
-    // First open the document
-    let open_req = DidOpenRequest {
-        language: "rust".into(),
-        file_path: fixture.main_rs_path.clone(),
-        language_id: "rust".into(),
-        version: 1,
-        text: "fn main() {}".into(),
-    };
     fixture
         .client
-        .post("/api/v1/lsp/didOpen", &open_req)
+        .did_open(open_req(&fixture.main_rs_path, MAIN_RS))
         .await
         .unwrap();
 
     let req =
         DiagnosticsRequest { language: "rust".into(), file_path: fixture.main_rs_path.clone() };
-
-    let resp = fixture
-        .client
-        .post("/api/v1/lsp/diagnostics", &req)
-        .await
-        .unwrap();
-    // Should succeed (may return empty diagnostics)
-    assert!(resp.is_success());
-
-    let json: ApiResponse<serde_json::Value> = resp.json();
-    assert!(json.success);
+    let _ = fixture.client.diagnostics(req).await.unwrap();
 }
 
 #[tokio::test]
 async fn test_rename_with_server() {
     let fixture = DaemonFixture::new().await;
-
-    // First open the document with a variable that can be renamed
-    let open_req = DidOpenRequest {
-        language: "rust".into(),
-        file_path: fixture.main_rs_path.clone(),
-        language_id: "rust".into(),
-        version: 1,
-        text: "fn main() { let x = 1; }".into(),
-    };
     fixture
         .client
-        .post("/api/v1/lsp/didOpen", &open_req)
+        .did_open(open_req(
+            &fixture.main_rs_path,
+            "fn main() { let x = 1; }\n",
+        ))
         .await
         .unwrap();
 
-    // Give rust-analyzer a moment to process the document
+    // Give rust-analyzer a moment to process the document.
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
     let req = RenameRequest {
         language: "rust".into(),
         file_path: fixture.main_rs_path.clone(),
-        position: Position { line: 0, character: 17 }, // On "x" variable
+        position: Position { line: 0, character: 17 }, // On "x"
         new_name: "renamed_var".into(),
     };
-
-    let resp = fixture
-        .client
-        .post("/api/v1/lsp/rename", &req)
-        .await
-        .unwrap();
-    // Rename may succeed or fail depending on LSP server readiness and position
-    // The important thing is that the handler is properly implemented and returns a response
-    // (not NOT_IMPLEMENTED)
-    if resp.is_success() {
-        let json: ApiResponse<serde_json::Value> = resp.json();
-        assert!(json.success);
-    } else {
-        // If it fails, it should be an LSP error, not NOT_IMPLEMENTED
-        assert_ne!(resp.status, StatusCode::NOT_IMPLEMENTED);
+    // Rename may succeed or report an LSP error depending on readiness/position,
+    // but must be a real LSP outcome — not a transport failure.
+    match fixture.client.rename(req).await {
+        Ok(_) | Err(ClientError::ApiError { .. }) => {}
+        Err(e) => panic!("unexpected error: {e}"),
     }
 }
 
-// --- Error Handling Tests ---
+// --- Error Handling ---
 
 #[tokio::test]
 async fn test_did_open_with_invalid_language() {
@@ -401,15 +225,10 @@ async fn test_did_open_with_invalid_language() {
         text: "some content".into(),
     };
 
-    // Returns LSP_ERROR because no LSP server is configured for this language
-    let resp = fixture
-        .client
-        .post("/api/v1/lsp/didOpen", &req)
-        .await
-        .unwrap();
-    assert_eq!(resp.status, StatusCode::INTERNAL_SERVER_ERROR);
-
-    let json: ApiResponse<serde_json::Value> = resp.json();
-    assert!(!json.success);
-    assert_eq!(json.error.unwrap().code, "LSP_ERROR");
+    // No LSP server configured for this language → LSP_ERROR.
+    let err = fixture.client.did_open(req).await.unwrap_err();
+    match err {
+        ClientError::ApiError { code, .. } => assert_eq!(code, "LSP_ERROR"),
+        other => panic!("expected ApiError, got {other:?}"),
+    }
 }

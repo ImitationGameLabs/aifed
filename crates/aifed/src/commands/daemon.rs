@@ -12,12 +12,13 @@ pub async fn execute(
     workspace: &Workspace,
     format: OutputFormat,
 ) -> Result<()> {
-    let socket_path = workspace.socket_path()?;
-    let client = DaemonClient::new(&socket_path);
+    // Discover a running daemon (does not spawn one). `None` means no live,
+    // authentic daemon for this workspace.
+    let client = DaemonClient::discover(workspace.root()).await;
 
     match cmd {
         DaemonCommands::Status => {
-            if !client.is_running().await {
+            let Some(client) = client.as_ref() else {
                 match format {
                     OutputFormat::Text => {
                         println!("Daemon not running");
@@ -39,7 +40,7 @@ pub async fn execute(
                     }
                 }
                 return Ok(());
-            }
+            };
 
             match client.status().await {
                 Ok(status) => match format {
@@ -75,7 +76,7 @@ pub async fn execute(
                         println!();
                         println!("Daemon Env:");
                         println!("  - Bin: {}", status.bin_path);
-                        println!("  - Socket: {}", status.socket_path);
+                        println!("  - Address: {}", status.address);
                         println!("  - Log: {}", status.log_path);
                     }
                     OutputFormat::Json => {
@@ -89,10 +90,10 @@ pub async fn execute(
             Ok(())
         }
         DaemonCommands::Stop { force } => {
-            if !client.is_running().await {
+            let Some(client) = client.as_ref() else {
                 println!("Daemon not running");
                 return Ok(());
-            }
+            };
 
             // Get list of servers and stop them
             match client.list_servers().await {

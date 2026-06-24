@@ -1,7 +1,8 @@
 //! aifed-daemon - Background daemon for aifed
 //!
-//! This daemon provides LSP services for a single workspace via HTTP over Unix socket.
-//! Each daemon instance is bound to exactly one workspace.
+//! This daemon provides LSP services for a single workspace via HTTP over a TCP
+//! loopback port. Each daemon instance is bound to exactly one workspace; the
+//! CLI discovers it via a per-workspace endpoint file (port + bearer token).
 
 mod args;
 mod error;
@@ -12,7 +13,8 @@ mod lsp;
 mod server;
 
 use aifed_common::{
-    ensure_default_config, load_registry_for_workspace, lock_path, log_path, socket_path,
+    DaemonEndpoint, endpoint_path, ensure_default_config, load_registry_for_workspace, lock_path,
+    log_path, read_endpoint, write_endpoint,
 };
 use anyhow::Context;
 use args::Args;
@@ -26,41 +28,72 @@ use std::fs::{File, TryLockError};
 use std::io;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
-use tokio::net::UnixListener;
+use tokio::net::TcpListener;
 use tracing::Level;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
-/// Try to connect to an existing daemon via socket.
-/// Returns Ok(()) if daemon is already running (connection succeeded).
-/// Returns Err if no daemon is running or connection failed.
-fn check_existing_daemon(socket: &std::path::Path) -> anyhow::Result<()> {
-    use std::io::{Read, Write};
-    use std::os::unix::net::UnixStream;
-
-    // Try to connect to the socket
-    let mut stream = match UnixStream::connect(socket) {
-        Ok(s) => s,
-        Err(e) if e.kind() == std::io::ErrorKind::ConnectionRefused => {
-            // Socket exists but no one is listening - stale socket
-            return Err(anyhow::anyhow!("Stale socket file exists"));
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            // Socket doesn't exist - no daemon running
-            return Err(anyhow::anyhow!("No daemon running"));
-        }
-        Err(e) => {
-            return Err(anyhow::anyhow!("Failed to connect to socket: {}", e));
-        }
+/// Probe whether a live, authentic daemon is already serving `workspace`.
+///
+/// Reads the workspace's endpoint file and, if present, performs a token-bearing
+/// `/health` probe over TCP. Returns `true` only if a daemon answers with HTTP
+/// 200 *and* a body containing our `ApiResponse` envelope (`"success":true`) —
+/// so a stale endpoint, a port reused by an unrelated process, or a different
+/// aifed daemon (wrong token → 401) all correctly report as "not running".
+fn check_existing_daemon(endpoint_file: &Path) -> bool {
+    let endpoint = match read_endpoint(endpoint_file) {
+        Ok(e) => e,
+        Err(_) => return false,
     };
+    probe_health(endpoint.port, &endpoint.token)
+}
 
-    // Send a simple HTTP request to verify it's actually our daemon (not some other process)
-    // We ignore errors here since we just want to confirm the daemon exists
-    let _ = stream.write_all(b"GET /health HTTP/1.0\r\n\r\n");
+/// Raw TCP `/health` probe (kept dependency-free — no `aifed-daemon-client`).
+fn probe_health(port: u16, token: &str) -> bool {
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
+    use std::time::Duration;
+
+    let Ok(addr) = format!("127.0.0.1:{port}").parse() else {
+        return false;
+    };
+    let mut stream = match TcpStream::connect_timeout(&addr, Duration::from_millis(500)) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
+    let request = format!(
+        "GET /api/v1/health HTTP/1.0\r\nHost: localhost\r\nAuthorization: Bearer {token}\r\nConnection: close\r\n\r\n"
+    );
+    if stream.write_all(request.as_bytes()).is_err() {
+        return false;
+    }
     let mut response = String::new();
-    let _ = stream.read_to_string(&mut response);
+    if stream.read_to_string(&mut response).is_err() {
+        return false;
+    }
+    // Anchor the status line (avoid matching a ` 200 ` substring in a header),
+    // and require our `ApiResponse` success envelope in the body — the token
+    // already rejects other aifed daemons (401); this body check rejects an
+    // unrelated process that happens to occupy the port and return some 200.
+    let status_ok = response.starts_with("HTTP/1.0 200") || response.starts_with("HTTP/1.1 200");
+    status_ok && response.contains("\"success\":true")
+}
 
-    // If we got here, daemon is running
-    Ok(())
+/// Prefix marking daemon bearer tokens so they are recognizable as secrets.
+const TOKEN_PREFIX: &str = "sk-";
+
+/// Generate a random 256-bit bearer token, `sk-`-prefixed and hex-encoded.
+fn generate_token() -> String {
+    let mut bytes = [0u8; 32];
+    getrandom::getrandom(&mut bytes).expect("getrandom failed");
+    let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+    format!("{TOKEN_PREFIX}{hex}")
+}
+
+/// SHA-256 digest of `input` as a fixed 32-byte array.
+fn sha256(input: &[u8]) -> [u8; 32] {
+    use sha2::Digest;
+    sha2::Sha256::digest(input).into()
 }
 
 /// Acquire an exclusive, non-blocking advisory lock on the lock file via std
@@ -204,10 +237,8 @@ async fn main() -> anyhow::Result<()> {
         )
     })?;
 
-    // Determine paths
-    let socket = args
-        .socket
-        .unwrap_or_else(|| socket_path(&workspace).expect("Failed to generate socket path"));
+    // Determine paths (all derived from the workspace, no per-invocation override)
+    let endpoint_file = endpoint_path(&workspace).expect("Failed to generate endpoint path");
     let lock = lock_path(&workspace).expect("Failed to generate lock path");
     let default_log = log_path(&workspace).expect("Failed to generate log path");
     let log_file = args.log_file.as_deref().unwrap_or(&default_log);
@@ -220,11 +251,10 @@ async fn main() -> anyhow::Result<()> {
     )?;
 
     // Check for existing daemon
-    if check_existing_daemon(&socket).is_ok() {
+    if check_existing_daemon(&endpoint_file) {
         anyhow::bail!(
-            "Daemon already running for workspace: {}\nSocket: {}",
-            workspace.display(),
-            socket.display()
+            "Daemon already running for workspace: {}",
+            workspace.display()
         );
     }
 
@@ -233,23 +263,11 @@ async fn main() -> anyhow::Result<()> {
     // exit), NOT by the remove_file cleanup near the end of main.
     let _lock_file = acquire_lock(&lock)?;
 
-    // Remove stale socket if present
-    if socket.exists() {
-        std::fs::remove_file(&socket)
-            .with_context(|| format!("Failed to remove stale socket: {}", socket.display()))?;
-    }
-
-    // Ensure socket directory exists
-    if let Some(parent) = socket.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("Failed to create socket directory: {}", parent.display()))?;
-    }
-
     tracing::info!(
         "Starting aifed-daemon for workspace: {}",
         workspace.display()
     );
-    tracing::info!("Socket path: {}", socket.display());
+    tracing::info!("Endpoint file: {}", endpoint_file.display());
     tracing::info!("Lock file: {}", lock.display());
     if !args.log_stderr {
         tracing::info!("Log file: {}", log_file.display());
@@ -297,24 +315,51 @@ async fn main() -> anyhow::Result<()> {
     monitor_clone.start_monitor();
 
     // Initialize history manager
-    // Create shared state
     let history_manager = Arc::new(HistoryManager::new());
+
+    // Bind the loopback port first so we know the actual port to advertise.
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .with_context(|| "Failed to bind loopback TCP port")?;
+    let port = listener
+        .local_addr()
+        .with_context(|| "Failed to read bound port")?
+        .port();
+    let address = format!("127.0.0.1:{port}");
+
+    // Generate the bearer token and publish the endpoint file so the CLI can
+    // discover us. The lock is already held and the port is bound, so this is
+    // the authoritative contact info for this daemon.
+    let token = generate_token();
+    let endpoint = DaemonEndpoint {
+        workspace: workspace.to_string_lossy().into_owned(),
+        pid: std::process::id(),
+        port,
+        token: token.clone(),
+    };
+    write_endpoint(&endpoint_file, &endpoint)
+        .with_context(|| format!("Failed to write endpoint file: {}", endpoint_file.display()))?;
+    tracing::info!("Listening on {}", address);
+
+    // Keep only the token's SHA-256 in memory; the plaintext lives solely in
+    // the endpoint file (for the CLI). The middleware compares hashes, so a
+    // process memory dump yields no usable credential.
+    let token_hash = sha256(token.as_bytes());
+
+    // Create shared state
     let state = DaemonState {
         workspace: workspace.clone(),
         lsp_manager,
         history_manager,
         idle_monitor: idle_monitor.clone(),
         clipboard: Arc::new(RwLock::new(None)),
-        socket_path: socket.clone(),
+        address,
+        token_hash,
         log_path: log_file.to_path_buf(),
     };
 
     // Build router
     let app = build_router(state);
-
-    // Bind to Unix socket
-    let listener = UnixListener::bind(&socket)?;
-    tracing::info!("Listening on socket: {}", socket.display());
 
     // Setup graceful shutdown
     let idle_for_shutdown = idle_monitor.clone();
@@ -337,8 +382,13 @@ async fn main() -> anyhow::Result<()> {
 
     // Cleanup
     tracing::info!("Shutting down daemon");
-    if let Err(e) = std::fs::remove_file(&socket) {
-        tracing::warn!("Failed to remove socket file: {}", e);
+    // Delete the endpoint file only if it still describes THIS daemon, so we
+    // never clobber a newer daemon that may have already overwritten it.
+    if let Ok(current) = read_endpoint(&endpoint_file)
+        && current.pid == endpoint.pid
+        && current.token == endpoint.token
+    {
+        let _ = std::fs::remove_file(&endpoint_file);
     }
     if let Err(e) = std::fs::remove_file(&lock) {
         tracing::warn!("Failed to remove lock file: {}", e);

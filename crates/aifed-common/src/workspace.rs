@@ -31,12 +31,21 @@ impl Workspace {
         &self.root
     }
 
-    /// Get the daemon socket path for this workspace
-    pub fn socket_path(&self) -> Result<PathBuf, WorkspaceError> {
-        crate::socket_path(&self.root).map_err(|e| match e {
-            crate::SocketError::NoCacheDir => WorkspaceError::NoCacheDir,
-            crate::SocketError::CanonicalizeError(io) => WorkspaceError::Io(io),
-            crate::SocketError::NoStateDir => WorkspaceError::NoCacheDir,
+    /// Get the daemon endpoint file path for this workspace.
+    ///
+    /// The endpoint file holds the running daemon's port + token; the CLI reads
+    /// it to discover the daemon. See [`crate::endpoint_path`].
+    pub fn endpoint_path(&self) -> Result<PathBuf, WorkspaceError> {
+        crate::endpoint_path(&self.root).map_err(|e| match e {
+            crate::PathError::NoCacheDir => WorkspaceError::NoCacheDir,
+            crate::PathError::CanonicalizeError(io) => WorkspaceError::Io(io),
+            crate::PathError::NoStateDir => WorkspaceError::NoCacheDir,
+            crate::PathError::EndpointIo(io) => WorkspaceError::Io(io),
+            crate::PathError::EndpointCorrupt(e) => {
+                WorkspaceError::InvalidPath(format!("corrupt endpoint file: {e}"))
+            }
+            // endpoint_path() never produces this; the arm exists for exhaustiveness.
+            crate::PathError::PermissionRestrictionFailed(io) => WorkspaceError::Io(io),
         })
     }
 }

@@ -7,7 +7,7 @@
 
 pub mod config;
 mod error;
-mod socket;
+mod paths;
 mod types;
 pub mod workspace;
 
@@ -17,6 +17,6 @@ pub use config::{
     normalize_extension, normalize_language,
 };
 pub use error::*;
-pub use socket::*;
+pub use paths::*;
 pub use types::*;
 pub use workspace::{Workspace, WorkspaceError, detect_workspace};

@@ -1,6 +1,6 @@
 [package]
 name = "aifed-daemon"
-description = "Long-running background daemon for aifed: edit-history, concurrency tracking, and a local code index served over a Unix socket"
+description = "Long-running background daemon for aifed: edit-history, concurrency tracking, and a local code index served over HTTP on TCP loopback"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
@@ -25,6 +25,9 @@ xxhash-rust = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 logroller = { workspace = true }
+getrandom = { workspace = true }
+sha2 = { workspace = true }
+subtle = { workspace = true }
 anyhow = { workspace = true }
 time = { workspace = true }
 aifed-common = { workspace = true }
@@ -34,8 +37,4 @@ serial_test = { workspace = true }
 tempfile = { workspace = true }
 aifed-daemon-client = { workspace = true }
 aifed-common = { workspace = true }
-hyper = { workspace = true }
-hyper-util = { workspace = true }
-hyperlocal = { workspace = true }
-http-body-util = { workspace = true }
 serde_json = { workspace = true }

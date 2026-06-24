@@ -53,7 +53,7 @@ pub struct StatusResponse {
     pub workspace: String,
     pub uptime_secs: u64,
     pub bin_path: String,
-    pub socket_path: String,
+    pub address: String,
     pub log_path: String,
     pub servers: Vec<ServerStatusDto>,
 }

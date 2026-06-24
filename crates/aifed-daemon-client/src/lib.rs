@@ -1,45 +1,68 @@
 //! HTTP client for aifed-daemon
 //!
 //! This crate provides a client library for communicating with aifed-daemon
-//! over Unix socket.
-
-use std::path::{Path, PathBuf};
+//! over HTTP on a TCP loopback port. The daemon's port and bearer token are
+//! discovered from a per-workspace endpoint file (see
+//! `aifed_common::DaemonEndpoint`).
 
 use aifed_common::*;
 use http_body_util::{BodyExt, Full};
 use hyper::body::Bytes;
 use hyper::{Method, Request, Uri as HyperUri};
 use hyper_util::client::legacy::Client;
+use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
-use hyperlocal::{UnixConnector, Uri};
 use serde::de::DeserializeOwned;
+use std::path::Path;
 
-/// HTTP client for aifed-daemon
+/// HTTP client for aifed-daemon.
+///
+/// Speaks HTTP to a daemon on `127.0.0.1`, authenticating each request with a
+/// bearer token read from the daemon's endpoint file.
 #[derive(Clone)]
 pub struct DaemonClient {
-    socket_path: PathBuf,
-    client: Client<UnixConnector, Full<Bytes>>,
+    base_url: String,
+    token: String,
+    client: Client<HttpConnector, Full<Bytes>>,
 }
 
 impl DaemonClient {
-    /// Create a new client connected to the daemon at the given socket path
-    pub fn new(socket_path: impl AsRef<Path>) -> Self {
+    /// Create a new client targeting `base_url` (e.g. `http://127.0.0.1:54321`),
+    /// authenticating with `token`.
+    pub fn new(base_url: impl AsRef<str>, token: impl Into<String>) -> Self {
         Self {
-            socket_path: socket_path.as_ref().to_path_buf(),
-            client: Client::builder(TokioExecutor::new()).build(UnixConnector),
+            base_url: base_url.as_ref().to_string(),
+            token: token.into(),
+            client: Client::builder(TokioExecutor::new()).build(HttpConnector::new()),
         }
     }
 
-    /// Create a client using the default socket path
-    pub fn default_socket() -> Result<Self, ClientError> {
-        let socket_path = dirs::runtime_dir()
-            .unwrap_or_else(std::env::temp_dir)
-            .join("aifed-daemon.sock");
-        Ok(Self::new(socket_path))
+    /// Create a client from a discovered [`DaemonEndpoint`].
+    pub fn from_endpoint(endpoint: &DaemonEndpoint) -> Self {
+        Self::new(endpoint.base_url(), endpoint.token.clone())
+    }
+
+    /// Discover and validate a running daemon for `workspace_root`.
+    ///
+    /// Reads the workspace's endpoint file and probes `/health` with its token.
+    /// Returns `Some(client)` only if a live, authentic daemon answers; `None`
+    /// otherwise (no endpoint file, corrupt, stale, wrong token, or unreachable).
+    pub async fn discover(workspace_root: &Path) -> Option<Self> {
+        let path = endpoint_path(workspace_root).ok()?;
+        let endpoint = read_endpoint(&path).ok()?;
+        let client = Self::from_endpoint(&endpoint);
+        client.is_running().await.then_some(client)
     }
 
     fn uri(&self, path: &str) -> HyperUri {
-        Uri::new(&self.socket_path, path).into()
+        format!("{}{}", self.base_url, path)
+            .parse()
+            .expect("base_url + request path must form a valid URI")
+    }
+
+    /// The `Authorization` header value authenticating every request.
+    fn auth_header_value(&self) -> String {
+        format!("Bearer {}", self.token)
     }
 
     /// Check if the daemon is running
@@ -191,12 +214,8 @@ impl DaemonClient {
         count: Option<usize>,
     ) -> Result<HistoryListResponse, ClientError> {
         let path = match count {
-            Some(n) => format!(
-                "/api/v1/history/{}?count={}",
-                Self::urlencoding_encode(file),
-                n
-            ),
-            None => format!("/api/v1/history/{}", Self::urlencoding_encode(file)),
+            Some(n) => format!("/api/v1/history/{}?count={}", urlencoding::encode(file), n),
+            None => format!("/api/v1/history/{}", urlencoding::encode(file)),
         };
         self.get(&path).await
     }
@@ -206,10 +225,10 @@ impl DaemonClient {
         let path = if dry_run {
             format!(
                 "/api/v1/history/{}/undo?dry_run=true",
-                Self::urlencoding_encode(file)
+                urlencoding::encode(file)
             )
         } else {
-            format!("/api/v1/history/{}/undo", Self::urlencoding_encode(file))
+            format!("/api/v1/history/{}/undo", urlencoding::encode(file))
         };
         self.post_empty(&path).await
     }
@@ -219,10 +238,10 @@ impl DaemonClient {
         let path = if dry_run {
             format!(
                 "/api/v1/history/{}/redo?dry_run=true",
-                Self::urlencoding_encode(file)
+                urlencoding::encode(file)
             )
         } else {
-            format!("/api/v1/history/{}/redo", Self::urlencoding_encode(file))
+            format!("/api/v1/history/{}/redo", urlencoding::encode(file))
         };
         self.post_empty(&path).await
     }
@@ -246,21 +265,13 @@ impl DaemonClient {
 
     // --- HTTP Helpers ---
 
-    /// URL-encode a path segment
-    fn urlencoding_encode(s: &str) -> String {
-        // Simple URL encoding for file paths
-        s.replace('%', "%25")
-            .replace('/', "%2F")
-            .replace(' ', "%20")
-            .replace('+', "%2B")
-    }
-
     /// Make a GET request
     async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T, ClientError> {
         let uri = self.uri(path);
         let req = Request::builder()
             .method(Method::GET)
             .uri(uri)
+            .header("Authorization", self.auth_header_value())
             .body(Full::new(Bytes::new()))
             .map_err(|e| ClientError::RequestFailed { message: e.to_string() })?;
 
@@ -287,6 +298,7 @@ impl DaemonClient {
             .method(Method::POST)
             .uri(uri)
             .header("Content-Type", "application/json")
+            .header("Authorization", self.auth_header_value())
             .body(Full::new(Bytes::from(json)))
             .map_err(|e| ClientError::RequestFailed { message: e.to_string() })?;
 
@@ -306,6 +318,7 @@ impl DaemonClient {
             .method(Method::POST)
             .uri(uri)
             .header("Content-Type", "application/json")
+            .header("Authorization", self.auth_header_value())
             .body(Full::new(Bytes::new()))
             .map_err(|e| ClientError::RequestFailed { message: e.to_string() })?;
 
@@ -332,6 +345,7 @@ impl DaemonClient {
             .method(Method::PUT)
             .uri(uri)
             .header("Content-Type", "application/json")
+            .header("Authorization", self.auth_header_value())
             .body(Full::new(Bytes::from(json)))
             .map_err(|e| ClientError::RequestFailed { message: e.to_string() })?;
 
@@ -357,22 +371,24 @@ impl DaemonClient {
             .map_err(|e| ClientError::RequestFailed { message: e.to_string() })?
             .to_bytes();
 
-        // Try to parse as ApiResponse first (works for both success and error responses)
-        let api_response: Result<ApiResponse<T>, _> = serde_json::from_slice(&body_bytes);
+        // Parse as ApiResponse<Value> so a null/absent `data` (void endpoints
+        // where T = ()) survives, then convert into T. Error responses carry no
+        // data, so this also covers them uniformly.
+        let api_response: Result<ApiResponse<serde_json::Value>, _> =
+            serde_json::from_slice(&body_bytes);
 
         if let Ok(api_response) = api_response {
             if api_response.success {
-                return api_response
-                    .data
-                    .ok_or_else(|| ClientError::SerializationError {
-                        message: "No data in response".to_string(),
-                    });
+                let data = api_response.data.unwrap_or(serde_json::Value::Null);
+                return serde_json::from_value(data).map_err(|e| ClientError::SerializationError {
+                    message: format!("response data mismatch: {e}"),
+                });
             } else {
                 let error = api_response
                     .error
                     .unwrap_or_else(|| aifed_common::ApiError {
                         code: "UNKNOWN".to_string(),
-                        message: "Unknown error".to_string(),
+                        message: format!("HTTP {status}"),
                     });
                 return Err(ClientError::ApiError { code: error.code, message: error.message });
             }

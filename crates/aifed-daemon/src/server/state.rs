@@ -19,8 +19,12 @@ pub struct DaemonState {
     pub history_manager: Arc<HistoryManager>,
     /// Clipboard content (in-memory only, single entry)
     pub clipboard: Arc<RwLock<Option<String>>>,
-    /// Socket path
-    pub socket_path: PathBuf,
+    /// Daemon bind address (e.g. `127.0.0.1:54321`).
+    pub address: String,
+    /// SHA-256 of the bearer token clients must present. Only the hash is kept
+    /// in memory (the plaintext lives in the endpoint file for the CLI); the
+    /// middleware compares `SHA-256(received)` against this in constant time.
+    pub token_hash: [u8; 32],
     /// Log file path
     pub log_path: PathBuf,
 }

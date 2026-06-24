@@ -59,8 +59,8 @@ pub enum Error {
     #[error("LSP error: {message}")]
     Lsp { message: String },
 
-    #[error("Socket path error: {0}")]
-    SocketError(#[from] aifed_common::SocketError),
+    #[error("Path error: {0}")]
+    PathError(#[from] aifed_common::PathError),
 
     #[error("Workspace error: {0}")]
     WorkspaceError(#[from] aifed_common::WorkspaceError),

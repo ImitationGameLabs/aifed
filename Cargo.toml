@@ -31,6 +31,7 @@ tokio = { version = "1", features = [
   "rt-multi-thread",
   "process",
   "io-util",
+  "net",
   "sync",
   "time",
   "macros",
@@ -49,10 +50,13 @@ dirs = "6"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
 logroller = "0.1"
+getrandom = "0.2"
+sha2 = "0.10"
+subtle = "2"
+urlencoding = "2"
 # Test dependencies for integration tests
 hyper = "1"
 hyper-util = { version = "0.1", features = ["client-legacy", "http1", "tokio"] }
-hyperlocal = { version = "0.9", features = ["client"] }
 http-body-util = "0.1"
 tower-service = "0.3"
 tower = "0.5"

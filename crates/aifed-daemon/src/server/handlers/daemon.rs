@@ -31,7 +31,7 @@ pub async fn status(State(state): State<DaemonState>) -> impl IntoResponse {
         workspace: state.workspace.to_string_lossy().to_string(),
         uptime_secs,
         bin_path,
-        socket_path: state.socket_path.to_string_lossy().to_string(),
+        address: state.address.clone(),
         log_path: state.log_path.to_string_lossy().to_string(),
         servers,
     }))
