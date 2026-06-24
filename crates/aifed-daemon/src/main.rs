@@ -32,53 +32,6 @@ use tokio::net::TcpListener;
 use tracing::Level;
 use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
-/// Probe whether a live, authentic daemon is already serving `workspace`.
-///
-/// Reads the workspace's endpoint file and, if present, performs a token-bearing
-/// `/health` probe over TCP. Returns `true` only if a daemon answers with HTTP
-/// 200 *and* a body containing our `ApiResponse` envelope (`"success":true`) —
-/// so a stale endpoint, a port reused by an unrelated process, or a different
-/// aifed daemon (wrong token → 401) all correctly report as "not running".
-fn check_existing_daemon(endpoint_file: &Path) -> bool {
-    let endpoint = match read_endpoint(endpoint_file) {
-        Ok(e) => e,
-        Err(_) => return false,
-    };
-    probe_health(endpoint.port, &endpoint.token)
-}
-
-/// Raw TCP `/health` probe (kept dependency-free — no `aifed-daemon-client`).
-fn probe_health(port: u16, token: &str) -> bool {
-    use std::io::{Read, Write};
-    use std::net::TcpStream;
-    use std::time::Duration;
-
-    let Ok(addr) = format!("127.0.0.1:{port}").parse() else {
-        return false;
-    };
-    let mut stream = match TcpStream::connect_timeout(&addr, Duration::from_millis(500)) {
-        Ok(s) => s,
-        Err(_) => return false,
-    };
-    let _ = stream.set_read_timeout(Some(Duration::from_millis(500)));
-    let request = format!(
-        "GET /api/v1/health HTTP/1.0\r\nHost: localhost\r\nAuthorization: Bearer {token}\r\nConnection: close\r\n\r\n"
-    );
-    if stream.write_all(request.as_bytes()).is_err() {
-        return false;
-    }
-    let mut response = String::new();
-    if stream.read_to_string(&mut response).is_err() {
-        return false;
-    }
-    // Anchor the status line (avoid matching a ` 200 ` substring in a header),
-    // and require our `ApiResponse` success envelope in the body — the token
-    // already rejects other aifed daemons (401); this body check rejects an
-    // unrelated process that happens to occupy the port and return some 200.
-    let status_ok = response.starts_with("HTTP/1.0 200") || response.starts_with("HTTP/1.1 200");
-    status_ok && response.contains("\"success\":true")
-}
-
 /// Prefix marking daemon bearer tokens so they are recognizable as secrets.
 const TOKEN_PREFIX: &str = "sk-";
 
@@ -121,7 +74,7 @@ fn acquire_lock(lock_path: &std::path::Path) -> anyhow::Result<File> {
     match file.try_lock() {
         Ok(()) => Ok(file),
         Err(TryLockError::WouldBlock) => anyhow::bail!(
-            "Another daemon is starting for this workspace (lock file: {})",
+            "Another daemon is running or starting for this workspace (lock file: {})",
             lock_path.display()
         ),
         Err(TryLockError::Error(e)) => {
@@ -243,20 +196,12 @@ async fn main() -> anyhow::Result<()> {
     let default_log = log_path(&workspace).expect("Failed to generate log path");
     let log_file = args.log_file.as_deref().unwrap_or(&default_log);
 
-    // Initialize logging (before duplicate check, so we can log errors)
+    // Initialize logging early, so startup errors are captured.
     init_logging(
         &args.log_level,
         if args.log_stderr { None } else { Some(log_file) },
         args.log_stderr,
     )?;
-
-    // Check for existing daemon
-    if check_existing_daemon(&endpoint_file) {
-        anyhow::bail!(
-            "Daemon already running for workspace: {}",
-            workspace.display()
-        );
-    }
 
     // Acquire lock to prevent race condition.
     // Held for the daemon's entire lifetime; released on drop (i.e. process
