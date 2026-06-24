@@ -75,7 +75,6 @@ dependencies = [
  "hyper",
  "hyper-util",
  "hyperlocal",
- "libc",
  "logroller",
  "lsp-types",
  "serde",

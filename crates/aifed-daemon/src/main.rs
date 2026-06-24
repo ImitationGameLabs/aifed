@@ -22,9 +22,8 @@ use idle::IdleMonitor;
 use languages::ConfiguredLanguageServerConfig;
 use lsp::LanguageServerManager;
 use server::{DaemonState, build_router};
-use std::fs::File;
+use std::fs::{File, TryLockError};
 use std::io;
-use std::os::fd::AsRawFd;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 use tokio::net::UnixListener;
@@ -64,11 +63,9 @@ fn check_existing_daemon(socket: &std::path::Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Acquire an exclusive lock on the lock file using flock.
-/// Returns the File handle that must be kept open for the lock to remain held.
-///
-/// TODO: This uses Unix-specific `flock` via libc. For cross-platform support,
-/// consider using `fs4` or `fd-lock` crates which provide platform-agnostic file locking.
+/// Acquire an exclusive, non-blocking advisory lock on the lock file via std
+/// `File::try_lock`. The returned File handle must be kept open for the lock to
+/// remain held; dropping it (or process exit) releases the lock.
 fn acquire_lock(lock_path: &std::path::Path) -> anyhow::Result<File> {
     // Ensure parent directory exists
     if let Some(parent) = lock_path.parent() {
@@ -76,23 +73,28 @@ fn acquire_lock(lock_path: &std::path::Path) -> anyhow::Result<File> {
             .with_context(|| format!("Failed to create lock directory: {}", parent.display()))?;
     }
 
-    // Create/open the lock file
-    let file = File::create(lock_path)
+    // Create/open the lock file. It is an empty sentinel we never write, so open
+    // read+write+create without truncate. std `try_lock` works on any open mode.
+    let file = File::options()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(lock_path)
         .with_context(|| format!("Failed to create lock file: {}", lock_path.display()))?;
 
-    // Try to acquire exclusive lock (non-blocking)
-    const LOCK_EX: i32 = 2; // Exclusive lock
-    const LOCK_NB: i32 = 4; // Non-blocking
-    let result = unsafe { libc::flock(file.as_raw_fd(), LOCK_EX | LOCK_NB) };
-    if result != 0 {
-        // Lock is held by another process
-        anyhow::bail!(
+    // Acquire an exclusive, non-blocking advisory lock. `WouldBlock` means the
+    // lock is already held (another daemon owns it); any other error is real.
+    match file.try_lock() {
+        Ok(()) => Ok(file),
+        Err(TryLockError::WouldBlock) => anyhow::bail!(
             "Another daemon is starting for this workspace (lock file: {})",
             lock_path.display()
-        );
+        ),
+        Err(TryLockError::Error(e)) => {
+            Err(e).with_context(|| format!("Failed to acquire lock file: {}", lock_path.display()))
+        }
     }
-
-    Ok(file)
 }
 
 /// Initialize logging with optional file output.
@@ -226,7 +228,9 @@ async fn main() -> anyhow::Result<()> {
         );
     }
 
-    // Acquire lock to prevent race condition
+    // Acquire lock to prevent race condition.
+    // Held for the daemon's entire lifetime; released on drop (i.e. process
+    // exit), NOT by the remove_file cleanup near the end of main.
     let _lock_file = acquire_lock(&lock)?;
 
     // Remove stale socket if present
@@ -341,4 +345,40 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Each `acquire_lock` does its own `open()`, so two calls contend on the
+    // same lock — do not refactor to share a File handle (e.g. `try_clone()`),
+    // which would share one open file description and mask contention.
+
+    #[test]
+    fn acquire_lock_then_second_fails() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("test.lock");
+
+        let _first = acquire_lock(&path).expect("first lock should succeed");
+        let second = acquire_lock(&path);
+        assert!(
+            second.is_err(),
+            "a second concurrent lock on the same file must be rejected"
+        );
+        // `_first` dropped here, releasing the lock.
+    }
+
+    #[test]
+    fn lock_released_on_drop() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("test.lock");
+
+        {
+            let _first = acquire_lock(&path).expect("first lock should succeed");
+        }
+
+        let _again = acquire_lock(&path)
+            .expect("lock must be reacquirable after the previous handle is dropped");
+    }
 }

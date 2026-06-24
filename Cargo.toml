@@ -11,7 +11,7 @@ resolver = "3"
 [workspace.package]
 version = "0.0.0"                                         # placeholder; each crate carries its own independent version
 edition = "2024"
-rust-version = "1.88.0"
+rust-version = "1.89.0"
 license = "MIT"
 repository = "https://github.com/ImitationGameLabs/aifed"
 
@@ -48,7 +48,6 @@ axum = { version = "0.8", default-features = false, features = [
 dirs = "6"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
-libc = "0.2"
 logroller = "0.1"
 # Test dependencies for integration tests
 hyper = "1"
