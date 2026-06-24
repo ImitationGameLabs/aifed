@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "aifed"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "aifed-common",
  "aifed-daemon-client",
@@ -48,7 +48,7 @@ dependencies = [
 
 [[package]]
 name = "aifed-common"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "dirs",
  "serde",
@@ -62,7 +62,7 @@ dependencies = [
 
 [[package]]
 name = "aifed-daemon"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "aifed-common",
  "aifed-daemon-client",
@@ -93,7 +93,7 @@ dependencies = [
 
 [[package]]
 name = "aifed-daemon-client"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "aifed-common",
  "dirs",

@@ -1,8 +1,14 @@
 [package]
 name = "aifed-daemon"
-edition = "2024"
-version.workspace = true
+description = "Long-running background daemon for aifed: edit-history, concurrency tracking, and a local code index served over a Unix socket"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+readme = "README.md"
+keywords = ["ai", "agent", "lsp", "daemon", "editor"]
+categories = ["development-tools", "command-line-utilities"]
 
 [dependencies]
 tokio = { workspace = true }
@@ -22,13 +28,13 @@ libc = { workspace = true }
 logroller = { workspace = true }
 anyhow = { workspace = true }
 time = { workspace = true }
-aifed-common = { path = "../aifed-common" }
+aifed-common = { workspace = true }
 
 [dev-dependencies]
 serial_test = { workspace = true }
 tempfile = { workspace = true }
-aifed-daemon-client = { path = "../aifed-daemon-client" }
-aifed-common = { path = "../aifed-common" }
+aifed-daemon-client = { workspace = true }
+aifed-common = { workspace = true }
 hyper = { workspace = true }
 hyper-util = { workspace = true }
 hyperlocal = { workspace = true }
